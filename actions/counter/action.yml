@@ -1,0 +1,70 @@
+name: Invocation Counter
+description: >
+  Reads or increments the weekly invocation counter for an agent from Actions Cache.
+  Cache key: hall-counters-{YYYY}-W{WW}. Counter resets naturally as the weekly key expires.
+
+inputs:
+  mode:
+    description: "read | increment — read returns current count, increment adds 1 and saves"
+    required: true
+  agent:
+    description: Agent identifier (must match a key in agents.yml)
+    required: true
+
+outputs:
+  count:
+    description: Current invocation count for the agent this week (after increment if mode=increment)
+    value: ${{ steps.run.outputs.count }}
+  cache-key:
+    description: The cache key used (hall-counters-{YYYY}-W{WW})
+    value: ${{ steps.run.outputs.cache-key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute cache key
+      id: key
+      shell: bash
+      run: |
+        WEEK=$(date -u +"%Y-W%V")
+        echo "cache-key=hall-counters-${WEEK}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore counter cache
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: .hall-counters.json
+        key: ${{ steps.key.outputs.cache-key }}
+
+    - name: Read or increment counter
+      id: run
+      shell: bash
+      run: |
+        CACHE_KEY="${{ steps.key.outputs.cache-key }}"
+        AGENT="${{ inputs.agent }}"
+        MODE="${{ inputs.mode }}"
+
+        if [ -f .hall-counters.json ]; then
+          COUNT=$(jq -r --arg a "$AGENT" '.counts[$a] // 0' .hall-counters.json)
+          WEEK=$(jq -r '.week' .hall-counters.json)
+        else
+          COUNT=0
+          WEEK=$(date -u +"%Y-W%V")
+          echo "{\"week\":\"$WEEK\",\"counts\":{}}" > .hall-counters.json
+        fi
+
+        if [ "$MODE" = "increment" ]; then
+          COUNT=$((COUNT + 1))
+          jq --arg a "$AGENT" --argjson c "$COUNT" '.counts[$a] = $c' .hall-counters.json > .hall-counters.tmp.json
+          mv .hall-counters.tmp.json .hall-counters.json
+        fi
+
+        echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+        echo "cache-key=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+
+    - name: Save counter cache (increment mode only)
+      if: inputs.mode == 'increment'
+      uses: actions/cache/save@v4
+      with:
+        path: .hall-counters.json
+        key: ${{ steps.key.outputs.cache-key }}

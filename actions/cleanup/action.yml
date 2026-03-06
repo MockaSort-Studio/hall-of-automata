@@ -1,0 +1,85 @@
+name: Task Cleanup
+description: >
+  Triggered on PR close (merged or not) for a hall-labeled PR.
+  Deletes the task memory cache, removes the hall:{agent} label from the PR,
+  and posts an optional summary comment on the linked issue.
+  The issue/PR thread is never modified beyond the summary — it remains as
+  permanent history.
+
+inputs:
+  app-token:
+    description: GitHub App installation token
+    required: true
+  agent:
+    description: Agent identifier (e.g. hamlet) — used to find the label hall:{agent}
+    required: true
+  repo-owner:
+    description: Repository owner
+    required: true
+  repo-name:
+    description: Repository name
+    required: true
+  pr-number:
+    description: PR number being closed
+    required: true
+  issue-number:
+    description: Linked issue number (empty if no linked issue)
+    required: false
+    default: ""
+  merged:
+    description: "true if the PR was merged, false if just closed"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Compute memory cache key
+      id: key
+      shell: bash
+      run: |
+        SAFE_REPO=$(echo "${{ inputs.repo-owner }}/${{ inputs.repo-name }}" | tr '/' '-')
+        echo "cache-key=hall-task-${SAFE_REPO}-${{ inputs.pr-number }}" >> "$GITHUB_OUTPUT"
+
+    - name: Delete task memory cache
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token }}
+      run: |
+        # Delete the cache entry via GitHub API
+        # Ignore errors — cache may have already expired
+        gh api \
+          --method DELETE \
+          -H "Accept: application/vnd.github+json" \
+          /repos/${{ inputs.repo-owner }}/${{ inputs.repo-name }}/actions/caches?key=${{ steps.key.outputs.cache-key }} \
+          || true
+
+    - name: Remove hall label from PR
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          const label = 'hall:${{ inputs.agent }}';
+          try {
+            await github.rest.issues.removeLabel({
+              owner: '${{ inputs.repo-owner }}',
+              repo: '${{ inputs.repo-name }}',
+              issue_number: Number('${{ inputs.pr-number }}'),
+              name: label
+            });
+          } catch {
+            // Label may already be gone — not an error
+          }
+
+    - name: Post summary on linked issue
+      if: inputs.issue-number != '' && inputs.merged == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          await github.rest.issues.createComment({
+            owner: '${{ inputs.repo-owner }}',
+            repo: '${{ inputs.repo-name }}',
+            issue_number: Number('${{ inputs.issue-number }}'),
+            body: `${{ inputs.agent }} — PR #${{ inputs.pr-number }} merged. Task complete.`
+          });

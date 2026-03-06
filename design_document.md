@@ -515,84 +515,6 @@ The keeper receives a GitHub notification, lands on the PR, and has the full thr
 
 ---
 
-## 7. Appendix A: The Case For and Against GitHub Deployments
-
-The Deployments API allows a GitHub App to create deployment records against a repository. Each deployment targets a named environment and progresses through statuses: pending, in_progress, success, failure, error. Deployments appear on the repository's main page under Environments and provide a timeline of activity per environment.
-
-### Arguments For
-
-**Task lifecycle visibility.** Each agent invocation could be modeled as a deployment. The status progression (pending → in_progress → success/failure) maps naturally to the agent task lifecycle. The repo's Environments tab would become a live dashboard of agent activity — which agent worked on what, when, and whether it succeeded — without building any custom UI.
-
-**Environment URLs.** Deployment statuses support an `environment_url` field. When an agent opens a PR, the deployment status could link directly to it. This creates a clickable trail from the Environments tab to the PR, to the issue, and back.
-
-**Organizational awareness.** For orgs with many repos, the Deployments API provides a cross-repo view of agent activity through GitHub's existing UI and API. Tooling that already monitors deployments (Slack integrations, dashboards) would pick up agent activity for free.
-
-**Semantic fit.** The agent is deploying a solution. The language of deployments (environment, status, rollback) maps to agent tasks more naturally than it might first appear. "Deploy agent to fix issue #42" is a reasonable mental model.
-
-### Arguments Against
-
-**Semantic mismatch.** Deployments are designed for releasing software to infrastructure environments (staging, production). Using them for agent task tracking overloads the concept. A team that also uses Deployments for actual deployments would see agent tasks mixed into their deployment history, creating noise.
-
-**Environment sprawl.** Each agent would create an environment in every target repo (or the Hall repo would accumulate environments for every agent-repo combination). For orgs with many agents and repos, this clutters the Environments tab with entries that have nothing to do with infrastructure.
-
-**No real deployment.** The agent is not deploying anything. It's writing code and opening a PR. The deployment status lifecycle (pending → success) adds a layer of abstraction that doesn't correspond to a real state machine the team needs. The PR itself already has states (open, changes requested, approved, merged) that are the actual lifecycle people care about.
-
-**Redundancy.** The audit trail is already covered by Actions Artifacts. Task visibility is covered by PR labels and comments. The deployment layer would be a second source of truth for information already available through more natural GitHub primitives (PRs, issues, labels).
-
-**Complexity cost.** Every dispatch would need to create a deployment, update its status at each stage, and handle edge cases (agent times out, workflow crashes mid-deployment). This adds code paths that must be maintained but don't provide functionality the Hall couldn't achieve with simpler mechanisms.
-
-### Recommendation
-
-The arguments against outweigh the arguments for in the MVP scope. The PR itself — with its labels, comments, linked issues, and status checks — is the natural unit of agent work visibility in GitHub. Adding a deployment layer on top creates redundancy without solving a problem the current design doesn't already address. If future requirements demand cross-repo dashboards or integration with deployment-monitoring tooling, the Deployments API can be layered in without changing the core dispatch architecture.
-
----
-
-## 8. Appendix B: Check Runs — CI Orchestration vs. Hall Status Surface
-
-There are two distinct ways the Hall could interact with GitHub's Checks system, and they serve fundamentally different purposes. This appendix distinguishes them clearly.
-
-### What Check Runs Are
-
-A Check Run is a result entry that appears in a PR's Checks tab. It has a name, a status (queued, in_progress, completed), a conclusion (success, failure, neutral, etc.), an optional output with a summary and text body, optional line-level annotations, and optional Requested Action buttons. Only GitHub Apps can create Check Runs — regular Actions workflows cannot.
-
-Check Runs are GitHub's richest feedback surface for code changes. They support structured output (not just a pass/fail), annotations that appear inline in the PR's Files tab, and interactive buttons that trigger webhooks back to the app.
-
-### Path A: The Agent Orchestrates Existing CI Checks
-
-This is the design adopted by Hall of Automata.
-
-The target repository has its own CI workflows: test suites, linters, security scans, build pipelines. These workflows create their own Check Runs or Commit Statuses when triggered. The Hall does not create, modify, or replace them.
-
-The agent's role in this model is:
-
-1. **Trigger.** The agent pushes code, which triggers CI workflows via the standard `push` or `pull_request` event. If the repo uses manual triggers (comment commands), the agent posts the appropriate comment.
-
-2. **Wait.** The dispatch workflow listens for `check_suite.completed` events or CI bot comments on agent-labeled PRs.
-
-3. **Read.** When results arrive, the Hall reads the Check Run conclusions, annotations, and output summaries via the GitHub API. It extracts the failure details.
-
-4. **React.** The Hall re-dispatches the bound agent with the failure context injected into the prompt. The agent fixes the code and pushes, re-triggering CI.
-
-5. **Loop.** Steps 1–4 repeat up to `max_retries`.
-
-In this model, the Hall is a consumer of Check Runs, not a producer. It reads the existing CI surface and feeds results to the agent. The Checks tab remains the domain of the repo's own tooling.
-
-### Path B: The Hall Creates Its Own Check Runs
-
-An alternative design where the Hall creates a Check Run for each agent invocation, using it as a status surface for the agent's work.
-
-This would provide: a structured progress report in the Checks tab (separate from CI), line-level annotations showing what the agent changed and why, Requested Action buttons (Retry, Reroute, Escalate) that trigger webhooks back to the Hall, and a re-run button that GitHub adds automatically.
-
-**Why this is attractive.** The Check Run UI is the richest structured feedback surface GitHub offers. Annotations on specific lines of code are a powerful way to communicate what the agent did. Requested Action buttons provide interactive control directly in the GitHub UI, without requiring the user to type a comment command.
-
-**Why this is deferred.** In the MVP scope, the agent's PR comment is the primary communication channel. PR comments are visible, threaded, and sufficient for the agent to report its work and for humans to provide feedback. Adding a Hall-owned Check Run creates a second status surface alongside the PR conversation, which may confuse teams who expect the Checks tab to show CI results, not agent status reports. The Requested Action buttons are compelling, but the same actions can be achieved through comment commands (`@hall-of-automata retry`, `@hall-of-automata escalate`) that are already part of the dispatch interface.
-
-**When to reconsider.** If the Hall scales to many agents per PR, the PR comment thread becomes noisy and a structured Check Run per agent provides better signal. If line-level annotations become a key feedback mechanism (e.g., the agent explains its reasoning per-file in the Files tab), Check Runs are the only way to deliver that. If interactive buttons are preferred over comment commands for control flow, Requested Actions justify the complexity.
-
-The Checks API permission (`checks:write`) should be included in the app's permission set from the start, even if not used in the MVP. Adding permissions later requires re-approval from every org where the app is installed. Having the permission available makes it a one-line change to start creating Check Runs when the team is ready.
-
----
-
 ## 9. Appendix C: Agent Configuration Reference
 
 ### agents.yml
@@ -636,7 +558,9 @@ routing:
   strategy: least_used
 ```
 
-### Persona File (personas/hamlet.md)
+### Persona File (roster/hamlet.md)
+
+Example:
 
 ```markdown
 You are Hamlet, a full-stack implementation agent in the Hall of Automata.

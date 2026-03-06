@@ -1,0 +1,10 @@
+agents:
+  hamlet:
+    environment: hall/hamlet          # GitHub Environment holding the OAuth token
+    secret: CLAUDE_CODE_OAUTH_TOKEN
+    persona: roster/hamlet.md
+    teams: [automata-invokers]
+    max_turns: 40
+    max_retries: 3
+    capabilities: [implement, fix, refactor]
+    keeper: mksetaro

@@ -1,0 +1,93 @@
+name: Authorize Invoker
+description: >
+  Validates that the invoker is a member of the agent's authorized GitHub team.
+  On failure: posts a rejection comment, removes the trigger label (if label-triggered),
+  and sets authorized=false. Caller must exit the job on false.
+
+inputs:
+  org-read-token:
+    description: PAT with read:org scope for team membership checks
+    required: true
+  org:
+    description: GitHub organization name
+    required: true
+  team-slug:
+    description: GitHub team slug to check membership against
+    required: true
+  username:
+    description: GitHub login of the invoker (github.event.sender.login)
+    required: true
+  app-token:
+    description: GitHub App installation token for posting comments and removing labels
+    required: true
+  repo-owner:
+    description: Owner of the target repository
+    required: true
+  repo-name:
+    description: Name of the target repository
+    required: true
+  issue-number:
+    description: Issue or PR number where the invocation occurred
+    required: true
+  trigger-event:
+    description: "issue_labeled | issue_comment | pr_review — used to decide whether to remove a label"
+    required: true
+  label-name:
+    description: Label to remove if the invoker is unauthorized and trigger was issue_labeled
+    required: false
+    default: ""
+  agent-name:
+    description: Display name of the agent, used in the rejection comment
+    required: true
+
+outputs:
+  authorized:
+    description: "true if the invoker is an active team member, false otherwise"
+    value: ${{ steps.check.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check team membership
+      id: check
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.org-read-token }}
+        script: |
+          try {
+            const res = await github.rest.teams.getMembershipForUserInOrg({
+              org: '${{ inputs.org }}',
+              team_slug: '${{ inputs.team-slug }}',
+              username: '${{ inputs.username }}'
+            });
+            return res.data.state === 'active';
+          } catch {
+            return false;
+          }
+        result-encoding: string
+
+    - name: Reject — remove label if label-triggered
+      if: steps.check.outputs.result != 'true' && inputs.trigger-event == 'issue_labeled' && inputs.label-name != ''
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          await github.rest.issues.removeLabel({
+            owner: '${{ inputs.repo-owner }}',
+            repo: '${{ inputs.repo-name }}',
+            issue_number: Number('${{ inputs.issue-number }}'),
+            name: '${{ inputs.label-name }}'
+          });
+
+    - name: Reject — post comment
+      if: steps.check.outputs.result != 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          await github.rest.issues.createComment({
+            owner: '${{ inputs.repo-owner }}',
+            repo: '${{ inputs.repo-name }}',
+            issue_number: Number('${{ inputs.issue-number }}'),
+            body: `@${{ inputs.username }} not authorized to invoke ${{ inputs.agent-name }}. Contact an org admin to request access.`
+          });

@@ -1,0 +1,10 @@
+routing:
+  weekly_cap: 25          # default cap applied to any agent without an override
+  reset_day: monday
+
+  overrides:
+    hamlet:
+      weekly_cap: 20
+
+  fallback: queue         # queue
+  strategy: least_used    # how to pick an alternate when the requested agent is capped

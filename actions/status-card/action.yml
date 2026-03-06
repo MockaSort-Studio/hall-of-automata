@@ -1,0 +1,118 @@
+name: Update Status Card
+description: >
+  Creates or updates the Hall status card comment on the triggering issue or PR.
+  The card is identified by the <!-- hall-status --> HTML marker. If no card exists,
+  one is created. If one exists, it is edited in-place. Never posts a new comment
+  when a card already exists.
+
+inputs:
+  app-token:
+    description: GitHub App installation token
+    required: true
+  repo-owner:
+    description: Owner of the repository where the comment lives
+    required: true
+  repo-name:
+    description: Repository name
+    required: true
+  issue-number:
+    description: Issue or PR number to post/update the card on
+    required: true
+  agent:
+    description: Agent name (e.g. hamlet)
+    required: true
+  stage:
+    description: >
+      Current lifecycle stage. One of:
+      dispatching | analyzing | awaiting-input | working | pr-opened | ci-fix | escalated | done
+    required: true
+  dispatched-at:
+    description: ISO timestamp of the initial dispatch (used only on card creation)
+    required: false
+    default: ""
+  branch:
+    description: Working branch name (e.g. hall/hamlet/issue-42), or empty
+    required: false
+    default: ""
+  pr-number:
+    description: PR number if one has been opened, or empty
+    required: false
+    default: ""
+  extra:
+    description: Optional extra line appended to the stage value (e.g. retry count)
+    required: false
+    default: ""
+
+outputs:
+  comment-id:
+    description: ID of the created or updated comment
+    value: ${{ steps.upsert.outputs.comment-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Create or update status card
+      id: upsert
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          const owner   = '${{ inputs.repo-owner }}';
+          const repo    = '${{ inputs.repo-name }}';
+          const issueNo = Number('${{ inputs.issue-number }}');
+          const agent   = '${{ inputs.agent }}';
+          const stage   = '${{ inputs.stage }}';
+          const branch  = '${{ inputs.branch }}' || '—';
+          const pr      = '${{ inputs.pr-number }}' ? `#${{ inputs.pr-number }}` : '—';
+          const extra   = '${{ inputs.extra }}';
+
+          const stageLabel = {
+            'dispatching':    'Dispatching agent...',
+            'analyzing':      'Analyzing...',
+            'awaiting-input': 'Awaiting context — question posted',
+            'working':        `Working — \`${branch}\``,
+            'pr-opened':      `PR opened — ${pr}`,
+            'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
+            'escalated':      `Escalated — keeper notified`,
+            'done':           `Done — ${pr} merged`
+          }[stage] ?? stage;
+
+          const dispatched = '${{ inputs.dispatched-at }}' || new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+
+          const body = [
+            '<!-- hall-status -->',
+            `### Hall \u2014 ${agent}`,
+            '',
+            '| | |',
+            '|---|---|',
+            `| **Stage** | ${stageLabel} |`,
+            `| **Dispatched** | ${dispatched} |`,
+            `| **Branch** | \`${branch}\` |`,
+            `| **PR** | ${pr} |`
+          ].join('\n');
+
+          // Search for an existing status card in the thread
+          let existingId = null;
+          for await (const page of github.paginate.iterator(
+            github.rest.issues.listComments,
+            { owner, repo, issue_number: issueNo, per_page: 100 }
+          )) {
+            for (const c of page.data) {
+              if (c.body && c.body.startsWith('<!-- hall-status -->')) {
+                existingId = c.id;
+                break;
+              }
+            }
+            if (existingId) break;
+          }
+
+          let commentId;
+          if (existingId) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: existingId, body });
+            commentId = existingId;
+          } else {
+            const res = await github.rest.issues.createComment({ owner, repo, issue_number: issueNo, body });
+            commentId = res.data.id;
+          }
+
+          core.setOutput('comment-id', String(commentId));
