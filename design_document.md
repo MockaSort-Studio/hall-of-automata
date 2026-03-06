@@ -25,7 +25,7 @@ Hall of Automata is a GitHub App installed at the organization level. It acts as
 
 The interaction model is simple: a team member comments `@hall-of-automata <agent>` on an issue or pull request, or applies a GitHub label matching the agent's name to the issue. The issue body or PR comment provides all the context the agent needs. The Hall validates the invoker's authorization, selects the right agent and its federated OAuth token, and dispatches a Claude Code Action against the target repository. The agent works, opens a PR, and the Hall applies a label (e.g., `hall:hamlet`) to bind all subsequent interactions — CI results, reviewer feedback, follow-up comments — to that agent for the PR's lifetime. When the PR is merged, the label is removed and the agent's context is cleaned up.
 
-All agent definitions, personas, routing rules, and workflows live in a central Hall repository. Target repositories require only the app installation — no local configuration.
+All agent definitions, personas, routing rules, and reusable dispatch actions live in the Hall repository. The dispatch entry-point workflow lives in the org's `.github` repo and calls the Hall's actions. Target repositories require only the app installation — no local configuration.
 
 ### Architecture Overview
 
@@ -38,12 +38,15 @@ graph TB
         subgraph TR2["Target Repo B"]
             I2["Issue / PR Comment@hall-of-automata ophelia"]
         end
-        subgraph HALL["Hall Repo (Central)"]
+        subgraph DOTGITHUB["Org .github Repo"]
+            DW["dispatch.yml(caller workflow)"]
+        end
+        subgraph HALL["Hall Repo (Actions + Config)"]
             direction TB
             AY["agents.yml"]
             RY["routing.yml"]
             P["personas/"]
-            DW["dispatch.yml workflow"]
+            RA["reusable actions/"]
         end
         APP(["🏛️ hall-of-automata[bot]GitHub App"])
     end
@@ -64,21 +67,23 @@ graph TB
 
     I1 -->|webhook| APP
     I2 -->|webhook| APP
-    APP -->|repository_dispatch| DW
-    DW --> AY
-    DW --> RY
-    DW --> P
-    DW -->|read/write| CACHE
-    DW -->|upload| ARTIFACTS
-    DW -->|access secrets| ENVS
+    APP -->|workflow_dispatch| DW
+    DW -->|calls| RA
+    RA --> AY
+    RA --> RY
+    RA --> P
+    RA -->|read/write| CACHE
+    RA -->|upload| ARTIFACTS
+    RA -->|access secrets| ENVS
     ENVS -.->|OAuth tokens| FED
-    DW -->|claude-code-action| A1
-    DW -->|claude-code-action| A2
-    DW -->|claude-code-action| A3
+    RA -->|claude-code-action| A1
+    RA -->|claude-code-action| A2
+    RA -->|claude-code-action| A3
     A1 -->|push, comment, open PR| TR1
     A2 -->|push, comment, open PR| TR2
 
     style APP fill:#f97316,stroke:#ea580c,color:#000,stroke-width:2px
+    style DOTGITHUB fill:#1e3a5f,stroke:#3b82f6,color:#dbeafe
     style HALL fill:#1e1b4b,stroke:#4338ca,color:#e0e7ff
     style CACHE fill:#0f172a,stroke:#334155,color:#94a3b8
     style ARTIFACTS fill:#0f172a,stroke:#334155,color:#94a3b8
@@ -109,7 +114,7 @@ A developer requests a specific agent, but that agent has hit its weekly cap of 
 
 ### UC-5: Task Cleanup on Merge
 
-When the agent's PR is merged, a workflow fires that cleans up the agent's task-specific cache (working memory for the issue), removes the `hall:<agent>` label, and optionally posts a summary comment on the original issue.
+When the agent's PR is merged, a workflow fires that cleans up the agent's task-specific cache (working memory for the task), removes the `hall:<agent>` label, and optionally posts a summary comment on the original issue.
 
 ### UC-6: Queued Task on Full Capacity
 
@@ -183,7 +188,7 @@ flowchart LR
 
 **FR-9: Automatic Routing.** When the requested agent exceeds its weekly cap, the system must reroute to the least-used eligible agent based on capability match.
 
-**FR-10: Task Memory.** The agent must be able to persist task-specific context (working memory) in Actions Cache for the duration of the task, keyed by issue/PR number. This memory must be cleaned up when the associated PR is merged.
+**FR-10: Task Memory.** The agent must be able to persist task-specific working memory in Actions Cache for the duration of the task, keyed by issue/PR number. The whole dispatch-to-merge flow is fully async and may span days or weeks; if the cache entry expires during an inactive period, the agent must reconstruct its context by re-reading the issue or PR thread, which serves as the permanent, human-readable history of the task.
 
 **FR-11: Cleanup.** On PR merge, the system must delete the agent's task-specific cache, remove the `hall:<agent>` label, and optionally post a summary on the originating issue.
 
@@ -215,15 +220,15 @@ The app is the Hall's identity on GitHub. It is registered as a GitHub App at th
 
 **Permissions:** Contents (read/write), Issues (read/write), Pull Requests (read/write), Members (read), Metadata (read), Statuses (read/write). Checks permission is discussed in Appendix B.
 
-**Webhook relay:** The app receives events and triggers `repository_dispatch` on the Hall repo, forwarding the event payload. The Hall repo's dispatch workflow contains all orchestration logic.
+**Webhook relay:** The app receives events and triggers `workflow_dispatch` on the org's `.github` repo dispatch workflow, forwarding the event payload as inputs. The caller workflow in the `.github` repo invokes reusable actions defined in the Hall repo. This separates the dispatch entry point (org-owned) from the implementation (Hall-owned), keeping org-specific configuration local while the Hall repo remains a stable, shared action library.
 
 ### 5.2 Dispatch Workflow
 
-The dispatch workflow is the central orchestrator. It runs in the Hall repo, triggered by `repository_dispatch` from the app's webhook relay.
+The dispatch workflow is the central orchestrator. It runs in two layers: a thin caller workflow in the org's `.github` repo receives the `workflow_dispatch` trigger from the App and invokes reusable composite actions defined in the Hall repo. All orchestration logic lives in the Hall repo's reusable actions; the `.github` caller only wires inputs and secrets through.
 
 ```mermaid
 flowchart TD
-    START(["repository_dispatchfrom GitHub App webhook"]) --> AUTH
+    START(["workflow_dispatchfrom GitHub App"]) --> AUTH
 
     AUTH{"1. Authorizeinvoker ∈ agent teams?"}
     AUTH -->|No| REJECT["Post rejection commenton target repo"]
@@ -275,7 +280,7 @@ sequenceDiagram
     participant CI as ⚙️ Repo CI Checks
 
     U->>R: @hall-of-automata hamlet"implement auth flow"
-    R-->>H: webhook → repository_dispatch
+    R-->>H: webhook → workflow_dispatch
 
     H->>H: Authorize → Load config → Check counter
     H->>A: Dispatch with persona + prompt
@@ -303,7 +308,7 @@ sequenceDiagram
             CI->>R: Post success
         else CI fails ❌ (retry limit)
             CI->>R: Post failure
-            H->>R: Comment: retries exhaustedApply needs-human label
+            H->>R: Comment: retries exhausted@mention keeper
         end
     end
 ```
@@ -320,7 +325,7 @@ When a CI result arrives on a PR labeled `hall:<agent>`:
 4. The agent reads the errors, fixes the code, and pushes new commits.
 5. CI fires again on the new push.
 
-This loop repeats up to `max_retries` (configured per agent in `agents.yml`). If retries are exhausted, the Hall posts a comment requesting human intervention and can optionally apply a `needs-human` label.
+This loop repeats up to `max_retries` (configured per agent in `agents.yml`). If retries are exhausted, the Hall posts a PR comment `@mentioning` the keeper (configured per agent in `agents.yml`) with the last failure context, and updates the issue status card to `Escalated`.
 
 **Distinguishing CI comments from human comments.** The dispatch workflow must only re-dispatch on CI results, not on every PR comment. This is done by filtering on the comment author's identity (e.g., `github-actions[bot]`, a known CI app login) or by matching a hidden HTML marker pattern (e.g., `<!-- ci-result -->`) that the CI workflow includes in its output.
 
@@ -365,40 +370,49 @@ sequenceDiagram
 4. It re-dispatches the bound agent with the review feedback as context.
 5. The agent addresses the feedback, pushes commits, and the reviewer is notified.
 
-The agent maintains continuity across these interactions through its task memory in Actions Cache. This memory includes the issue context, files modified, approach taken, and any prior feedback — giving the agent coherent multi-turn behavior across separate workflow invocations.
+The agent maintains continuity across these interactions through task memory, described in Section 5.5.
 
 ### 5.5 Task Memory and Cleanup
 
-**Task memory** is a per-task cache entry stored in Actions Cache, keyed by `hall-task-{repo}-{pr_number}`. It contains serialized context that the agent uses to maintain coherence across multiple dispatch cycles (initial implementation, CI retries, review responses).
+Task memory operates in two layers with distinct roles and lifecycles.
+
+**Layer 1 — Actions Cache (working memory).** A per-task cache entry keyed by `hall-task-{repo}-{pr_number}` stores the agent's structured working state: current approach, files modified, CI failure history, and review feedback. This is a compact, machine-readable snapshot optimized for fast load on re-dispatch. It is written at the end of each dispatch cycle and restored at the start of the next.
+
+GitHub evicts cache entries that have not been accessed for 7 days. This is acceptable: the working memory is a performance layer, not the source of truth. If the entry is evicted during a long async pause (e.g., the invoker takes a week to reply to an agent question), the agent reconstructs context from Layer 2.
+
+**Layer 2 — Issue/PR thread (natural memory).** The complete history of every invocation, status update, clarification exchange, agent response, CI result, and review comment is recorded in the triggering issue or PR thread. This thread never expires. It is human-readable, accessible to anyone with repo access, and serves as the permanent audit trail and fallback context source.
+
+On cache miss, the dispatch workflow passes the thread URL to the agent as part of the prompt. The agent reads the thread, reconstructs its working state, and continues. A new cache entry is written at the end of that dispatch cycle.
+
+This design makes the full dispatch-to-merge flow resilient to async gaps of any duration. A task can be paused indefinitely while waiting for user input and will resume correctly regardless of cache state.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Created: Agent opens PRFirst dispatch saves context
+    [*] --> Active: Agent opens PRWorking memory created in cache
 
-    Created --> Restored: CI failure orreview comment arrives
-    Restored --> Updated: Agent fixes code,pushes new commits
-    Updated --> Restored: Another CI failureor review round
+    Active --> Resumed: CI failure or review commentCache hit: load snapshot
+    Active --> Reconstructed: Cache evicted (7-day gap)Agent reads issue/PR thread
 
-    Updated --> Deleted: PR merged or closed
-    Restored --> Deleted: Retries exhausted +PR closed by human
+    Reconstructed --> Resumed: Context reconstructedNew cache entry written
+    Resumed --> Active: Agent fixes code, pushes commits
 
-    Deleted --> [*]: Cache entry removedLabel removedSummary posted
+    Active --> Closed: PR merged or closed
+    Resumed --> Closed: PR merged or closed
 
-    note right of Created
+    Closed --> [*]: Cache entry deletedLabel removedSummary posted on issue
+
+    note right of Active
         Cache key: hall-task-{repo}-{pr}
-        Contents: issue context,
-        files modified, approach,
-        prior feedback
+        Contents: approach, files changed,
+        CI failures, feedback, retry count
     end note
 
-    note right of Deleted
-        Triggered by:
-        pull_request.closed event
-        on hall:agent labeled PR
+    note right of Reconstructed
+        Fallback: agent reads full
+        issue/PR thread to reconstruct.
+        Thread is permanent — no expiry.
     end note
 ```
-
-The agent writes to this cache at the end of each dispatch. The dispatch workflow restores it at the start of each re-dispatch for the same PR.
 
 **Cleanup** is triggered by a `pull_request` event with action `closed` (merged or not). When a PR with a `hall:<agent>` label is closed:
 
@@ -406,7 +420,7 @@ The agent writes to this cache at the end of each dispatch. The dispatch workflo
 2. The `hall:<agent>` label is removed from the PR.
 3. If the PR was linked to an issue, an optional summary comment is posted on the issue.
 
-This ensures no stale state accumulates across tasks.
+The issue/PR thread is never modified on cleanup — it remains as the permanent history of the task.
 
 ### 5.6 Runtime State Storage
 
@@ -419,7 +433,89 @@ This ensures no stale state accumulates across tasks.
 
 ---
 
-## 6. Appendix A: The Case For and Against GitHub Deployments
+## 6. UX/UI Considerations
+
+Hall of Automata has no custom frontend. GitHub is the interface. The design principle is: every meaningful state transition must be visible on a GitHub surface that the relevant person would naturally navigate to, without requiring knowledge of the Hall's internals.
+
+### 6.1 Entry Points and Phase Assignment
+
+The Hall has two invocation entry points that determine which phase a task starts in.
+
+**Issue entry point → begins at Phase 1.** A comment or label on an issue where no PR yet exists. The Hall works through Phase 1 (dispatch → analysis → optional clarification → working → PR open) before transitioning to Phase 2.
+
+**PR entry point → begins at Phase 2.** A comment on an existing PR (e.g., invoking the Hall directly on a PR not originally authored by the Hall). There is no Phase 1. The Hall posts its status card directly on the PR and begins the CI/review loop immediately.
+
+In both cases the GitHub Issues API is used identically — GitHub's data model treats PRs as issues, and `POST /repos/{owner}/{repo}/issues/{number}/comments` works for both. The Hall makes no distinction at the API layer.
+
+### 6.2 Phase 1 — Issue as Dashboard
+
+When invoked from an issue, the Hall immediately posts a **status card comment** on the issue. This is a single comment from `hall-of-automata[bot]`, edited in-place at each sub-stage transition. No new comments are posted for status updates. A hidden HTML marker (`<!-- hall-status -->`) allows the dispatch workflow to locate and overwrite it deterministically.
+
+Phase 1 has four explicit sub-stages:
+
+1. **Dispatching** — Hall validates the invoker, selects and configures the agent.
+2. **Analyzing** — Agent reads the issue and codebase, assesses scope and feasibility.
+3. **Awaiting input** _(conditional)_ — Agent determines it needs clarification and posts a question on the issue. The status card is updated. This state is indefinite: the Hall waits for a non-bot `issue_comment` event on the issue, then re-dispatches the agent with the full thread as context — including the user's reply. There is no timeout.
+4. **Working (WIP)** — Agent has sufficient context and begins implementation on a branch.
+
+All comments in the issue thread — agent questions, user replies, status card updates — are posted by `hall-of-automata[bot]` via the App installation token. Agent persona is expressed through comment content and `hall:{agent}` labels, not through separate GitHub accounts.
+
+### 6.3 Phase 2 — PR as Dashboard
+
+When the agent opens a PR (from Phase 1) or when the Hall is invoked directly on a PR (Phase 2 entry), the PR page becomes the primary working surface. The issue status card continues to be updated in-place on the issue thread throughout Phase 2 — it is the invoker's single-pane view of the task from start to finish. For PR-entry invocations (no issue exists), the status card is posted on the PR itself.
+
+The Hall reads the repo's CI check runs to drive the fix loop; it does not create its own check runs. PR comments carry the agent-reviewer conversation.
+
+### 6.4 The Status Card
+
+```markdown
+<!-- hall-status -->
+### Hall — hamlet
+
+| | |
+|---|---|
+| **Stage** | Analyzing... |
+| **Dispatched** | 2026-03-06 14:22 UTC |
+| **Branch** | — |
+| **PR** | — |
+```
+
+Stage values across the full lifecycle:
+
+| Sub-stage | Stage value |
+|-----------|------------|
+| Dispatching | Dispatching agent... |
+| Analyzing | Analyzing... |
+| Awaiting user input | Awaiting context — question posted |
+| Working | Working — `hall/hamlet/issue-42` |
+| PR opened | PR opened — #58 |
+| CI fix loop active | CI fix in progress (attempt 2 / 3) |
+| Retries exhausted | Escalated — @{keeper} notified |
+| PR merged | Done — PR #58 merged |
+
+### 6.5 Escalation to Keeper
+
+When `max_retries` is exhausted:
+
+1. The status card is edited to `Escalated — @{keeper} notified`.
+2. A PR comment `@mentions` the keeper with the last CI failure summary.
+
+The keeper receives a GitHub notification, lands on the PR, and has the full thread history and the repo's CI check run results in the Checks tab. The keeper's GitHub handle is configured per agent in `agents.yml` (see Appendix C).
+
+### 6.6 UI Summary
+
+| Phase | Primary surface | Signal |
+|-------|----------------|--------|
+| Pre-PR (issue entry) | Issue thread | Status card, edited in-place |
+| Awaiting input | Issue thread | Status card + agent question comment |
+| PR open (either entry) | PR thread | Status card + CI check runs |
+| PR conversation | PR comments | Agent reports, reviewer feedback |
+| Escalation | PR comment | Keeper @mention |
+| Done | Status card | Final stage value |
+
+---
+
+## 7. Appendix A: The Case For and Against GitHub Deployments
 
 The Deployments API allows a GitHub App to create deployment records against a repository. Each deployment targets a named environment and progresses through statuses: pending, in_progress, success, failure, error. Deployments appear on the repository's main page under Environments and provide a timeline of activity per environment.
 
@@ -451,7 +547,7 @@ The arguments against outweigh the arguments for in the MVP scope. The PR itself
 
 ---
 
-## 7. Appendix B: Check Runs — CI Orchestration vs. Hall Status Surface
+## 8. Appendix B: Check Runs — CI Orchestration vs. Hall Status Surface
 
 There are two distinct ways the Hall could interact with GitHub's Checks system, and they serve fundamentally different purposes. This appendix distinguishes them clearly.
 
@@ -497,7 +593,7 @@ The Checks API permission (`checks:write`) should be included in the app's permi
 
 ---
 
-## 8. Appendix C: Agent Configuration Reference
+## 9. Appendix C: Agent Configuration Reference
 
 ### agents.yml
 
@@ -510,6 +606,7 @@ agents:
     max_turns: 40
     max_retries: 3
     capabilities: [implement, review, fix, refactor]
+    keeper: mksetaro                    # GitHub handle to @mention on retry exhaustion
 
   ophelia:
     secret: CLAUDE_CODE_OAUTH_TOKEN
@@ -518,6 +615,7 @@ agents:
     max_turns: 20
     max_retries: 2
     capabilities: [review, comment]
+    keeper: mksetaro
 ```
 
 ### routing.yml
@@ -563,7 +661,7 @@ When reacting to reviewer feedback:
 
 ---
 
-## 9. Appendix D: Invocation Counter Schema
+## 10. Appendix D: Invocation Counter Schema
 
 Stored in Actions Cache under key `hall-counters-{YYYY}-W{WW}`.
 
@@ -581,7 +679,7 @@ The `invocations` detail is captured per-dispatch in Actions Artifacts, not in t
 
 ---
 
-## 10. Appendix E: Invocation Audit Log Schema
+## 11. Appendix E: Invocation Audit Log Schema
 
 Uploaded as an Actions Artifact per dispatch.
 
