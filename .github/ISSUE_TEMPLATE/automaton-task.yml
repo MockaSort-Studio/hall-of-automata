@@ -1,0 +1,72 @@
+name: Automaton Task
+description: Invoke an automaton on a task. Fill this out completely — the agent has no context beyond what is here.
+labels: []
+body:
+  - type: dropdown
+    id: automaton
+    attributes:
+      label: Automaton
+      description: Which automaton to invoke. Apply the matching label after creating the issue.
+      options:
+        - "🐗 Hamlet"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: What you need from the automaton.
+      options:
+        - "Doing — implement this"
+        - "Advising — evaluate options and recommend"
+        - "Researching — investigate and report"
+    validations:
+      required: true
+
+  - type: input
+    id: repository
+    attributes:
+      label: Target repository
+      description: "Which repo this task concerns (if different from this one)"
+      placeholder: "MockaSort-Studio/ADP8"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What the automaton needs to know. Relevant files, current behavior, constraints, prior decisions.
+      placeholder: |
+        - File: core/lifecycle/task.hpp — base class for all tasks
+        - Current behavior: X
+        - Constraint: no heap allocation in hot path
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      description: What done looks like. Be specific.
+      placeholder: |
+        - [ ] Implement X following Y pattern
+        - [ ] Unit test covering Z edge case
+        - [ ] BUILD file updated
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What the automaton should NOT do or touch. Optional but useful.
+      placeholder: |
+        - Do not modify the public API
+        - Do not add dependencies
+
+  - type: checkboxes
+    id: sign-off-required
+    attributes:
+      label: Sign-off required before action
+      options:
+        - label: "This task requires human review before any code is pushed"
