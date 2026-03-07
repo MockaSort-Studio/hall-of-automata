@@ -2,11 +2,17 @@ name: Automaton Task
 description: Invoke an automaton on a task. Fill this out completely — the agent has no context beyond what is here.
 labels: []
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **How to invoke:** After submitting, comment `@hall-of-automata[bot] hamlet` (or your agent of choice) on the issue.
+        Alternatively, apply the matching `hall:{agent}` label. The Hall will post a status card as its first response.
+
   - type: dropdown
     id: automaton
     attributes:
       label: Automaton
-      description: Which automaton to invoke. Apply the matching label after creating the issue.
+      description: Which automaton to invoke.
       options:
         - "🐗 Hamlet"
     validations:

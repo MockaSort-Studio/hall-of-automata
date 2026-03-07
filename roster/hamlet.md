@@ -15,27 +15,28 @@
 | Field | Value |
 |-------|-------|
 | Keeper | @mksetaro |
-| API key | `ANTHROPIC_KEY_HAMLET` (org secret) |
+| OAuth token | `CLAUDE_CODE_OAUTH_TOKEN` in GitHub Environment `hall/hamlet` |
 | Invocation team | `automata-invokers` |
 
-The keeper is responsible for the key lifecycle, rotating it on schedule, and updating it when compromised. See [`codex/key-management.md`](../codex/key-management.md).
+The keeper is responsible for the token lifecycle. Token is a Claude Pro/Max OAuth credential — see [`codex/key-management.md`](../codex/key-management.md) for rotation procedures (principles apply; token type is now OAuth, not API key).
+
+Canonical configuration is in [`agents.yml`](../agents.yml) — that file is authoritative for `max_turns`, `max_retries`, team membership, and environment name.
 
 ---
 
 ## Invocation
 
-Apply the `hamlet` label to any issue in any MockaSort Studio repo. Members of `automata-invokers` are dispatched through. Everyone else has the label removed.
+Comment `@hall-of-automata[bot] hamlet` on any issue. Alternatively, apply a `hall:hamlet` label. Members of `automata-invokers` are dispatched through. Everyone else receives a rejection comment.
 
 ```mermaid
 flowchart LR
-    A[Apply label: hamlet] --> B{Member of automata-invokers?}
+    A["@hall-of-automata[bot] hamlet\nor hall:hamlet label"] --> B{Member of automata-invokers?}
     B -- Yes --> C[Hamlet dispatched]
-    B -- No --> D[Label removed + comment]
+    B -- No --> D[Rejection comment posted]
 ```
 
-**Label:** `hamlet`
 **Team:** `automata-invokers`
-**Scope:** all MockaSort-Studio repositories
+**Scope:** any MockaSort-Studio repository where the Hall App is installed
 
 ---
 

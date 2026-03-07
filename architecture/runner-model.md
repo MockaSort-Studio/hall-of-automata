@@ -1,38 +1,67 @@
 # Runner Model
 
-## Responsibilities
-
-The system has two distinct execution environments:
+## Execution layers
 
 | Layer | Where it runs | What it does |
 |-------|--------------|-------------|
-| **Workflow** | GitHub-hosted runner | Team check, label management, API call, result posting |
-| **Automaton** | Anthropic infrastructure | Receives issue context, generates response |
+| **Dispatch workflow** | GitHub-hosted runner (Hall repo) | Auth, cap check, routing, persona injection, status card, counter, audit log |
+| **Agent (Claude Code Action)** | GitHub-hosted runner (target repo checkout) | Reads issue, writes code, opens PR, pushes commits |
+| **Claude inference** | Anthropic infrastructure | Language model processing; called by the Claude Code Action via OAuth token |
 
-The GitHub runner does not run the automaton. It calls the Anthropic API with the issue context and waits for the response. Claude runs on Anthropic's servers.
+The GitHub runner checks out the target repository, injects the agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner. The runner is not stateless for the duration of a dispatch; it holds the working tree.
 
 ---
 
 ## GitHub-hosted runners
 
-Runners are ephemeral VMs managed by GitHub. They spin up on workflow trigger, execute the workflow steps, and are destroyed. No member of the org maintains infrastructure. No machine needs to be online.
+Runners are ephemeral VMs managed by GitHub. They spin up on workflow trigger, execute all steps, and are destroyed. No org member maintains infrastructure.
 
 What runs on the runner:
-- Team membership check via GitHub API
-- Label removal if unauthorized
-- Construction of the prompt from issue context
-- HTTP call to Anthropic API (`ANTHROPIC_KEY_[AGENT]` from org secrets)
-- Posting the response back as an issue comment
+- GitHub App token creation (`actions/create-github-app-token@v1`)
+- Composite action steps: `authorize`, `counter`, `status-card`, `memory`, `dispatch`, `post-dispatch`, `cleanup`
+- Shell scripts in `scripts/` (yq config reads, context injection, cache operations)
+- The Claude Code Action agentic loop (bash, file r/w, git operations on the checked-out target repo)
 
 ---
 
-## What this means in practice
+## Composite action model
 
-**Available 24/7.** Not tied to any member's uptime. A label applied at any time dispatches immediately.
+All orchestration logic lives in `actions/` as GitHub composite actions. The dispatch workflows (`invoke.yml`, `hall-ci-loop.yml`, `hall-cleanup.yml`) call these actions. This separation means:
+- Orchestration logic is versioned and reusable
+- Target repos require no local configuration — the Hall repo is the single source of logic
+- Individual action steps can be tested or replaced independently
 
-**Stateless.** Each invocation is a fresh runner. No state carries between runs. Context must be in the issue — title, body, comments. The workflow can optionally check out the repository to include file content in the prompt.
+---
 
-**Isolated.** Concurrent invocations run in separate environments. Concurrency controls at the workflow level prevent racing on the same issue.
+## Concurrency controls
+
+Each dispatch job declares:
+
+```yaml
+concurrency:
+  group: hall-{agent}-{issue-number}
+  cancel-in-progress: false
+```
+
+This ensures at most one active dispatch per agent per issue at any time. Re-dispatches queue behind the running job rather than cancelling it.
+
+---
+
+## GitHub Environments and secret isolation
+
+Each agent's OAuth token lives in a GitHub Environment (`hall/{agent}`). The dispatch job declares `environment: hall/{agent}` (computed dynamically from the detected agent). This gives access to that environment's secrets and allows environment-level protection rules (e.g., required reviewers for certain agents).
+
+---
+
+## State persistence
+
+The runner is ephemeral, but task state persists between runs via:
+
+- **Actions Cache:** weekly invocation counters (`hall-counters-{YYYY}-W{WW}`) and per-task memory (`hall-task-{repo}-{pr}`)
+- **Actions Artifacts:** immutable invocation audit logs (`hall-log-{agent}-{issue}-{run_id}`)
+- **GitHub issue/PR thread:** permanent human-readable task history; serves as fallback context if cache expires
+
+See `architecture/` overall and the design document for the full state model.
 
 ---
 
@@ -40,8 +69,7 @@ What runs on the runner:
 
 | Tradeoff | Consequence |
 |----------|-------------|
-| API keys in org secrets | Keys are managed by GitHub, visible to org admins — see [`secrets-model.md`](secrets-model.md) |
-| No persistent runner environment | No caching, no local state — anything the automaton needs must be fetched per run |
-| Context window bounded by issue content | The automaton sees what is in the issue; repo access requires explicit checkout in the workflow |
-
-The self-hosted runner alternative was evaluated and rejected. The full reasoning is in [`codex/design-options.md`](../codex/design-options.md).
+| GitHub-hosted runners only | No persistent environment, no local tooling beyond what the runner image provides; target repo must be checked out |
+| App private key in repo secrets | Visible to repo admins — see [`secrets-model.md`](secrets-model.md) |
+| Cache as working memory | 7-day expiry; agent reconstructs from issue thread on miss |
+| Dynamic `environment:` expression | GitHub evaluates this at job start; the environment must exist before the first dispatch |

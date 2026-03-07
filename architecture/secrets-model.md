@@ -4,56 +4,60 @@
 
 | Secret | Location | Scope | Purpose |
 |--------|----------|-------|---------|
-| `ORG_READ_TOKEN` | Org secret | Read-only, `read:org` | Team membership checks |
-| `ANTHROPIC_KEY_HAMLET` | Org secret | Anthropic API | Hamlet invocation, billed to keeper |
-| *(future automaton)* | Org secret | Anthropic API | Per-automaton, billed to keeper |
+| `APP_ID` | Hall repo secret | Public identifier | GitHub App identity, used to mint installation tokens |
+| `APP_PRIVATE_KEY` | Hall repo secret | Signs JWT requests | Generates GitHub App installation tokens |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Per-agent GitHub Environment (`hall/{agent}`) | Claude Pro/Max subscription | Agent OAuth credential, billed to keeper's subscription |
 
-Two categories. One operational secret (`ORG_READ_TOKEN`), one per-automaton secret per agent.
-
----
-
-## ORG_READ_TOKEN
-
-A GitHub Personal Access Token with `read:org` scope only. Created once, stored as an org-level secret. Used exclusively in the team membership check step.
-
-**What it can do:** read org membership and team data.
-**What it cannot do:** write anything, access repos, modify settings.
-
-If this token leaked, an attacker could read org membership lists. That is the full blast radius.
+The GitHub App private key and App ID are Hall-level infrastructure secrets. Agent OAuth tokens are isolated per-agent in dedicated Environments.
 
 ---
 
-## Per-automaton keys
+## GitHub App secrets (`APP_ID`, `APP_PRIVATE_KEY`)
 
-Each automaton's Anthropic API key is stored as an org secret named `ANTHROPIC_KEY_[NAME]`. The key is provided by the automaton's keeper and billed to their Anthropic account.
+Stored as repository secrets on the Hall repo. Used by `actions/create-github-app-token@v1` at the start of each dispatch job to mint a short-lived installation token scoped to the target repo owner.
 
-The keeper owns the key. The org stores it. The workflow uses it. This is the accepted tradeoff of Option A — see [`codex/design-options.md`](../codex/design-options.md) for why this was chosen over keeping keys on keeper-owned infrastructure.
+**What the installation token can do:** whatever permissions the App was granted at install time (Contents, Issues, Pull Requests R/W; Members R).
+**Lifetime:** 1 hour. Never stored; minted fresh per job.
 
-**Org admins can see these keys.** This is a known and accepted condition. Mitigation is process, not architecture: trusted admins, rotation schedule, immediate rotation on personnel change.
+If `APP_PRIVATE_KEY` leaked, an attacker could mint installation tokens. Mitigation: immediate key rotation in the App settings (Settings → Private keys → Revoke).
+
+---
+
+## Per-agent OAuth tokens (`CLAUDE_CODE_OAUTH_TOKEN`)
+
+Each agent's keeper runs `claude setup-token` on their machine, authenticates via their Claude Pro/Max subscription, and obtains an OAuth token. The token is stored as a secret in the agent's dedicated GitHub Environment (`hall/{agent}`).
+
+**Isolation:** GitHub Environments allow environment-level secrets that are only accessible when the job explicitly declares `environment: hall/{agent}`. No job can access another agent's token unless it targets that environment.
+
+**Billing:** Consumption is billed against the keeper's Claude subscription, not a shared API key. There is no Anthropic API key — OAuth tokens use the same Pro/Max quota the keeper already pays for.
+
+**Org admin visibility:** GitHub Environment secrets are visible to org admins. This is a known and accepted condition. Mitigation is process: trusted admins, immediate rotation on personnel change.
+
+**Rotation:** If a token is compromised, the keeper runs `claude setup-token` again and updates the Environment secret. The old token is revoked by Anthropic automatically when the new one is issued.
 
 ---
 
 ## What GitHub does not hold
 
-- No keeper personal credentials beyond the API key
-- No private keys, SSH keys, or signing credentials
-- No infrastructure passwords or tokens beyond the two categories above
+- No Anthropic API keys
+- No billing credentials
+- No keeper personal passwords or SSH keys
 
 ---
 
-## Key masking
+## Token masking
 
-Every workflow that uses an API key masks it immediately to prevent accidental log exposure:
+The dispatch action masks the OAuth token immediately on use:
 
 ```yaml
-- name: Mask key
-  run: echo "::add-mask::${{ secrets.ANTHROPIC_KEY_HAMLET }}"
+- name: Mask OAuth token
+  run: echo "::add-mask::${{ inputs.oauth-token }}"
 ```
 
-This makes the key value unsearchable in all subsequent log output, even if something attempts to print it.
+This prevents the token value from appearing in any subsequent log output.
 
 ---
 
-## Rotation
+## Key management procedures
 
-Key rotation schedule and procedures are in [`codex/key-management.md`](../codex/key-management.md).
+Rotation schedule and emergency procedures are in [`codex/key-management.md`](../codex/key-management.md). That document predates the OAuth model — the principles apply but the token type is now OAuth, not API key.

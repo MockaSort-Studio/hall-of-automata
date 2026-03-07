@@ -13,7 +13,8 @@ elif [ -n "$FIND_PR" ]; then
   echo "pr-number=$FIND_PR"      >> "$GITHUB_OUTPUT"
   echo "branch=$BRANCH"          >> "$GITHUB_OUTPUT"
 else
-  echo "stage=done"              >> "$GITHUB_OUTPUT"
+  # No PR opened — agent likely asked a clarifying question
+  echo "stage=awaiting-input"    >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 fi

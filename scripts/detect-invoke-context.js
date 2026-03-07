@@ -24,9 +24,22 @@ module.exports = async ({ context, core }) => {
 
   } else if (event === 'issue_comment') {
     const body  = payload.comment?.body || '';
-    const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
-    if (!match) { core.setOutput('agent', ''); return; }
-    agent        = match[1];
+    // Path A — explicit @mention: @hall-of-automata[bot] <agent>
+    const mentionMatch = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
+    if (mentionMatch) {
+      agent = mentionMatch[1];
+    } else {
+      // Path B — human reply while awaiting input: non-bot comment on a
+      // hall:awaiting-input labeled issue that also has a hall:{agent} label.
+      const senderType = payload.sender?.type || '';
+      if (senderType === 'Bot') { core.setOutput('agent', ''); return; }
+      const labels     = payload.issue?.labels || [];
+      const awaitLabel = labels.find(l => l.name === 'hall:awaiting-input');
+      if (!awaitLabel) { core.setOutput('agent', ''); return; }
+      const hallLabel  = labels.find(l => l.name.startsWith('hall:') && l.name !== 'hall:awaiting-input');
+      if (!hallLabel)  { core.setOutput('agent', ''); return; }
+      agent = hallLabel.name.replace('hall:', '');
+    }
     issueNumber  = String(payload.issue.number);
     invoker      = payload.sender.login;
     triggerEvent = 'issue_comment';

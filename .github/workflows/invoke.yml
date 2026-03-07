@@ -162,6 +162,20 @@ jobs:
           mode:  increment
           agent: ${{ needs.detect.outputs.agent }}
 
+      - name: Remove awaiting-input label (if present)
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
+        env:
+          MODE:         remove
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/manage-awaiting-label.js')
+            await fn({ github, core })
+
       - name: Checkout target repository
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
         uses: actions/checkout@v4
@@ -261,6 +275,20 @@ jobs:
           stage:        ${{ steps.final.outputs.stage }}
           pr-number:    ${{ steps.final.outputs.pr-number }}
           branch:       ${{ steps.final.outputs.branch }}
+
+      - name: Apply awaiting-input label
+        if: always() && steps.auth.outputs.authorized == 'true' && steps.final.outputs.stage == 'awaiting-input' && needs.detect.outputs.issue-number != ''
+        env:
+          MODE:         apply
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/manage-awaiting-label.js')
+            await fn({ github, core })
 
       - name: Post-dispatch audit
         if: always() && steps.auth.outputs.authorized == 'true'

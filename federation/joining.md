@@ -1,96 +1,107 @@
 # Joining the Hall
 
-Registering an automaton in the Hall of Automata. Follow these steps in order.
+Registering a new agent in the Hall of Automata. Follow these steps in order.
 
 ---
 
 ## Prerequisites
 
-- You are a member of MockaSort Studio org
-- You have an Anthropic account with API access
-- You have chosen a name for your automaton and confirmed it is not already in the roster
-- An org admin is available to add secrets and manage team membership (or you have org admin rights)
+- You are a member of the MockaSort Studio org
+- You hold a Claude Pro or Max subscription (the OAuth token is tied to your subscription quota)
+- You have chosen a name for your agent — a lowercase slug (`hamlet`, `ophelia`) — and confirmed it is not already in `agents.yml`
+- An org admin is available to create the GitHub Environment and add you to the invoker team
 
 ---
 
-## Step 1 — Generate an API key
+## Step 1 — Generate your OAuth token
 
-In your Anthropic account, create a new API key scoped to this automaton. Do not reuse a key you use for other purposes — this key will live in org secrets and should be isolatable.
+On your machine, run:
 
-Keep the key value ready for Step 2. You will not need it again after it is stored.
+```sh
+claude setup-token
+```
 
----
+This opens a browser flow, authenticates with your Claude Pro/Max account, and outputs an OAuth token. Copy it — it is only shown once.
 
-## Step 2 — Store the key as an org secret
-
-An org admin adds the key to MockaSort Studio org secrets:
-
-- **Name:** `ANTHROPIC_KEY_[AUTOMATON_NAME]` (uppercase, e.g. `ANTHROPIC_KEY_HAMLET`)
-- **Value:** the key from Step 1
-- **Access:** all repositories (the automaton can be invoked from any org repo)
-
-The key is now under org custody. See [`architecture/secrets-model.md`](../architecture/secrets-model.md) for what this implies.
+This token is billed against your own Claude subscription quota. There is no Anthropic API key involved.
 
 ---
 
-## Step 3 — Create the invocation label
+## Step 2 — Create the GitHub Environment
 
-The label must exist in every repo where the automaton can be invoked. For org-wide availability, create it in each repo or use the GitHub API to add it across repos.
+An org admin creates a GitHub Environment in the Hall repo:
 
-**Label name:** lowercase automaton name (e.g. `hamlet`)
-**Color:** keeper's choice — pick something distinct from existing labels
+1. Hall repo → Settings → Environments → New environment
+2. **Name:** `hall/{your-agent-name}` (e.g. `hall/ophelia`)
+3. Add secret: `CLAUDE_CODE_OAUTH_TOKEN` = (paste your token from Step 1)
+4. Set protection rules if desired (e.g. require approval for the environment)
 
----
-
-## Step 4 — Add the workflow file to each target repo
-
-The invocation workflow must exist in every repo where the automaton can be invoked. The base logic lives centrally in `hall-of-automata` — each repo only needs a thin wrapper that calls it.
-
-Copy [`invoke-hamlet.yml`](../.github/workflows/invoke-hamlet.yml) into `.github/workflows/` of the target repo. Adapt:
-- Job names and trigger label (`github.event.label.name == 'your-name'`)
-- `automaton-name`, `label-name` inputs
-- `ANTHROPIC_API_KEY` secret reference (`secrets.ANTHROPIC_KEY_[NAME]`)
-- `personality-instructions` input — personality layer for this automaton
-
-The wrapper calls `MockaSort-Studio/hall-of-automata/.github/workflows/_base-invoke.yml@main` for all shared logic: auth check, label removal, CLAUDE.md override, and Claude Code Action invocation.
-
-**Note on CLAUDE.md:** the workflow intentionally deletes any local `CLAUDE.md` in the target repo before invoking the agent and replaces it with the Hall's behavior contract. Do not rely on local `CLAUDE.md` files to control automaton behavior. See [`agents/base-behavior.md`](../agents/base-behavior.md).
-
-**Triggers covered by the wrapper:**
-- Issue labeled with the automaton's label → initial invocation
-- Issue comment containing `@[name]` → follow-up or re-invocation
-- PR review submitted on a PR carrying the automaton's label → feedback loop
+The token is now under your agent's isolated environment. No other agent's job can access it.
 
 ---
 
-## Step 5 — Add keeper to automata-invokers
+## Step 3 — Register the agent in `agents.yml`
 
-An org admin adds the keeper to the `automata-invokers` team if they are not already a member. This grants the keeper invocation rights for all automata in the Hall, including their own.
+Open a PR to the Hall repo adding your agent to `agents.yml`:
+
+```yaml
+agents:
+  your-agent:
+    environment: hall/your-agent
+    secret: CLAUDE_CODE_OAUTH_TOKEN
+    persona: roster/your-agent.md
+    teams: [automata-invokers]   # or a more restricted team
+    max_turns: 40
+    max_retries: 3
+    capabilities: [implement, review, fix, refactor]
+    keeper: your-github-handle
+```
+
+Optionally add a `routing.yml` override if your agent needs a different weekly cap.
 
 ---
 
-## Step 6 — Write the roster profile
+## Step 4 — Write the roster profile
 
-Create `roster/[name].md` in this repo. Use [`roster/hamlet.md`](../roster/hamlet.md) as a template. Include:
+Create `roster/{your-agent}.md` in the Hall repo. Use [`roster/hamlet.md`](../roster/hamlet.md) as a template. Include:
 
-- Identity and personality summary
-- Keeper details and API key secret name
-- Invocation label and team
+- Identity and personality summary (this becomes the agent's `CLAUDE.md` at dispatch time)
+- Keeper and contact details
 - Capabilities
-- Contact
+- Behavioral notes specific to this agent
 
-Open a PR to this repo. An existing Hall member reviews and merges.
+The persona file is the agent's sole behavioral contract — everything the agent knows about how to behave comes from this file at dispatch time.
+
+---
+
+## Step 5 — Create labels in target repos
+
+Each target repo where the agent can be invoked needs:
+
+- `hall:{your-agent}` — applied by the Hall to bind the agent to a PR
+
+The Hall creates `hall:{agent}` automatically on first dispatch if it does not exist. No manual label creation is required.
+
+---
+
+## Step 6 — Add keeper to the invoker team
+
+An org admin adds your GitHub handle to the team listed in `agents.yml` (`automata-invokers` by default). This grants invocation rights — without team membership, the authorization step rejects all invocations.
 
 ---
 
 ## Step 7 — Update the roster table
 
-Add a row to the table in [`roster/README.md`](../roster/README.md) and in the root [`README.md`](../README.md).
-
-Include this in the same PR as Step 6.
+Add a row to [`roster/README.md`](../roster/README.md) and the root [`README.md`](../README.md). Include this in the same PR as Steps 3 and 4.
 
 ---
 
 ## Done
 
-Once the PR is merged, the automaton is federated. Anyone in `automata-invokers` can apply the label and the automaton will respond.
+Once the PR is merged and the Environment is live, the agent is federated. Anyone in the authorized team can comment `@hall-of-automata[bot] {your-agent}` on any issue or apply a matching label — and the Hall will dispatch your agent.
+
+---
+
+## No per-repo configuration required
+
+Target repositories do not need any workflow files, secrets, or labels pre-created. The Hall repo's `invoke.yml` triggers on events from the Hall repo itself (for MVP), with org-wide coverage coming via the webhook relay (see `TODO.md` Deferred section). The Hall app installation token handles all cross-repo API access.
