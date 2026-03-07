@@ -230,8 +230,10 @@ jobs:
 
       - name: Inject agent persona
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
-        run: cp .hall/roster/${{ needs.detect.outputs.agent }}.md CLAUDE.md
+        run: cp ".hall/roster/${AGENT}.md" CLAUDE.md
 
       - name: Restore task memory (review re-dispatch)
         id: memory
@@ -244,13 +246,14 @@ jobs:
 
       - name: Append review context to CLAUDE.md
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
+        env:
+          PR_NUMBER: ${{ needs.detect.outputs.pr-number }}
+          REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
         shell: bash
         run: |
           cat >> CLAUDE.md << 'HALLCTX'
 
           ## Hall Task Context — Review Re-dispatch
-
-          **PR:** #${{ needs.detect.outputs.pr-number }}
 
           A reviewer has requested changes on the PR you opened. Address the
           feedback below and push to the existing branch. Do not open a new PR.
@@ -258,8 +261,7 @@ jobs:
           ### Review comment
 
           HALLCTX
-          # Append review body (already substituted by GitHub Actions, safe as plain text)
-          printf '%s\n' '${{ needs.detect.outputs.review-body }}' >> CLAUDE.md
+          printf 'PR: #%s\n\n%s\n' "$PR_NUMBER" "$REVIEW_BODY" >> CLAUDE.md
 
       - name: Run agent
         id: agent
@@ -308,21 +310,32 @@ jobs:
               "last_review_feedback": ""
             }
 
-      - name: Update status card — pr-opened
-        if: always() && steps.auth.outputs.authorized == 'true' && steps.find-pr.outputs.pr-number != '' && needs.detect.outputs.issue-number != ''
-        uses: ./.hall/actions/status-card
-        with:
-          app-token:    ${{ steps.app-token.outputs.token }}
-          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
-          repo-name:    ${{ needs.detect.outputs.repo-name }}
-          issue-number: ${{ needs.detect.outputs.issue-number }}
-          agent:        ${{ needs.detect.outputs.agent }}
-          stage:        pr-opened
-          pr-number:    ${{ steps.find-pr.outputs.pr-number }}
-          branch:       ${{ steps.find-pr.outputs.branch }}
+      - name: Resolve final stage
+        id: final
+        if: always() && steps.auth.outputs.authorized == 'true'
+        env:
+          TRIGGER:   ${{ needs.detect.outputs.trigger-event }}
+          FIND_PR:   ${{ steps.find-pr.outputs.pr-number }}
+          DETECT_PR: ${{ needs.detect.outputs.pr-number }}
+          BRANCH:    ${{ steps.find-pr.outputs.branch }}
+        shell: bash
+        run: |
+          if [ "$TRIGGER" = "pr_review" ]; then
+            echo "stage=pr-opened"    >> "$GITHUB_OUTPUT"
+            echo "pr-number=$DETECT_PR" >> "$GITHUB_OUTPUT"
+            echo "branch="            >> "$GITHUB_OUTPUT"
+          elif [ -n "$FIND_PR" ]; then
+            echo "stage=pr-opened"    >> "$GITHUB_OUTPUT"
+            echo "pr-number=$FIND_PR" >> "$GITHUB_OUTPUT"
+            echo "branch=$BRANCH"     >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=done"         >> "$GITHUB_OUTPUT"
+            echo "pr-number="         >> "$GITHUB_OUTPUT"
+            echo "branch="            >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Update status card — pr-opened (review)
-        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review' && needs.detect.outputs.issue-number != ''
+      - name: Update status card
+        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
         uses: ./.hall/actions/status-card
         with:
           app-token:    ${{ steps.app-token.outputs.token }}
@@ -330,19 +343,9 @@ jobs:
           repo-name:    ${{ needs.detect.outputs.repo-name }}
           issue-number: ${{ needs.detect.outputs.issue-number }}
           agent:        ${{ needs.detect.outputs.agent }}
-          stage:        pr-opened
-          pr-number:    ${{ needs.detect.outputs.pr-number }}
-
-      - name: Update status card — done
-        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event != 'pr_review' && steps.find-pr.outputs.pr-number == '' && needs.detect.outputs.issue-number != ''
-        uses: ./.hall/actions/status-card
-        with:
-          app-token:    ${{ steps.app-token.outputs.token }}
-          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
-          repo-name:    ${{ needs.detect.outputs.repo-name }}
-          issue-number: ${{ needs.detect.outputs.issue-number }}
-          agent:        ${{ needs.detect.outputs.agent }}
-          stage:        done
+          stage:        ${{ steps.final.outputs.stage }}
+          pr-number:    ${{ steps.final.outputs.pr-number }}
+          branch:       ${{ steps.final.outputs.branch }}
 
       - name: Post-dispatch audit
         if: always() && steps.auth.outputs.authorized == 'true'
@@ -354,6 +357,7 @@ jobs:
           repo-owner:         ${{ needs.detect.outputs.repo-owner }}
           repo-name:          ${{ needs.detect.outputs.repo-name }}
           issue-number:       ${{ needs.detect.outputs.issue-number }}
+          pr-number:          ${{ steps.final.outputs.pr-number }}
           invoker:            ${{ needs.detect.outputs.invoker }}
           team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
           outcome:            ${{ steps.agent.outcome || 'skipped' }}

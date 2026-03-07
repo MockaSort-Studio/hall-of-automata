@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: hall/${{ needs.detect.outputs.agent }}
     concurrency:
-      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number }}
+      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
       cancel-in-progress: false
     steps:
       - name: Create GitHub App token
@@ -127,9 +127,10 @@ jobs:
 
       - name: Resolve retry count
         id: retry
+        env:
+          MEMORY: ${{ steps.memory.outputs.memory-json }}
         shell: bash
         run: |
-          MEMORY='${{ steps.memory.outputs.memory-json }}'
           if [ -n "$MEMORY" ] && [ "$MEMORY" != '{}' ]; then
             COUNT=$(printf '%s' "$MEMORY" | jq -r '.retry_count // 0')
           else
@@ -201,21 +202,26 @@ jobs:
 
       - name: Inject persona and CI context
         if: steps.retry.outputs.escalate != 'true'
+        env:
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          ATTEMPT:      ${{ steps.retry.outputs.new-count }}
+          MAX_RETRIES:  ${{ steps.agent-cfg.outputs.max-retries }}
+          PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
+          CI_FAILURES:  ${{ needs.detect.outputs.ci-failures }}
         shell: bash
         run: |
-          cp .hall/roster/${{ needs.detect.outputs.agent }}.md CLAUDE.md
+          cp ".hall/roster/${AGENT}.md" CLAUDE.md
           cat >> CLAUDE.md << 'HALLCTX'
 
           ## Hall Task Context — CI Re-dispatch
 
-          **Attempt:** ${{ steps.retry.outputs.new-count }} of ${{ steps.agent-cfg.outputs.max-retries }}
-          **PR:** #${{ needs.detect.outputs.pr-number }}
-          **Failed checks:** ${{ needs.detect.outputs.ci-failures }}
-
-          The above CI checks failed on the PR you previously opened.
+          The CI checks below failed on the PR you previously opened.
           Investigate the failures, push fixes to the same branch, and do
           not open a new PR.
+
           HALLCTX
+          printf '**Attempt:** %s of %s\n**PR:** #%s\n**Failed checks:** %s\n' \
+            "$ATTEMPT" "$MAX_RETRIES" "$PR_NUMBER" "$CI_FAILURES" >> CLAUDE.md
 
       - name: Run agent
         id: agent
