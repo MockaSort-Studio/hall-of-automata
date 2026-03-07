@@ -145,7 +145,7 @@ jobs:
         if: steps.retry.outputs.escalate != 'true'
         uses: ./.hall/actions/dispatch
         with:
-          oauth-token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
 

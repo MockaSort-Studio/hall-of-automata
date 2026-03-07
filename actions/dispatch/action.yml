@@ -28,5 +28,4 @@ runs:
       with:
         claude_code_oauth_token: ${{ inputs.oauth-token }}
         github_token: ${{ inputs.app-token }}
-        max_turns: ${{ inputs.max-turns }}
-        allowed_tools: "Bash,Read,Write,Edit,Glob,Grep"
+        claude_args: "--max-turns ${{ inputs.max-turns }}"
