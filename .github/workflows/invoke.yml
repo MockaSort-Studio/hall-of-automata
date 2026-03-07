@@ -41,6 +41,8 @@ jobs:
       trigger-event: ${{ steps.ctx.outputs.trigger-event }}
       repo-owner:    ${{ steps.ctx.outputs.repo-owner }}
       repo-name:     ${{ steps.ctx.outputs.repo-name }}
+      pr-number:     ${{ steps.ctx.outputs.pr-number }}
+      review-body:   ${{ steps.ctx.outputs.review-body }}
     steps:
       - name: Resolve invocation context
         id: ctx
@@ -91,6 +93,8 @@ jobs:
               issueNumber  = String(payload.pull_request.number);
               invoker      = payload.sender.login;
               triggerEvent = 'pr_review';
+              core.setOutput('pr-number',   issueNumber);
+              core.setOutput('review-body', body);
 
             } else if (event === 'workflow_call') {
               triggerEvent = 'workflow_call';
@@ -229,6 +233,34 @@ jobs:
         shell: bash
         run: cp .hall/roster/${{ needs.detect.outputs.agent }}.md CLAUDE.md
 
+      - name: Restore task memory (review re-dispatch)
+        id: memory
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
+        uses: ./.hall/actions/memory
+        with:
+          mode:      restore
+          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number: ${{ needs.detect.outputs.pr-number }}
+
+      - name: Append review context to CLAUDE.md
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
+        shell: bash
+        run: |
+          cat >> CLAUDE.md << 'HALLCTX'
+
+          ## Hall Task Context — Review Re-dispatch
+
+          **PR:** #${{ needs.detect.outputs.pr-number }}
+
+          A reviewer has requested changes on the PR you opened. Address the
+          feedback below and push to the existing branch. Do not open a new PR.
+
+          ### Review comment
+
+          HALLCTX
+          # Append review body (already substituted by GitHub Actions, safe as plain text)
+          printf '%s\n' '${{ needs.detect.outputs.review-body }}' >> CLAUDE.md
+
       - name: Run agent
         id: agent
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
@@ -238,8 +270,71 @@ jobs:
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
 
+      # ── Post-dispatch: find PR, save memory, update status card ───────────
+
+      - name: Find PR opened by agent
+        id: find-pr
+        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event != 'pr_review'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const branch = `hall/${{ needs.detect.outputs.agent }}/issue-${{ needs.detect.outputs.issue-number }}`;
+            const prs = await github.rest.pulls.list({
+              owner: '${{ needs.detect.outputs.repo-owner }}',
+              repo:  '${{ needs.detect.outputs.repo-name }}',
+              head:  `${{ needs.detect.outputs.repo-owner }}:${branch}`,
+              state: 'open'
+            });
+            const pr = prs.data[0];
+            core.setOutput('pr-number', pr ? String(pr.number) : '');
+            core.setOutput('branch',    branch);
+
+      - name: Save task memory
+        if: always() && steps.auth.outputs.authorized == 'true' && steps.find-pr.outputs.pr-number != ''
+        uses: ./.hall/actions/memory
+        with:
+          mode:        save
+          repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:   ${{ steps.find-pr.outputs.pr-number }}
+          memory-json: >-
+            {
+              "agent": "${{ needs.detect.outputs.agent }}",
+              "issue_number": "${{ needs.detect.outputs.issue-number }}",
+              "pr_number": "${{ steps.find-pr.outputs.pr-number }}",
+              "branch": "${{ steps.find-pr.outputs.branch }}",
+              "retry_count": 0,
+              "last_ci_failures": "",
+              "last_review_feedback": ""
+            }
+
+      - name: Update status card — pr-opened
+        if: always() && steps.auth.outputs.authorized == 'true' && steps.find-pr.outputs.pr-number != '' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        pr-opened
+          pr-number:    ${{ steps.find-pr.outputs.pr-number }}
+          branch:       ${{ steps.find-pr.outputs.branch }}
+
+      - name: Update status card — pr-opened (review)
+        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        pr-opened
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
+
       - name: Update status card — done
-        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
+        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event != 'pr_review' && steps.find-pr.outputs.pr-number == '' && needs.detect.outputs.issue-number != ''
         uses: ./.hall/actions/status-card
         with:
           app-token:    ${{ steps.app-token.outputs.token }}

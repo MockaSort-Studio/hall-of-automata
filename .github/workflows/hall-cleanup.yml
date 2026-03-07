@@ -1,0 +1,60 @@
+name: Hall PR Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    name: Cleanup hall-labeled PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for hall label
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels;
+            const hallLabel = labels.find(l => l.name.startsWith('hall:'));
+            if (!hallLabel) {
+              core.setOutput('agent', '');
+              return;
+            }
+
+            const agent = hallLabel.name.replace('hall:', '');
+
+            // Extract linked issue number from PR body (closes/fixes/resolves #N)
+            const body = context.payload.pull_request.body || '';
+            const issueMatch = body.match(/(?:closes|fixes|resolves)\s+#(\d+)/i);
+
+            core.setOutput('agent',        agent);
+            core.setOutput('pr-number',    String(context.payload.pull_request.number));
+            core.setOutput('merged',       String(context.payload.pull_request.merged));
+            core.setOutput('issue-number', issueMatch ? issueMatch[1] : '');
+
+      - name: Create GitHub App token
+        id: app-token
+        if: steps.check.outputs.agent != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner:       ${{ github.repository_owner }}
+
+      - name: Checkout Hall repo
+        if: steps.check.outputs.agent != ''
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Run cleanup
+        if: steps.check.outputs.agent != ''
+        uses: ./.hall/actions/cleanup
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          agent:        ${{ steps.check.outputs.agent }}
+          repo-owner:   ${{ github.repository_owner }}
+          repo-name:    ${{ github.event.repository.name }}
+          pr-number:    ${{ steps.check.outputs.pr-number }}
+          issue-number: ${{ steps.check.outputs.issue-number }}
+          merged:       ${{ steps.check.outputs.merged }}

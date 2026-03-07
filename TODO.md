@@ -79,7 +79,7 @@ Repeat for each agent added to the roster.
 
 Confirm the team exists in the org and has the right members. The authorization logic depends on this team slug — if you rename it, update `agents.yml` accordingly.
 
-### 6. Create the `hall-of-automata` labels in target repos 👤
+### 6. Create the `hall-of-automata` labels in target repos ✅
 
 Each target repo needs:
 - `hall:hamlet` (or per-agent) — for PR binding
@@ -201,66 +201,41 @@ Use `actions/create-github-app-token@v1` at the start of each job to generate an
 
 ---
 
-## Phase 3 — Task lifecycle 🔧 ← next
+## Phase 3 — Task lifecycle ✅
 
 **Goal:** the full loop from PR open through CI, review, memory, and cleanup.
 
-### 3.1 `actions/memory/action.yml`
+### 3.1 `actions/memory/action.yml` ✅
 
-Save and restore task memory from Actions Cache.
+Done in Phase 1. Cache key: `hall-task-{repo}-{pr_number}`. Save/restore JSON blob from Actions Cache.
 
-- Cache key: `hall-task-{repo}-{pr_number}`
-- On save: write JSON blob to cache (approach, files changed, CI failures, review feedback, retry count)
-- On restore: attempt cache restore; if miss, pass thread URL to agent as fallback context
+### 3.2 CI orchestration loop ✅
 
-### 3.2 CI orchestration loop
+`.github/workflows/hall-ci-loop.yml`:
+- Trigger: `check_suite: completed` on `hall/*` branches
+- detect job: finds agent from `hall:*` PR label, collects failed check names, extracts issue number from branch
+- redispatch job: restores memory → checks retry count → escalates (keeper @mention + card: `escalated`) or re-dispatches (injects CI context into CLAUDE.md, runs agent, saves memory with incremented retry_count, card: `ci-fix → pr-opened`)
 
-New workflow: `.github/workflows/hall-ci-loop.yml`
+### 3.3 Review interaction loop ✅
 
-- Trigger: `check_suite` (completed) or `issue_comment` (created, bot author)
-- Condition: event is on a PR labeled `hall:{agent}`
-- Logic:
-  1. Identify bound agent from PR label
-  2. Restore task memory (or fall back to thread)
-  3. Read CI check run conclusions via API
-  4. Re-dispatch agent with failure context + memory
-  5. Update status card → stage: `ci-fix (attempt N/max)`
-  6. If `retry_count >= max_retries` → escalate (see 3.4)
+`invoke.yml` `pull_request_review` path extended:
+- detect job now outputs `pr-number` and `review-body` for pr_review events
+- dispatch job restores memory by PR number and appends review feedback to CLAUDE.md before running agent
 
-### 3.3 Review interaction loop
+### 3.4 Keeper escalation ✅
 
-Extend the existing `pull_request_review` trigger (currently in `invoke-hamlet.yml` Mode 3).
+Implemented in `hall-ci-loop.yml`: when `retry_count >= max_retries`, posts `@{keeper}` comment on the PR with failure summary, updates status card to `escalated`, skips re-dispatch.
 
-Refactor to:
-1. Confirm PR has `hall:{agent}` label
-2. Confirm reviewer is a human (`user.type == 'User'`)
-3. Restore task memory
-4. Re-dispatch agent with review feedback + memory
-5. Save updated memory after dispatch
+### 3.5 Cleanup workflow ✅
 
-### 3.4 Keeper escalation
-
-When `retry_count >= max_retries`:
-1. Post PR comment: `@{keeper} — retries exhausted. Last failure: [summary]`
-2. Update status card → stage: `escalated`
-3. Do not re-dispatch
-
-Keeper handle comes from `agents.yml` per agent.
-
-### 3.5 Cleanup workflow
-
-New workflow: `.github/workflows/hall-cleanup.yml`
-
-- Trigger: `pull_request` (closed) on PR with any `hall:*` label
-- Logic:
-  1. Delete `hall-task-{repo}-{pr}` cache entry
-  2. Remove `hall:{agent}` label from PR
-  3. If PR linked to issue: post summary comment on issue
-  4. Update status card → stage: `done`
+`.github/workflows/hall-cleanup.yml`:
+- Trigger: `pull_request: closed` on PRs with any `hall:*` label
+- Extracts agent from label, linked issue from PR body (`closes/fixes/resolves #N`)
+- Calls `actions/cleanup` (deletes memory cache, removes label, posts summary on linked issue if merged)
 
 ---
 
-## Phase 4 — Audit & polish 🔧
+## Phase 4 — Audit & polish 🔧 ← next
 
 ### 4.1 `actions/post-dispatch/action.yml`
 
@@ -322,3 +297,5 @@ Do not start Phase 2 before the GitHub App and OAuth tokens are in place — the
 ## Open questions / constraints to investigate
 
 - **PR size cap (800 LOC):** Analyse whether enforcing a hard upper bound on output PR diff size (e.g. 800 LOC) is a viable scope constraint. If the required change would exceed the cap the agent should decline and reply to the originating comment explaining why the task is too large to implement in a single PR, rather than opening an oversized PR. Investigate: where the check fits (pre-dispatch persona instruction vs. post-dispatch CI gate), how to measure LOC reliably across added/removed lines, and whether the cap should be configurable per agent in `agents.yml`.
+
+- **Agent display names with emoji:** Agent identifiers in `agents.yml` (e.g. `hamlet`) are plain slugs used as branch names, label names (`hall:hamlet`), and environment names (`hall/hamlet`) — none of which allow emoji. However, agents may have a human-facing display name with emoji (e.g. `hamlet 🐗`) for use in status card headers, comments, and persona files. Decide where the display name lives (field in `agents.yml`? first line of persona file?) and update status-card and any comment templates to use it instead of the raw slug.

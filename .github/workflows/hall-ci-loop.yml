@@ -1,0 +1,256 @@
+name: CI Re-dispatch Loop
+
+on:
+  check_suite:
+    types: [completed]
+
+jobs:
+  # ── Job 1: identify agent from the failing PR ────────────────────────────
+  detect:
+    name: Detect agent from failing check suite
+    runs-on: ubuntu-latest
+    outputs:
+      agent:        ${{ steps.ctx.outputs.agent }}
+      pr-number:    ${{ steps.ctx.outputs.pr-number }}
+      issue-number: ${{ steps.ctx.outputs.issue-number }}
+      repo-owner:   ${{ steps.ctx.outputs.repo-owner }}
+      repo-name:    ${{ steps.ctx.outputs.repo-name }}
+      ci-failures:  ${{ steps.ctx.outputs.ci-failures }}
+    steps:
+      - name: Resolve context from check_suite event
+        id: ctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const suite   = context.payload.check_suite;
+            const owner   = context.repo.owner;
+            const repo    = context.repo.repo;
+
+            // Only act on failures
+            if (suite.conclusion !== 'failure') {
+              core.setOutput('agent', '');
+              return;
+            }
+
+            // Only act on hall/* branches
+            const branch = suite.head_branch || '';
+            if (!branch.startsWith('hall/')) {
+              core.setOutput('agent', '');
+              return;
+            }
+
+            // Find open PRs on this branch
+            const prs = await github.rest.pulls.list({
+              owner, repo,
+              head:  `${owner}:${branch}`,
+              state: 'open'
+            });
+            if (!prs.data.length) {
+              core.setOutput('agent', '');
+              return;
+            }
+            const pr = prs.data[0];
+
+            // Confirm PR carries a hall:{agent} label
+            const hallLabel = pr.labels.find(l => l.name.startsWith('hall:'));
+            if (!hallLabel) {
+              core.setOutput('agent', '');
+              return;
+            }
+            const agent = hallLabel.name.replace('hall:', '');
+
+            // Extract issue number from branch: hall/{agent}/issue-{N}
+            const issueMatch = branch.match(/\/issue-(\d+)$/);
+            const issueNumber = issueMatch ? issueMatch[1] : '';
+
+            // Collect failed check run names
+            const runs = await github.rest.checks.listForSuite({
+              owner, repo,
+              check_suite_id: suite.id,
+              per_page: 50
+            });
+            const failures = runs.data.check_runs
+              .filter(r => r.conclusion === 'failure')
+              .map(r => r.name)
+              .join(', ');
+
+            core.setOutput('agent',        agent);
+            core.setOutput('pr-number',    String(pr.number));
+            core.setOutput('issue-number', issueNumber);
+            core.setOutput('repo-owner',   owner);
+            core.setOutput('repo-name',    repo);
+            core.setOutput('ci-failures',  failures);
+
+  # ── Job 2: retry or escalate ─────────────────────────────────────────────
+  redispatch:
+    name: Re-dispatch ${{ needs.detect.outputs.agent }}
+    needs: [detect]
+    if: needs.detect.outputs.agent != ''
+    runs-on: ubuntu-latest
+    environment: hall/${{ needs.detect.outputs.agent }}
+    concurrency:
+      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number }}
+      cancel-in-progress: false
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner:       ${{ needs.detect.outputs.repo-owner }}
+
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Read agent config
+        id: agent-cfg
+        shell: bash
+        run: |
+          AGENT="${{ needs.detect.outputs.agent }}"
+          MAX_RETRIES=$(yq ".agents.${AGENT}.max_retries // 3" .hall/agents.yml)
+          MAX_TURNS=$(yq ".agents.${AGENT}.max_turns // 40" .hall/agents.yml)
+          KEEPER=$(yq ".agents.${AGENT}.keeper" .hall/agents.yml)
+          echo "max-retries=$MAX_RETRIES" >> "$GITHUB_OUTPUT"
+          echo "max-turns=$MAX_TURNS"     >> "$GITHUB_OUTPUT"
+          echo "keeper=$KEEPER"           >> "$GITHUB_OUTPUT"
+
+      - name: Restore task memory
+        id: memory
+        uses: ./.hall/actions/memory
+        with:
+          mode:      restore
+          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number: ${{ needs.detect.outputs.pr-number }}
+
+      - name: Resolve retry count
+        id: retry
+        shell: bash
+        run: |
+          MEMORY='${{ steps.memory.outputs.memory-json }}'
+          if [ -n "$MEMORY" ] && [ "$MEMORY" != '{}' ]; then
+            COUNT=$(printf '%s' "$MEMORY" | jq -r '.retry_count // 0')
+          else
+            COUNT=0
+          fi
+          NEW_COUNT=$((COUNT + 1))
+          MAX="${{ steps.agent-cfg.outputs.max-retries }}"
+          if [ "$COUNT" -ge "$MAX" ]; then
+            echo "escalate=true"        >> "$GITHUB_OUTPUT"
+          else
+            echo "escalate=false"       >> "$GITHUB_OUTPUT"
+          fi
+          echo "count=$COUNT"           >> "$GITHUB_OUTPUT"
+          echo "new-count=$NEW_COUNT"   >> "$GITHUB_OUTPUT"
+
+      # ── Escalation path ───────────────────────────────────────────────────
+
+      - name: Escalate — notify keeper on PR
+        if: steps.retry.outputs.escalate == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner:        '${{ needs.detect.outputs.repo-owner }}',
+              repo:         '${{ needs.detect.outputs.repo-name }}',
+              issue_number: Number('${{ needs.detect.outputs.pr-number }}'),
+              body: [
+                `@${{ steps.agent-cfg.outputs.keeper }} — retries exhausted`,
+                `after ${{ steps.retry.outputs.count }} attempts.`,
+                `Last CI failures: \`${{ needs.detect.outputs.ci-failures }}\`.`,
+                'Manual review required.'
+              ].join(' ')
+            });
+
+      - name: Update status card — escalated
+        if: steps.retry.outputs.escalate == 'true' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        escalated
+
+      # ── Re-dispatch path ──────────────────────────────────────────────────
+
+      - name: Update status card — ci-fix
+        if: steps.retry.outputs.escalate != 'true' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        ci-fix
+          extra:        attempt ${{ steps.retry.outputs.new-count }} of ${{ steps.agent-cfg.outputs.max-retries }}
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
+
+      - name: Checkout target repository
+        if: steps.retry.outputs.escalate != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          token:      ${{ steps.app-token.outputs.token }}
+          clean:      false
+
+      - name: Inject persona and CI context
+        if: steps.retry.outputs.escalate != 'true'
+        shell: bash
+        run: |
+          cp .hall/roster/${{ needs.detect.outputs.agent }}.md CLAUDE.md
+          cat >> CLAUDE.md << 'HALLCTX'
+
+          ## Hall Task Context — CI Re-dispatch
+
+          **Attempt:** ${{ steps.retry.outputs.new-count }} of ${{ steps.agent-cfg.outputs.max-retries }}
+          **PR:** #${{ needs.detect.outputs.pr-number }}
+          **Failed checks:** ${{ needs.detect.outputs.ci-failures }}
+
+          The above CI checks failed on the PR you previously opened.
+          Investigate the failures, push fixes to the same branch, and do
+          not open a new PR.
+          HALLCTX
+
+      - name: Run agent
+        id: agent
+        if: steps.retry.outputs.escalate != 'true'
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
+
+      - name: Save updated task memory
+        if: always() && steps.retry.outputs.escalate != 'true'
+        uses: ./.hall/actions/memory
+        with:
+          mode:        save
+          repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:   ${{ needs.detect.outputs.pr-number }}
+          memory-json: >-
+            {
+              "agent": "${{ needs.detect.outputs.agent }}",
+              "issue_number": "${{ needs.detect.outputs.issue-number }}",
+              "pr_number": "${{ needs.detect.outputs.pr-number }}",
+              "retry_count": ${{ steps.retry.outputs.new-count }},
+              "last_ci_failures": "${{ needs.detect.outputs.ci-failures }}",
+              "last_review_feedback": ""
+            }
+
+      - name: Update status card — pr-opened
+        if: always() && steps.retry.outputs.escalate != 'true' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        pr-opened
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
