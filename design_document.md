@@ -218,7 +218,51 @@ The app is the Hall's identity on GitHub. It is registered as a GitHub App at th
 
 **Webhook events subscribed:** `issue_comment`, `pull_request_review_comment`, `pull_request_review`, `issues` (for label application and assignment), `check_suite`, `pull_request` (for merge detection and label changes).
 
-**Permissions:** Contents (read/write), Issues (read/write), Pull Requests (read/write), Members (read), Metadata (read), Statuses (read/write). Checks permission is discussed in Appendix B.
+**Permissions:** Expand the table below — it mirrors the GitHub App settings UI exactly so you can set permissions without guessing.
+
+<details>
+<summary><strong>Repository permissions</strong></summary>
+
+| Permission | Access | Why |
+|---|---|---|
+| **Actions** | Read | Read workflow run status for CI loop detection |
+| **Checks** | Read | Read check suite results on `hall/*` branches |
+| **Contents** | Read & Write | Create branches, push commits, write `CLAUDE.md` |
+| **Issues** | Read & Write | Read issue body; post comments; manage labels |
+| **Metadata** | Read | Required by GitHub for all Apps |
+| **Pull requests** | Read & Write | Open PRs, post review responses, read PR context |
+| **Commit statuses** | Read | Read commit status for CI failure detection |
+
+</details>
+
+<details>
+<summary><strong>Organization permissions</strong></summary>
+
+| Permission | Access | Why |
+|---|---|---|
+| **Members** | Read | Check team membership for invoker authorization |
+
+</details>
+
+<details>
+<summary><strong>Account permissions</strong></summary>
+
+None required.
+
+</details>
+
+<details>
+<summary><strong>Webhook events</strong></summary>
+
+| Event | Why |
+|---|---|
+| `issue_comment` | Detect `@mention` invocations and awaiting-input re-dispatch |
+| `issues` | Detect `hall:{agent}` label application |
+| `pull_request_review` | Detect review-triggered re-dispatch |
+| `check_suite` | Detect CI failures on `hall/*` branches for the CI loop |
+| `pull_request` | Detect PR close/merge for cleanup |
+
+</details>
 
 **Webhook relay:** The app receives events and triggers `workflow_dispatch` on the org's `.github` repo dispatch workflow, forwarding the event payload as inputs. The caller workflow in the `.github` repo invokes reusable actions defined in the Hall repo. This separates the dispatch entry point (org-owned) from the implementation (Hall-owned), keeping org-specific configuration local while the Hall repo remains a stable, shared action library.
 
