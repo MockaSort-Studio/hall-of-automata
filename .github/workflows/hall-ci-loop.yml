@@ -51,6 +51,12 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
           owner:       ${{ needs.detect.outputs.repo-owner }}
 
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          token:      ${{ steps.app-token.outputs.token }}
+
       - name: Checkout Hall repo
         uses: actions/checkout@v4
         with:
@@ -122,14 +128,6 @@ jobs:
           stage:        ci-fix
           extra:        attempt ${{ steps.retry.outputs.new-count }} of ${{ steps.agent-cfg.outputs.max-retries }}
           pr-number:    ${{ needs.detect.outputs.pr-number }}
-
-      - name: Checkout target repository
-        if: steps.retry.outputs.escalate != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          token:      ${{ steps.app-token.outputs.token }}
-          clean:      false
 
       - name: Inject persona and CI context
         if: steps.retry.outputs.escalate != 'true'
