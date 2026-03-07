@@ -14,15 +14,23 @@ module.exports = async ({ context, core }) => {
   let repoOwner    = process.env.INPUT_REPO_OWNER || context.repo.owner;
   let repoName     = process.env.INPUT_REPO_NAME  || context.repo.repo;
 
+  const SYSTEM_LABELS = ['hall:awaiting-input', 'hall:queued'];
+
   if (event === 'issues' && payload.action === 'labeled') {
     const label = payload.label?.name || '';
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
+    // Ignore system labels — they are applied by the Hall itself, not invokers
+    if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
     agent        = label.replace('hall:', '');
     issueNumber  = String(payload.issue.number);
     invoker      = payload.sender.login;
     triggerEvent = 'issue_labeled';
 
   } else if (event === 'issue_comment') {
+    // Never process bot comments — prevents rejection comment feedback loops
+    const senderType = payload.sender?.type || '';
+    if (senderType === 'Bot') { core.setOutput('agent', ''); return; }
+
     const body  = payload.comment?.body || '';
     // Path A — explicit @mention: @hall-of-automata[bot] <agent>
     const mentionMatch = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
@@ -31,12 +39,9 @@ module.exports = async ({ context, core }) => {
     } else {
       // Path B — human reply while awaiting input: non-bot comment on a
       // hall:awaiting-input labeled issue that also has a hall:{agent} label.
-      const senderType = payload.sender?.type || '';
-      if (senderType === 'Bot') { core.setOutput('agent', ''); return; }
       const labels     = payload.issue?.labels || [];
       const awaitLabel = labels.find(l => l.name === 'hall:awaiting-input');
       if (!awaitLabel) { core.setOutput('agent', ''); return; }
-      const SYSTEM_LABELS = ['hall:awaiting-input', 'hall:queued'];
       const hallLabel  = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
       if (!hallLabel)  { core.setOutput('agent', ''); return; }
       agent = hallLabel.name.replace('hall:', '');
