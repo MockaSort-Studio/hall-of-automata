@@ -17,69 +17,20 @@ jobs:
       repo-name:    ${{ steps.ctx.outputs.repo-name }}
       ci-failures:  ${{ steps.ctx.outputs.ci-failures }}
     steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
       - name: Resolve context from check_suite event
         id: ctx
         uses: actions/github-script@v7
         with:
           script: |
-            const suite   = context.payload.check_suite;
-            const owner   = context.repo.owner;
-            const repo    = context.repo.repo;
-
-            // Only act on failures
-            if (suite.conclusion !== 'failure') {
-              core.setOutput('agent', '');
-              return;
-            }
-
-            // Only act on hall/* branches
-            const branch = suite.head_branch || '';
-            if (!branch.startsWith('hall/')) {
-              core.setOutput('agent', '');
-              return;
-            }
-
-            // Find open PRs on this branch
-            const prs = await github.rest.pulls.list({
-              owner, repo,
-              head:  `${owner}:${branch}`,
-              state: 'open'
-            });
-            if (!prs.data.length) {
-              core.setOutput('agent', '');
-              return;
-            }
-            const pr = prs.data[0];
-
-            // Confirm PR carries a hall:{agent} label
-            const hallLabel = pr.labels.find(l => l.name.startsWith('hall:'));
-            if (!hallLabel) {
-              core.setOutput('agent', '');
-              return;
-            }
-            const agent = hallLabel.name.replace('hall:', '');
-
-            // Extract issue number from branch: hall/{agent}/issue-{N}
-            const issueMatch = branch.match(/\/issue-(\d+)$/);
-            const issueNumber = issueMatch ? issueMatch[1] : '';
-
-            // Collect failed check run names
-            const runs = await github.rest.checks.listForSuite({
-              owner, repo,
-              check_suite_id: suite.id,
-              per_page: 50
-            });
-            const failures = runs.data.check_runs
-              .filter(r => r.conclusion === 'failure')
-              .map(r => r.name)
-              .join(', ');
-
-            core.setOutput('agent',        agent);
-            core.setOutput('pr-number',    String(pr.number));
-            core.setOutput('issue-number', issueNumber);
-            core.setOutput('repo-owner',   owner);
-            core.setOutput('repo-name',    repo);
-            core.setOutput('ci-failures',  failures);
+            const fn = require('./.hall/scripts/detect-ci-context.js')
+            await fn({ github, context, core })
 
   # ── Job 2: retry or escalate ─────────────────────────────────────────────
   redispatch:
@@ -107,15 +58,10 @@ jobs:
 
       - name: Read agent config
         id: agent-cfg
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
-        run: |
-          AGENT="${{ needs.detect.outputs.agent }}"
-          MAX_RETRIES=$(yq ".agents.${AGENT}.max_retries // 3" .hall/agents.yml)
-          MAX_TURNS=$(yq ".agents.${AGENT}.max_turns // 40" .hall/agents.yml)
-          KEEPER=$(yq ".agents.${AGENT}.keeper" .hall/agents.yml)
-          echo "max-retries=$MAX_RETRIES" >> "$GITHUB_OUTPUT"
-          echo "max-turns=$MAX_TURNS"     >> "$GITHUB_OUTPUT"
-          echo "keeper=$KEEPER"           >> "$GITHUB_OUTPUT"
+        run: bash .hall/scripts/read-agent-config.sh
 
       - name: Restore task memory
         id: memory
@@ -128,43 +74,28 @@ jobs:
       - name: Resolve retry count
         id: retry
         env:
-          MEMORY: ${{ steps.memory.outputs.memory-json }}
+          MEMORY:      ${{ steps.memory.outputs.memory-json }}
+          MAX_RETRIES: ${{ steps.agent-cfg.outputs.max-retries }}
         shell: bash
-        run: |
-          if [ -n "$MEMORY" ] && [ "$MEMORY" != '{}' ]; then
-            COUNT=$(printf '%s' "$MEMORY" | jq -r '.retry_count // 0')
-          else
-            COUNT=0
-          fi
-          NEW_COUNT=$((COUNT + 1))
-          MAX="${{ steps.agent-cfg.outputs.max-retries }}"
-          if [ "$COUNT" -ge "$MAX" ]; then
-            echo "escalate=true"        >> "$GITHUB_OUTPUT"
-          else
-            echo "escalate=false"       >> "$GITHUB_OUTPUT"
-          fi
-          echo "count=$COUNT"           >> "$GITHUB_OUTPUT"
-          echo "new-count=$NEW_COUNT"   >> "$GITHUB_OUTPUT"
+        run: bash .hall/scripts/resolve-retry.sh
 
       # ── Escalation path ───────────────────────────────────────────────────
 
       - name: Escalate — notify keeper on PR
         if: steps.retry.outputs.escalate == 'true'
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
+          KEEPER:       ${{ steps.agent-cfg.outputs.keeper }}
+          RETRY_COUNT:  ${{ steps.retry.outputs.count }}
+          CI_FAILURES:  ${{ needs.detect.outputs.ci-failures }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            await github.rest.issues.createComment({
-              owner:        '${{ needs.detect.outputs.repo-owner }}',
-              repo:         '${{ needs.detect.outputs.repo-name }}',
-              issue_number: Number('${{ needs.detect.outputs.pr-number }}'),
-              body: [
-                `@${{ steps.agent-cfg.outputs.keeper }} — retries exhausted`,
-                `after ${{ steps.retry.outputs.count }} attempts.`,
-                `Last CI failures: \`${{ needs.detect.outputs.ci-failures }}\`.`,
-                'Manual review required.'
-              ].join(' ')
-            });
+            const fn = require('./.hall/scripts/escalate-to-keeper.js')
+            await fn({ github, core })
 
       - name: Update status card — escalated
         if: steps.retry.outputs.escalate == 'true' && needs.detect.outputs.issue-number != ''
@@ -203,25 +134,13 @@ jobs:
       - name: Inject persona and CI context
         if: steps.retry.outputs.escalate != 'true'
         env:
-          AGENT:        ${{ needs.detect.outputs.agent }}
-          ATTEMPT:      ${{ steps.retry.outputs.new-count }}
-          MAX_RETRIES:  ${{ steps.agent-cfg.outputs.max-retries }}
-          PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
-          CI_FAILURES:  ${{ needs.detect.outputs.ci-failures }}
+          AGENT:       ${{ needs.detect.outputs.agent }}
+          ATTEMPT:     ${{ steps.retry.outputs.new-count }}
+          MAX_RETRIES: ${{ steps.agent-cfg.outputs.max-retries }}
+          PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
+          CI_FAILURES: ${{ needs.detect.outputs.ci-failures }}
         shell: bash
-        run: |
-          cp ".hall/roster/${AGENT}.md" CLAUDE.md
-          cat >> CLAUDE.md << 'HALLCTX'
-
-          ## Hall Task Context — CI Re-dispatch
-
-          The CI checks below failed on the PR you previously opened.
-          Investigate the failures, push fixes to the same branch, and do
-          not open a new PR.
-
-          HALLCTX
-          printf '**Attempt:** %s of %s\n**PR:** #%s\n**Failed checks:** %s\n' \
-            "$ATTEMPT" "$MAX_RETRIES" "$PR_NUMBER" "$CI_FAILURES" >> CLAUDE.md
+        run: bash .hall/scripts/inject-ci-context.sh
 
       - name: Run agent
         id: agent

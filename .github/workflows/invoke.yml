@@ -44,72 +44,25 @@ jobs:
       pr-number:     ${{ steps.ctx.outputs.pr-number }}
       review-body:   ${{ steps.ctx.outputs.review-body }}
     steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
       - name: Resolve invocation context
         id: ctx
+        env:
+          INPUT_AGENT:        ${{ inputs.agent }}
+          INPUT_ISSUE_NUMBER: ${{ inputs.issue-number }}
+          INPUT_REPO_OWNER:   ${{ inputs.repo-owner }}
+          INPUT_REPO_NAME:    ${{ inputs.repo-name }}
         uses: actions/github-script@v7
         with:
           script: |
-            const event   = context.eventName;
-            const payload  = context.payload;
-            let agent        = '${{ inputs.agent }}' || '';
-            let issueNumber  = '${{ inputs.issue-number }}' || '';
-            let invoker      = context.actor;
-            let triggerEvent = event;
-            let repoOwner    = '${{ inputs.repo-owner }}' || context.repo.owner;
-            let repoName     = '${{ inputs.repo-name }}' || context.repo.repo;
-
-            if (event === 'issues' && payload.action === 'labeled') {
-              const label = payload.label?.name || '';
-              if (!label.startsWith('hall:')) {
-                core.setOutput('agent', '');
-                return;
-              }
-              agent        = label.replace('hall:', '');
-              issueNumber  = String(payload.issue.number);
-              invoker      = payload.sender.login;
-              triggerEvent = 'issue_labeled';
-
-            } else if (event === 'issue_comment') {
-              const body = payload.comment?.body || '';
-              // Accept: @hall-of-automata[bot] <agent>  or  @hall-of-automata[bot] agent:<agent>
-              const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
-              if (!match) {
-                core.setOutput('agent', '');
-                return;
-              }
-              agent        = match[1];
-              issueNumber  = String(payload.issue.number);
-              invoker      = payload.sender.login;
-              triggerEvent = 'issue_comment';
-
-            } else if (event === 'pull_request_review') {
-              const body = payload.review?.body || '';
-              const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
-              if (!match) {
-                core.setOutput('agent', '');
-                return;
-              }
-              agent        = match[1];
-              issueNumber  = String(payload.pull_request.number);
-              invoker      = payload.sender.login;
-              triggerEvent = 'pr_review';
-              core.setOutput('pr-number',   issueNumber);
-              core.setOutput('review-body', body);
-
-            } else if (event === 'workflow_call') {
-              triggerEvent = 'workflow_call';
-              // agent, issueNumber, repoOwner, repoName all come from inputs above
-            } else {
-              core.setOutput('agent', '');
-              return;
-            }
-
-            core.setOutput('agent',         agent);
-            core.setOutput('issue-number',  issueNumber);
-            core.setOutput('invoker',       invoker);
-            core.setOutput('trigger-event', triggerEvent);
-            core.setOutput('repo-owner',    repoOwner);
-            core.setOutput('repo-name',     repoName);
+            const fn = require('./.hall/scripts/detect-invoke-context.js')
+            await fn({ github, context, core })
 
   # ── Job 2: dispatch the resolved agent ───────────────────────────────────
   dispatch:
@@ -137,15 +90,10 @@ jobs:
 
       - name: Read agent config
         id: agent-cfg
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
-        run: |
-          AGENT="${{ needs.detect.outputs.agent }}"
-          MAX_TURNS=$(yq ".agents.${AGENT}.max_turns // 40" .hall/agents.yml)
-          TEAM=$(yq ".agents.${AGENT}.teams[0]" .hall/agents.yml)
-          KEEPER=$(yq ".agents.${AGENT}.keeper" .hall/agents.yml)
-          echo "max-turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
-          echo "team-slug=$TEAM"      >> "$GITHUB_OUTPUT"
-          echo "keeper=$KEEPER"       >> "$GITHUB_OUTPUT"
+        run: bash .hall/scripts/read-agent-config.sh
 
       - name: Read weekly counter
         id: counter
@@ -156,32 +104,26 @@ jobs:
 
       - name: Check cap
         id: cap
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
+          COUNT: ${{ steps.counter.outputs.count }}
         shell: bash
-        run: |
-          AGENT="${{ needs.detect.outputs.agent }}"
-          DEFAULT=$(yq '.routing.weekly_cap' .hall/routing.yml)
-          OVERRIDE=$(yq ".routing.overrides.${AGENT}.weekly_cap // \"\"" .hall/routing.yml)
-          CAP=${OVERRIDE:-$DEFAULT}
-          COUNT="${{ steps.counter.outputs.count }}"
-          if [ "$COUNT" -ge "$CAP" ]; then
-            echo "over-cap=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "over-cap=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "cap=$CAP" >> "$GITHUB_OUTPUT"
+        run: bash .hall/scripts/check-weekly-cap.sh
 
       - name: Post cap-exceeded comment
         if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          CAP:          ${{ steps.cap.outputs.cap }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            await github.rest.issues.createComment({
-              owner:        '${{ needs.detect.outputs.repo-owner }}',
-              repo:         '${{ needs.detect.outputs.repo-name }}',
-              issue_number: Number('${{ needs.detect.outputs.issue-number }}'),
-              body: `**${{ needs.detect.outputs.agent }}** has reached its weekly invocation cap (${{ steps.cap.outputs.cap }}). The request has been queued.`
-            });
+            const fn = require('./.hall/scripts/post-cap-comment.js')
+            await fn({ github, core })
 
       - name: Authorize invoker
         id: auth
@@ -247,21 +189,10 @@ jobs:
       - name: Append review context to CLAUDE.md
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
         env:
-          PR_NUMBER: ${{ needs.detect.outputs.pr-number }}
+          PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
           REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
         shell: bash
-        run: |
-          cat >> CLAUDE.md << 'HALLCTX'
-
-          ## Hall Task Context — Review Re-dispatch
-
-          A reviewer has requested changes on the PR you opened. Address the
-          feedback below and push to the existing branch. Do not open a new PR.
-
-          ### Review comment
-
-          HALLCTX
-          printf 'PR: #%s\n\n%s\n' "$PR_NUMBER" "$REVIEW_BODY" >> CLAUDE.md
+        run: bash .hall/scripts/append-review-context.sh
 
       - name: Run agent
         id: agent
@@ -277,20 +208,17 @@ jobs:
       - name: Find PR opened by agent
         id: find-pr
         if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event != 'pr_review'
+        env:
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const branch = `hall/${{ needs.detect.outputs.agent }}/issue-${{ needs.detect.outputs.issue-number }}`;
-            const prs = await github.rest.pulls.list({
-              owner: '${{ needs.detect.outputs.repo-owner }}',
-              repo:  '${{ needs.detect.outputs.repo-name }}',
-              head:  `${{ needs.detect.outputs.repo-owner }}:${branch}`,
-              state: 'open'
-            });
-            const pr = prs.data[0];
-            core.setOutput('pr-number', pr ? String(pr.number) : '');
-            core.setOutput('branch',    branch);
+            const fn = require('./.hall/scripts/find-agent-pr.js')
+            await fn({ github, core })
 
       - name: Save task memory
         if: always() && steps.auth.outputs.authorized == 'true' && steps.find-pr.outputs.pr-number != ''
@@ -319,20 +247,7 @@ jobs:
           DETECT_PR: ${{ needs.detect.outputs.pr-number }}
           BRANCH:    ${{ steps.find-pr.outputs.branch }}
         shell: bash
-        run: |
-          if [ "$TRIGGER" = "pr_review" ]; then
-            echo "stage=pr-opened"    >> "$GITHUB_OUTPUT"
-            echo "pr-number=$DETECT_PR" >> "$GITHUB_OUTPUT"
-            echo "branch="            >> "$GITHUB_OUTPUT"
-          elif [ -n "$FIND_PR" ]; then
-            echo "stage=pr-opened"    >> "$GITHUB_OUTPUT"
-            echo "pr-number=$FIND_PR" >> "$GITHUB_OUTPUT"
-            echo "branch=$BRANCH"     >> "$GITHUB_OUTPUT"
-          else
-            echo "stage=done"         >> "$GITHUB_OUTPUT"
-            echo "pr-number="         >> "$GITHUB_OUTPUT"
-            echo "branch="            >> "$GITHUB_OUTPUT"
-          fi
+        run: bash .hall/scripts/resolve-final-stage.sh
 
       - name: Update status card
         if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''

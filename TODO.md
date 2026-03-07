@@ -235,15 +235,11 @@ Implemented in `hall-ci-loop.yml`: when `retry_count >= max_retries`, posts `@{k
 
 ---
 
-## Phase 4 — Audit & polish 🔧 ← next
+## Phase 4 — Audit & polish 🔧 ← in progress
 
-### 4.1 `actions/post-dispatch/action.yml`
+### 4.1 `actions/post-dispatch/action.yml` ✅
 
-Runs after every successful dispatch:
-- Increment weekly counter in cache
-- Upload invocation JSON as Actions Artifact (schema: Appendix E of design doc)
-- Apply `hall:{agent}` label to any PR the agent opened
-- Update status card to current stage
+Done in Phase 3. Applies `hall:{agent}` label to the opened PR, writes and uploads the invocation audit log as an Actions Artifact. Called at the end of every dispatch job in `invoke.yml`.
 
 ### 4.2 Awaiting-input state
 
@@ -280,6 +276,20 @@ These are explicitly out of scope for the first working version.
 | Org `.github` repo split | Shareability enhancement. Hall repo actions already reusable; split is an install-UX improvement, not a functional one. |
 | Hall-owned Check Runs | Appendix B/design doc: deferred. `checks:write` permission should be requested upfront (no re-approval later). |
 | Scheduled queue drain (UC-6 full) | `hall:queued` label logic is simple; the scheduled re-dispatch on counter reset is a separate cron workflow. Not needed for core loop. |
+
+### Webhook relay — what it is and why it matters 👤
+
+**Current limitation.** GitHub only delivers workflow trigger events (issues, issue_comment, pull_request_review, check_suite) to workflows in the *same repository where the event occurred*. The Hall's `invoke.yml` therefore only reacts to events on the hall-of-automata repo itself. To invoke an agent from a target repo today, someone would need to trigger the workflow manually or add a caller workflow to each target repo — neither is the intended UX.
+
+**What the relay does.** The GitHub App (hall-of-automata) is installed at the org level and receives webhooks for *all* org repos. A relay is a small HTTPS server that:
+
+1. Receives the GitHub App webhook (any org repo event)
+2. Validates the payload signature with the App's webhook secret
+3. Calls `POST /repos/org/hall-of-automata/actions/workflows/invoke.yml/dispatches` (or the `.github` repo equivalent) with the event payload forwarded as `workflow_dispatch` inputs
+
+This makes the Hall org-wide with zero per-repo configuration. Any `@hall-of-automata comment` or label event anywhere in the org triggers the Hall automatically.
+
+**When to build it.** After a successful end-to-end smoke test on the hall repo itself (Phase 4 done). The relay is a prerequisite for real multi-repo use. Options for hosting: a small Cloudflare Worker, a Fly.io instance, or a GitHub App proxy service. The relay only needs to validate a signature and call one GitHub API endpoint — it can be fewer than 100 lines.
 
 ---
 
