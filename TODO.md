@@ -1,311 +1,103 @@
-# Hall of Automata — Implementation Plan
+# Hall of Automata — Dev Log
 
-> Legend: 👤 you · 🔧 code · ⚠️ breaking change
-
----
-
-## State of the repo vs. the design document
-
-The current repo has a working skeleton: label-triggered dispatch, team-membership auth, basic CLAUDE.md injection, Hamlet roster entry. It was built before the design document and differs in several structural ways:
-
-| Area | Current | Design doc |
-|------|---------|------------|
-| Auth mechanism | Anthropic API key (`ANTHROPIC_API_KEY`) | Claude OAuth token (`claude_code_oauth_token`) ⚠️ |
-| Bot identity | `github-actions[bot]` | `hall-of-automata[bot]` (GitHub App) |
-| Agent config | Inline in per-agent workflow files | `agents.yml` + `routing.yml` |
-| Persona | Inline `personality-instructions` input | Separate `personas/{agent}.md` files |
-| Workflows location | Hall repo `.github/workflows/` | Hall repo `actions/` (reusable) + per-repo callers |
-| PR lifecycle | Not handled | CI loop + review loop + cleanup |
-| Task memory | None (stateless) | Actions Cache, keyed by PR number |
-| Status card | None | In-place comment on issue/PR thread |
-| Weekly counter + routing | None | Cache-based counter + least-used routing |
-| Audit log | None | Actions Artifact per dispatch |
-| Keeper escalation | None | @mention on retry exhaustion |
-
-The `agents/`, `architecture/`, `codex/`, `federation/`, and `roster/` directories are good reference material and should be kept. The workflows need significant restructuring.
+> Legend: ✅ done · 🔧 code task · 👤 keeper task · ⚠️ known gap
 
 ---
 
-## 👤 Prerequisites — you do these first
+## Status
 
-Nothing else can start until these are in place.
-
-### 1. Register the GitHub App ✅
-
-Go to `github.com/organizations/{org}/settings/apps` → New GitHub App.
-
-| Field | Value |
-|-------|-------|
-| Name | `Hall of Automata` |
-| Homepage URL | your org or Hall repo URL |
-| Webhook | Active: No (for now — relay server is deferred) |
-| Permissions | Contents: R/W · Issues: R/W · Pull Requests: R/W · Members: R · Metadata: R · Checks: R/W |
-| Events | `issue_comment`, `issues`, `pull_request`, `pull_request_review`, `check_suite` |
-| Where installed | This account (org) |
-
-After creating: note the **App ID** and generate + download a **private key** (`.pem`). Store both as repo secrets in the Hall repo (Settings → Secrets and variables → Actions → New repository secret):
-- `APP_ID` → the numeric App ID shown on the App's settings page
-- `APP_PRIVATE_KEY` → the full `.pem` file content
-
-These names are used verbatim in `invoke.yml` (`secrets.APP_ID`, `secrets.APP_PRIVATE_KEY`). Do not prefix or rename them.
-
-Install the App at the org level: App settings → Install App → select org → all repositories.
-
-### 2. Find or commission the bot avatar ✅
-
-The `hall-of-automata[bot]` needs a custom avatar. Upload it in the App settings under "Display information". No action blocked on this, but do it early — the identity matters.
-
-### 3. Set up Claude OAuth tokens per agent ✅
-
-On each agent keeper's machine, run:
-
-```sh
-claude setup-token
-```
-
-This authenticates via Claude Pro/Max and produces an OAuth token. Copy the token — it is only shown once.
-
-### 4. Create GitHub Environments for agents ✅
-
-In the Hall repo: Settings → Environments → New environment.
-
-- Name: `hall/hamlet`
-- Add secret: `CLAUDE_CODE_OAUTH_TOKEN` = (paste hamlet keeper's token)
-- Set protection rules if desired (e.g., require approval for production use)
-
-Repeat for each agent added to the roster.
-
-### 5. Verify the `automata-invokers` team ✅
-
-Confirm the team exists in the org and has the right members. The authorization logic depends on this team slug — if you rename it, update `agents.yml` accordingly.
-
-### 6. Create the `hall-of-automata` labels in target repos ✅
-
-Each target repo needs:
-- `hall:hamlet` (or per-agent) — for PR binding
-- `hall:queued` — for queued tasks
-- Per-agent trigger labels (`hamlet`, etc.) — these likely already exist
-
-Labels can be created via `gh label create` or the GitHub UI.
+**Phases 1–4 complete.** The dispatch core, task lifecycle, and audit layer are all implemented. The system is ready for a smoke test on the hall repo itself before the webhook relay is built.
 
 ---
 
-## Phase 1 — Repo restructuring ✅
+## What was built
 
-**Goal:** get the Hall repo into the shape the design doc describes before adding new logic.
+### Prerequisites (👤)
+- GitHub App registered (`hall-of-automata[bot]`), App ID and private key stored as repo secrets
+- Bot avatar uploaded
+- `hamlet` keeper OAuth token generated via `claude setup-token`, stored in `hall/hamlet` Environment
+- `automata-invokers` team verified
+- Trigger labels created in target repos
 
-### 1.1 `roster/` is the personas directory
+### Phase 1 — Repo structure
+- `agents.yml` · `routing.yml` · `actions/` skeletons · `roster/hamlet.md` as persona file
+- Generic `invoke.yml` replaces per-agent workflow files
 
-`roster/hamlet.md` already is the agent identity and persona file. No new directory. `agents.yml` references `roster/hamlet.md` as the persona path. The dispatch action reads it and writes its content into CLAUDE.md before the agent runs.
+### Phase 2 — Dispatch core
+- `actions/authorize` — team membership gate, rejection comment, label removal
+- `actions/status-card` — upsert `<!-- hall-status -->` comment across full lifecycle
+- `actions/counter` — weekly invocation counter via Actions Cache
+- `actions/dispatch` — runs `claude-code-action@v1` with OAuth token and persona
+- `actions/post-dispatch` — applies `hall:{agent}` label to opened PR, uploads audit artifact
+- `invoke.yml` — two-job workflow: detect trigger context → dispatch agent
 
-### 1.2 Create `agents.yml`
+### Phase 3 — Task lifecycle
+- `actions/memory` — save/restore task JSON blob via Actions Cache (keyed by PR)
+- `hall-ci-loop.yml` — detects failing CI on `hall/*` branches, re-dispatches or escalates
+- `invoke.yml` pr_review path — restores memory, appends review feedback, re-dispatches
+- Keeper escalation — @mention on PR after `max_retries` exhausted
+- `hall-cleanup.yml` + `actions/cleanup` — deletes memory, removes labels, posts issue summary
 
-Centralized agent registry. See Appendix C of design doc for schema. Hamlet entry:
+### Phase 4 — Polish
+- `scripts/` — all inline bash and JS extracted from workflows into standalone files
+- `awaiting-input` state — status card stage + `hall:awaiting-input` label + auto-re-dispatch on human reply
+- Issue template updated with `@mention` + label invocation instructions
+- Docs reconciled: `secrets-model.md`, `runner-model.md`, `federation/joining.md`, `roster/hamlet.md`
 
-```yaml
-agents:
-  hamlet:
-    environment: hall/hamlet          # GitHub Environment holding the OAuth token
-    secret: CLAUDE_CODE_OAUTH_TOKEN
-    persona: personas/hamlet.md
-    teams: [automata-invokers]
-    max_turns: 40
-    max_retries: 3
-    capabilities: [implement, review, fix, refactor]
-    keeper: mksetaro
-```
+---
 
-### 1.3 Create `routing.yml`
+## Open items
 
-```yaml
-routing:
-  weekly_cap: 25
-  reset_day: monday
-  overrides:
-    hamlet:
-      weekly_cap: 40
-  fallback: queue
-  strategy: least_used
-```
+### 🔧 FR-9: Automatic routing (cap → least-used agent)
 
-### 1.4 Scaffold `actions/` directory
+Currently when an agent exceeds its weekly cap the Hall posts a comment and exits. The design calls for rerouting to the least-used eligible agent with matching capabilities.
 
-Create the skeleton for composite actions (implementations come in Phase 2):
+What needs to happen in `invoke.yml` dispatch job:
+1. After cap check fires, query the counter cache for all agents
+2. Filter by `capabilities` overlap with the requested agent (from `agents.yml`)
+3. Pick the agent with the lowest count that is still under its own cap
+4. Re-run auth + dispatch with the alternate agent
+5. Post a comment noting the reroute (`rerouted: true` in audit log)
+
+`routing.yml` `strategy: least_used` and `fallback: queue` are already parsed — implement the lookup and fallback to `hall:queued` label when all alternates are also capped.
+
+### 🔧 Semantic `outcome` in audit log
+
+`post-dispatch` receives `outcome: ${{ steps.agent.outcome || 'skipped' }}` which is a GitHub step conclusion (`success`/`failure`/`skipped`), not the semantic outcome defined in Appendix E (`pr_created`, `comment_posted`, `awaiting_input`, `failed`).
+
+Fix: pass `${{ steps.final.outputs.stage }}` as an additional input or derive the semantic outcome from the final stage in `post-dispatch` itself.
+
+---
+
+## Known limitations
+
+| Limitation | Impact | When to fix |
+|------------|--------|-------------|
+| No webhook relay | Hall only reacts to events on the hall repo itself; target repos don't trigger the Hall automatically | Before real multi-repo use — see relay notes below |
+| `post-dispatch` pre-built inputs unused (`turns-used`, `turns-max`, `retry-count`, `rerouted`) | Audit log always shows `0`/`false` for these fields | When FR-9 routing is implemented |
+| `hall-cleanup.yml` detect step stays inline JS | Minor style inconsistency; step runs before checkout so extraction would require an extra sparse checkout step | Low priority |
+| PR size cap (800 LOC) | No limit on how large an agent's PR diff can be | Investigate: persona instruction vs. post-dispatch CI gate; configurable per agent in `agents.yml` |
+| Agent display names with emoji | Status card and comments use the raw slug (`hamlet`) not the display name (`hamlet 🐗`) | Add `display_name` field to `agents.yml`; update status-card and comment templates |
+
+---
+
+## Webhook relay — 👤 next infrastructure task
+
+**Why it's needed.** GitHub delivers workflow events only to the repo where the event occurs. The Hall's `invoke.yml` currently only fires on events within the hall-of-automata repo itself. For true org-wide operation, a relay is required.
+
+**What it does:**
+1. Receives GitHub App webhook (any org repo event)
+2. Validates signature with the App's webhook secret
+3. Calls `POST /repos/MockaSort-Studio/hall-of-automata/actions/workflows/invoke.yml/dispatches` with the event payload forwarded as `workflow_dispatch` inputs
+
+**Hosting options:** Cloudflare Worker, Fly.io, GitHub App proxy. Fewer than 100 lines. The relay only validates a signature and calls one API endpoint.
+
+**Build it after** a successful end-to-end smoke test on the hall repo (see `TEST_PLAN.md`).
+
+---
+
+## Order of remaining work
 
 ```
-actions/
-  authorize/action.yml
-  status-card/action.yml
-  counter/action.yml
-  dispatch/action.yml
-  post-dispatch/action.yml
-  memory/action.yml
-  cleanup/action.yml
+Smoke test (TEST_PLAN.md) → FR-9 routing → webhook relay → full org test
 ```
-
-Each is a GitHub composite action with `runs: using: composite`.
-
----
-
-## Phase 2 — Dispatch core ✅
-
-**Goal:** a working end-to-end dispatch from invocation to agent running on a PR, with status card and counter.
-
-### 2.1 `actions/authorize/action.yml`
-
-Extracted from current `_base-invoke.yml` step 1. Inputs: `org`, `team-slug`, `username`, `org-read-token`. Output: `authorized` (true/false). Posts rejection comment and exits if unauthorized.
-
-### 2.2 `actions/status-card/action.yml`
-
-Creates or updates the `<!-- hall-status -->` comment on the triggering issue or PR.
-
-Inputs: `issue-number`, `repo`, `stage`, `agent`, `dispatched-at`, `branch`, `pr-number`.
-Logic: search existing comments for `<!-- hall-status -->` marker; if found, edit it; if not, create it.
-Stage values: `dispatching` · `analyzing` · `awaiting-input` · `working` · `pr-opened` · `ci-fix` · `escalated` · `done`.
-
-### 2.3 `actions/counter/action.yml`
-
-Read/write weekly invocation counts from Actions Cache.
-
-- Cache key: `hall-counters-{YYYY}-W{WW}`
-- On read: restore cache, parse JSON, return count for requested agent
-- On write: increment count, re-save cache
-- Schema: Appendix D of design doc
-
-### 2.4 Main dispatch workflow
-
-`.github/workflows/invoke.yml` — generic two-job workflow (replaces deleted `_base-invoke.yml` and `invoke-hamlet.yml`):
-
-- **`detect` job**: resolves `agent`, `issue-number`, `invoker`, `trigger-event`, `repo-owner`, `repo-name` from any trigger. For `workflow_call` the agent comes from `inputs.agent`; for direct triggers it is extracted from label names or `@hall-of-automata[bot]` mentions.
-- **`dispatch` job**: runs with `environment: hall/{agent}` (dynamic, computed from detect outputs) and `concurrency: hall-{agent}-{issue-number}`. Calls composite actions in sequence:
-  1. `create-github-app-token` — app installation token
-  2. Checkout Hall repo → `.hall/`
-  3. Read agent config (max-turns, team-slug, keeper) from `agents.yml` via `yq`
-  4. `counter` read + cap check via `routing.yml`
-  5. `authorize` — gate, exit on failure
-  6. `status-card` → stage: `dispatching`
-  7. `counter` increment
-  8. Checkout target repo (`clean: false`)
-  9. Inject persona (`CLAUDE.md`)
-  10. `dispatch` — run `claude-code-action@v1` with OAuth token
-  11. `status-card` → stage: `done`
-  12. `post-dispatch` — upload audit artifact
-
-⚠️ Auth mechanism: `CLAUDE_CODE_OAUTH_TOKEN` comes from the agent's GitHub Environment (not `ANTHROPIC_API_KEY`).
-
-### 2.5 App installation token for bot identity
-
-Replace uses of default `GITHUB_TOKEN` (which posts as `github-actions[bot]`) with the App's installation token (which posts as `hall-of-automata[bot]`).
-
-Use `actions/create-github-app-token@v1` at the start of each job to generate an installation-scoped token from `APP_ID` + `APP_PRIVATE_KEY`. Pass this token to all API calls and to the claude-code-action.
-
----
-
-## Phase 3 — Task lifecycle ✅
-
-**Goal:** the full loop from PR open through CI, review, memory, and cleanup.
-
-### 3.1 `actions/memory/action.yml` ✅
-
-Done in Phase 1. Cache key: `hall-task-{repo}-{pr_number}`. Save/restore JSON blob from Actions Cache.
-
-### 3.2 CI orchestration loop ✅
-
-`.github/workflows/hall-ci-loop.yml`:
-- Trigger: `check_suite: completed` on `hall/*` branches
-- detect job: finds agent from `hall:*` PR label, collects failed check names, extracts issue number from branch
-- redispatch job: restores memory → checks retry count → escalates (keeper @mention + card: `escalated`) or re-dispatches (injects CI context into CLAUDE.md, runs agent, saves memory with incremented retry_count, card: `ci-fix → pr-opened`)
-
-### 3.3 Review interaction loop ✅
-
-`invoke.yml` `pull_request_review` path extended:
-- detect job now outputs `pr-number` and `review-body` for pr_review events
-- dispatch job restores memory by PR number and appends review feedback to CLAUDE.md before running agent
-
-### 3.4 Keeper escalation ✅
-
-Implemented in `hall-ci-loop.yml`: when `retry_count >= max_retries`, posts `@{keeper}` comment on the PR with failure summary, updates status card to `escalated`, skips re-dispatch.
-
-### 3.5 Cleanup workflow ✅
-
-`.github/workflows/hall-cleanup.yml`:
-- Trigger: `pull_request: closed` on PRs with any `hall:*` label
-- Extracts agent from label, linked issue from PR body (`closes/fixes/resolves #N`)
-- Calls `actions/cleanup` (deletes memory cache, removes label, posts summary on linked issue if merged)
-
----
-
-## Phase 4 — Audit & polish 🔧 ← in progress
-
-### 4.1 `actions/post-dispatch/action.yml` ✅
-
-Done in Phase 3. Applies `hall:{agent}` label to the opened PR, writes and uploads the invocation audit log as an Actions Artifact. Called at the end of every dispatch job in `invoke.yml`.
-
-### 4.2 Awaiting-input state
-
-Add logic in the dispatch workflow to detect when the agent has posted a question (no PR opened, no code committed). Set status card → stage: `awaiting-input`. No re-dispatch until a non-bot `issue_comment` arrives on the issue.
-
-This is event-driven: the existing `issue_comment` trigger already handles re-dispatch. The key is the status card update and NOT auto-closing or timing out.
-
-### 4.3 Update issue template
-
-Update `.github/ISSUE_TEMPLATE/automaton-task.yml`:
-- Change invocation instruction from "apply label" to `@hall-of-automata <agent>` comment model (FR-1a)
-- Keep label model as alternative (FR-1b)
-- Add note that the Hall will post a status card as first response
-
-### 4.4 Reconcile old docs
-
-`architecture/`, `codex/`, and `federation/` are kept. They contain useful rationale and process docs. Some are stale relative to the design doc (API keys vs OAuth tokens, etc.) — update them in place rather than deleting.
-
-Priority updates:
-- `architecture/secrets-model.md` → OAuth tokens + GitHub Environments instead of org secrets
-- `architecture/runner-model.md` → composite actions + GitHub App model
-- `federation/joining.md` → `claude setup-token` onboarding flow
-- `roster/hamlet.md` → reference `agents.yml` as canonical config source
-
----
-
-## Deferred
-
-These are explicitly out of scope for the first working version.
-
-| Item | Why deferred |
-|------|-------------|
-| Webhook relay server | Requires persistent HTTPS endpoint. Direct Actions triggers cover MVP. Needed when: multi-repo org wants zero per-repo config. |
-| Org `.github` repo split | Shareability enhancement. Hall repo actions already reusable; split is an install-UX improvement, not a functional one. |
-| Hall-owned Check Runs | Appendix B/design doc: deferred. `checks:write` permission should be requested upfront (no re-approval later). |
-| Scheduled queue drain (UC-6 full) | `hall:queued` label logic is simple; the scheduled re-dispatch on counter reset is a separate cron workflow. Not needed for core loop. |
-
-### Webhook relay — what it is and why it matters 👤
-
-**Current limitation.** GitHub only delivers workflow trigger events (issues, issue_comment, pull_request_review, check_suite) to workflows in the *same repository where the event occurred*. The Hall's `invoke.yml` therefore only reacts to events on the hall-of-automata repo itself. To invoke an agent from a target repo today, someone would need to trigger the workflow manually or add a caller workflow to each target repo — neither is the intended UX.
-
-**What the relay does.** The GitHub App (hall-of-automata) is installed at the org level and receives webhooks for *all* org repos. A relay is a small HTTPS server that:
-
-1. Receives the GitHub App webhook (any org repo event)
-2. Validates the payload signature with the App's webhook secret
-3. Calls `POST /repos/org/hall-of-automata/actions/workflows/invoke.yml/dispatches` (or the `.github` repo equivalent) with the event payload forwarded as `workflow_dispatch` inputs
-
-This makes the Hall org-wide with zero per-repo configuration. Any `@hall-of-automata comment` or label event anywhere in the org triggers the Hall automatically.
-
-**When to build it.** After a successful end-to-end smoke test on the hall repo itself (Phase 4 done). The relay is a prerequisite for real multi-repo use. Options for hosting: a small Cloudflare Worker, a Fly.io instance, or a GitHub App proxy service. The relay only needs to validate a signature and call one GitHub API endpoint — it can be fewer than 100 lines.
-
----
-
-## Order of execution
-
-```
-Prerequisites (👤) → Phase 1 (structure) → Phase 2 (dispatch core) → smoke test
-→ Phase 3 (lifecycle) → Phase 4 (polish) → full end-to-end test
-```
-
-Do not start Phase 2 before the GitHub App and OAuth tokens are in place — the App token and OAuth credential are load-bearing for everything downstream.
-
----
-
-## Open questions / constraints to investigate
-
-- **PR size cap (800 LOC):** Analyse whether enforcing a hard upper bound on output PR diff size (e.g. 800 LOC) is a viable scope constraint. If the required change would exceed the cap the agent should decline and reply to the originating comment explaining why the task is too large to implement in a single PR, rather than opening an oversized PR. Investigate: where the check fits (pre-dispatch persona instruction vs. post-dispatch CI gate), how to measure LOC reliably across added/removed lines, and whether the cap should be configurable per agent in `agents.yml`.
-
-- **Agent display names with emoji:** Agent identifiers in `agents.yml` (e.g. `hamlet`) are plain slugs used as branch names, label names (`hall:hamlet`), and environment names (`hall/hamlet`) — none of which allow emoji. However, agents may have a human-facing display name with emoji (e.g. `hamlet 🐗`) for use in status card headers, comments, and persona files. Decide where the display name lives (field in `agents.yml`? first line of persona file?) and update status-card and any comment templates to use it instead of the raw slug.

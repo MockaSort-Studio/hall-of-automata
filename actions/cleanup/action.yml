@@ -71,6 +71,23 @@ runs:
             // Label may already be gone — not an error
           }
 
+    - name: Remove awaiting-input label from linked issue
+      if: inputs.issue-number != ''
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.app-token }}
+        script: |
+          try {
+            await github.rest.issues.removeLabel({
+              owner: '${{ inputs.repo-owner }}',
+              repo: '${{ inputs.repo-name }}',
+              issue_number: Number('${{ inputs.issue-number }}'),
+              name: 'hall:awaiting-input'
+            });
+          } catch {
+            // Label may not exist — not an error
+          }
+
     - name: Post summary on linked issue
       if: inputs.issue-number != '' && inputs.merged == 'true'
       uses: actions/github-script@v7

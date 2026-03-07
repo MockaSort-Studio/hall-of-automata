@@ -36,7 +36,8 @@ module.exports = async ({ context, core }) => {
       const labels     = payload.issue?.labels || [];
       const awaitLabel = labels.find(l => l.name === 'hall:awaiting-input');
       if (!awaitLabel) { core.setOutput('agent', ''); return; }
-      const hallLabel  = labels.find(l => l.name.startsWith('hall:') && l.name !== 'hall:awaiting-input');
+      const SYSTEM_LABELS = ['hall:awaiting-input', 'hall:queued'];
+      const hallLabel  = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
       if (!hallLabel)  { core.setOutput('agent', ''); return; }
       agent = hallLabel.name.replace('hall:', '');
     }
