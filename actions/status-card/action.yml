@@ -78,6 +78,8 @@ runs:
           }[stage] ?? stage;
 
           const dispatched = '${{ inputs.dispatched-at }}' || new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+          const runUrl  = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const runLink = `[Run #${context.runId}](${runUrl})`;
 
           const body = [
             '<!-- hall-status -->',
@@ -88,7 +90,8 @@ runs:
             `| **Stage** | ${stageLabel} |`,
             `| **Dispatched** | ${dispatched} |`,
             `| **Branch** | \`${branch}\` |`,
-            `| **PR** | ${pr} |`
+            `| **PR** | ${pr} |`,
+            `| **Run** | ${runLink} |`
           ].join('\n');
 
           // Search for an existing status card in the thread
