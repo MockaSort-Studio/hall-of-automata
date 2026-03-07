@@ -1,0 +1,265 @@
+name: Invoke Agent
+
+on:
+  workflow_call:
+    inputs:
+      agent:
+        description: Agent identifier (e.g. hamlet)
+        required: true
+        type: string
+      repo-owner:
+        description: Target repository owner (defaults to this org)
+        required: false
+        type: string
+        default: ""
+      repo-name:
+        description: Target repository name (defaults to this repo)
+        required: false
+        type: string
+        default: ""
+      issue-number:
+        description: Issue or PR number in the target repository
+        required: false
+        type: string
+        default: ""
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  # ── Job 1: resolve invocation context ────────────────────────────────────
+  detect:
+    name: Detect invocation context
+    runs-on: ubuntu-latest
+    outputs:
+      agent:         ${{ steps.ctx.outputs.agent }}
+      issue-number:  ${{ steps.ctx.outputs.issue-number }}
+      invoker:       ${{ steps.ctx.outputs.invoker }}
+      trigger-event: ${{ steps.ctx.outputs.trigger-event }}
+      repo-owner:    ${{ steps.ctx.outputs.repo-owner }}
+      repo-name:     ${{ steps.ctx.outputs.repo-name }}
+    steps:
+      - name: Resolve invocation context
+        id: ctx
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const event   = context.eventName;
+            const payload  = context.payload;
+            let agent        = '${{ inputs.agent }}' || '';
+            let issueNumber  = '${{ inputs.issue-number }}' || '';
+            let invoker      = context.actor;
+            let triggerEvent = event;
+            let repoOwner    = '${{ inputs.repo-owner }}' || context.repo.owner;
+            let repoName     = '${{ inputs.repo-name }}' || context.repo.repo;
+
+            if (event === 'issues' && payload.action === 'labeled') {
+              const label = payload.label?.name || '';
+              if (!label.startsWith('hall:')) {
+                core.setOutput('agent', '');
+                return;
+              }
+              agent        = label.replace('hall:', '');
+              issueNumber  = String(payload.issue.number);
+              invoker      = payload.sender.login;
+              triggerEvent = 'issue_labeled';
+
+            } else if (event === 'issue_comment') {
+              const body = payload.comment?.body || '';
+              // Accept: @hall-of-automata[bot] <agent>  or  @hall-of-automata[bot] agent:<agent>
+              const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
+              if (!match) {
+                core.setOutput('agent', '');
+                return;
+              }
+              agent        = match[1];
+              issueNumber  = String(payload.issue.number);
+              invoker      = payload.sender.login;
+              triggerEvent = 'issue_comment';
+
+            } else if (event === 'pull_request_review') {
+              const body = payload.review?.body || '';
+              const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
+              if (!match) {
+                core.setOutput('agent', '');
+                return;
+              }
+              agent        = match[1];
+              issueNumber  = String(payload.pull_request.number);
+              invoker      = payload.sender.login;
+              triggerEvent = 'pr_review';
+
+            } else if (event === 'workflow_call') {
+              triggerEvent = 'workflow_call';
+              // agent, issueNumber, repoOwner, repoName all come from inputs above
+            } else {
+              core.setOutput('agent', '');
+              return;
+            }
+
+            core.setOutput('agent',         agent);
+            core.setOutput('issue-number',  issueNumber);
+            core.setOutput('invoker',       invoker);
+            core.setOutput('trigger-event', triggerEvent);
+            core.setOutput('repo-owner',    repoOwner);
+            core.setOutput('repo-name',     repoName);
+
+  # ── Job 2: dispatch the resolved agent ───────────────────────────────────
+  dispatch:
+    name: Dispatch ${{ needs.detect.outputs.agent }}
+    needs: [detect]
+    if: needs.detect.outputs.agent != ''
+    runs-on: ubuntu-latest
+    environment: hall/${{ needs.detect.outputs.agent }}
+    concurrency:
+      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
+      cancel-in-progress: false
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ needs.detect.outputs.repo-owner }}
+
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Read agent config
+        id: agent-cfg
+        shell: bash
+        run: |
+          AGENT="${{ needs.detect.outputs.agent }}"
+          MAX_TURNS=$(yq ".agents.${AGENT}.max_turns // 40" .hall/agents.yml)
+          TEAM=$(yq ".agents.${AGENT}.teams[0]" .hall/agents.yml)
+          KEEPER=$(yq ".agents.${AGENT}.keeper" .hall/agents.yml)
+          echo "max-turns=$MAX_TURNS" >> "$GITHUB_OUTPUT"
+          echo "team-slug=$TEAM"      >> "$GITHUB_OUTPUT"
+          echo "keeper=$KEEPER"       >> "$GITHUB_OUTPUT"
+
+      - name: Read weekly counter
+        id: counter
+        uses: ./.hall/actions/counter
+        with:
+          mode: read
+          agent: ${{ needs.detect.outputs.agent }}
+
+      - name: Check cap
+        id: cap
+        shell: bash
+        run: |
+          AGENT="${{ needs.detect.outputs.agent }}"
+          DEFAULT=$(yq '.routing.weekly_cap' .hall/routing.yml)
+          OVERRIDE=$(yq ".routing.overrides.${AGENT}.weekly_cap // \"\"" .hall/routing.yml)
+          CAP=${OVERRIDE:-$DEFAULT}
+          COUNT="${{ steps.counter.outputs.count }}"
+          if [ "$COUNT" -ge "$CAP" ]; then
+            echo "over-cap=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "over-cap=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "cap=$CAP" >> "$GITHUB_OUTPUT"
+
+      - name: Post cap-exceeded comment
+        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner:        '${{ needs.detect.outputs.repo-owner }}',
+              repo:         '${{ needs.detect.outputs.repo-name }}',
+              issue_number: Number('${{ needs.detect.outputs.issue-number }}'),
+              body: `**${{ needs.detect.outputs.agent }}** has reached its weekly invocation cap (${{ steps.cap.outputs.cap }}). The request has been queued.`
+            });
+
+      - name: Authorize invoker
+        id: auth
+        if: steps.cap.outputs.over-cap != 'true'
+        uses: ./.hall/actions/authorize
+        with:
+          org-read-token: ${{ steps.app-token.outputs.token }}
+          org:            ${{ needs.detect.outputs.repo-owner }}
+          team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
+          username:       ${{ needs.detect.outputs.invoker }}
+          app-token:      ${{ steps.app-token.outputs.token }}
+          repo-owner:     ${{ needs.detect.outputs.repo-owner }}
+          repo-name:      ${{ needs.detect.outputs.repo-name }}
+          issue-number:   ${{ needs.detect.outputs.issue-number }}
+          trigger-event:  ${{ needs.detect.outputs.trigger-event }}
+          label-name:     hall:${{ needs.detect.outputs.agent }}
+          agent-name:     ${{ needs.detect.outputs.agent }}
+
+      - name: Update status card — dispatching
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:     ${{ steps.app-token.outputs.token }}
+          repo-owner:    ${{ needs.detect.outputs.repo-owner }}
+          repo-name:     ${{ needs.detect.outputs.repo-name }}
+          issue-number:  ${{ needs.detect.outputs.issue-number }}
+          agent:         ${{ needs.detect.outputs.agent }}
+          stage:         dispatching
+          dispatched-at: ${{ github.event.created_at }}
+
+      - name: Increment weekly counter
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
+        id: increment
+        uses: ./.hall/actions/counter
+        with:
+          mode:  increment
+          agent: ${{ needs.detect.outputs.agent }}
+
+      - name: Checkout target repository
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          token:      ${{ steps.app-token.outputs.token }}
+          clean:      false
+
+      - name: Inject agent persona
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
+        shell: bash
+        run: cp .hall/roster/${{ needs.detect.outputs.agent }}.md CLAUDE.md
+
+      - name: Run agent
+        id: agent
+        if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token: ${{ env.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
+
+      - name: Update status card — done
+        if: always() && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        done
+
+      - name: Post-dispatch audit
+        if: always() && steps.auth.outputs.authorized == 'true'
+        uses: ./.hall/actions/post-dispatch
+        with:
+          app-token:          ${{ steps.app-token.outputs.token }}
+          agent:              ${{ needs.detect.outputs.agent }}
+          agent-dispatched:   ${{ needs.detect.outputs.agent }}
+          repo-owner:         ${{ needs.detect.outputs.repo-owner }}
+          repo-name:          ${{ needs.detect.outputs.repo-name }}
+          issue-number:       ${{ needs.detect.outputs.issue-number }}
+          invoker:            ${{ needs.detect.outputs.invoker }}
+          team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
+          outcome:            ${{ steps.agent.outcome || 'skipped' }}
+          weekly-count-after: ${{ steps.increment.outputs.count }}

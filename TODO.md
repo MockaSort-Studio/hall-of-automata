@@ -30,7 +30,7 @@ The `agents/`, `architecture/`, `codex/`, `federation/`, and `roster/` directori
 
 Nothing else can start until these are in place.
 
-### 1. Register the GitHub App
+### 1. Register the GitHub App ✅
 
 Go to `github.com/organizations/{org}/settings/apps` → New GitHub App.
 
@@ -43,17 +43,19 @@ Go to `github.com/organizations/{org}/settings/apps` → New GitHub App.
 | Events | `issue_comment`, `issues`, `pull_request`, `pull_request_review`, `check_suite` |
 | Where installed | This account (org) |
 
-After creating: note the **App ID** and generate + download a **private key** (`.pem`). Store both as secrets in the Hall repo:
-- `APP_ID` → repo secret
-- `APP_PRIVATE_KEY` → repo secret (paste full PEM content)
+After creating: note the **App ID** and generate + download a **private key** (`.pem`). Store both as repo secrets in the Hall repo (Settings → Secrets and variables → Actions → New repository secret):
+- `APP_ID` → the numeric App ID shown on the App's settings page
+- `APP_PRIVATE_KEY` → the full `.pem` file content
+
+These names are used verbatim in `invoke.yml` (`secrets.APP_ID`, `secrets.APP_PRIVATE_KEY`). Do not prefix or rename them.
 
 Install the App at the org level: App settings → Install App → select org → all repositories.
 
-### 2. Find or commission the bot avatar
+### 2. Find or commission the bot avatar ✅
 
 The `hall-of-automata[bot]` needs a custom avatar. Upload it in the App settings under "Display information". No action blocked on this, but do it early — the identity matters.
 
-### 3. Set up Claude OAuth tokens per agent
+### 3. Set up Claude OAuth tokens per agent ✅
 
 On each agent keeper's machine, run:
 
@@ -63,7 +65,7 @@ claude setup-token
 
 This authenticates via Claude Pro/Max and produces an OAuth token. Copy the token — it is only shown once.
 
-### 4. Create GitHub Environments for agents
+### 4. Create GitHub Environments for agents ✅
 
 In the Hall repo: Settings → Environments → New environment.
 
@@ -73,11 +75,11 @@ In the Hall repo: Settings → Environments → New environment.
 
 Repeat for each agent added to the roster.
 
-### 5. Verify the `automata-invokers` team
+### 5. Verify the `automata-invokers` team ✅
 
 Confirm the team exists in the org and has the right members. The authorization logic depends on this team slug — if you rename it, update `agents.yml` accordingly.
 
-### 6. Create the `hall-of-automata` labels in target repos
+### 6. Create the `hall-of-automata` labels in target repos 👤
 
 Each target repo needs:
 - `hall:hamlet` (or per-agent) — for PR binding
@@ -145,7 +147,7 @@ Each is a GitHub composite action with `runs: using: composite`.
 
 ---
 
-## Phase 2 — Dispatch core 🔧 ← next
+## Phase 2 — Dispatch core ✅
 
 **Goal:** a working end-to-end dispatch from invocation to agent running on a PR, with status card and counter.
 
@@ -172,18 +174,24 @@ Read/write weekly invocation counts from Actions Cache.
 
 ### 2.4 Main dispatch workflow
 
-Rewrite `.github/workflows/invoke-hamlet.yml` (and remove `_base-invoke.yml`) into a new structure:
+`.github/workflows/invoke.yml` — generic two-job workflow (replaces deleted `_base-invoke.yml` and `invoke-hamlet.yml`):
 
-- Trigger: `issues` (labeled), `issue_comment` (created), `pull_request_review` (submitted)
-- Jobs call the composite actions in sequence:
-  1. `authorize` — gate, exit on failure
-  2. `status-card` → stage: `dispatching`
-  3. `counter` read → check cap → route if needed
-  4. `status-card` → stage: `analyzing`
-  5. `dispatch` — run `claude-code-action@v1` with OAuth token + persona
-  6. `post-dispatch` — increment counter, upload artifact, apply `hall:hamlet` label to any opened PR, update status card
+- **`detect` job**: resolves `agent`, `issue-number`, `invoker`, `trigger-event`, `repo-owner`, `repo-name` from any trigger. For `workflow_call` the agent comes from `inputs.agent`; for direct triggers it is extracted from label names or `@hall-of-automata[bot]` mentions.
+- **`dispatch` job**: runs with `environment: hall/{agent}` (dynamic, computed from detect outputs) and `concurrency: hall-{agent}-{issue-number}`. Calls composite actions in sequence:
+  1. `create-github-app-token` — app installation token
+  2. Checkout Hall repo → `.hall/`
+  3. Read agent config (max-turns, team-slug, keeper) from `agents.yml` via `yq`
+  4. `counter` read + cap check via `routing.yml`
+  5. `authorize` — gate, exit on failure
+  6. `status-card` → stage: `dispatching`
+  7. `counter` increment
+  8. Checkout target repo (`clean: false`)
+  9. Inject persona (`CLAUDE.md`)
+  10. `dispatch` — run `claude-code-action@v1` with OAuth token
+  11. `status-card` → stage: `done`
+  12. `post-dispatch` — upload audit artifact
 
-⚠️ This is where the auth mechanism switches from `anthropic_api_key` to `claude_code_oauth_token`. The `actions/dispatch/action.yml` uses the agent's GitHub Environment to access the OAuth token.
+⚠️ Auth mechanism: `CLAUDE_CODE_OAUTH_TOKEN` comes from the agent's GitHub Environment (not `ANTHROPIC_API_KEY`).
 
 ### 2.5 App installation token for bot identity
 
@@ -193,7 +201,7 @@ Use `actions/create-github-app-token@v1` at the start of each job to generate an
 
 ---
 
-## Phase 3 — Task lifecycle 🔧
+## Phase 3 — Task lifecycle 🔧 ← next
 
 **Goal:** the full loop from PR open through CI, review, memory, and cleanup.
 
@@ -308,3 +316,9 @@ Prerequisites (👤) → Phase 1 (structure) → Phase 2 (dispatch core) → smo
 ```
 
 Do not start Phase 2 before the GitHub App and OAuth tokens are in place — the App token and OAuth credential are load-bearing for everything downstream.
+
+---
+
+## Open questions / constraints to investigate
+
+- **PR size cap (800 LOC):** Analyse whether enforcing a hard upper bound on output PR diff size (e.g. 800 LOC) is a viable scope constraint. If the required change would exceed the cap the agent should decline and reply to the originating comment explaining why the task is too large to implement in a single PR, rather than opening an oversized PR. Investigate: where the check fits (pre-dispatch persona instruction vs. post-dispatch CI gate), how to measure LOC reliably across added/removed lines, and whether the cap should be configurable per agent in `agents.yml`.

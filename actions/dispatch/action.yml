@@ -1,8 +1,8 @@
 name: Dispatch Agent
 description: >
-  Checks out the target repository, injects the agent persona as CLAUDE.md,
-  and runs the Claude Code Action with the agent's OAuth token.
-  Uses the agent's GitHub Environment to access the isolated OAuth token.
+  Runs the Claude Code Action with the agent's OAuth token.
+  Precondition: the calling workflow has already checked out the target repository
+  and written the agent's persona to CLAUDE.md in the workspace root.
 
 inputs:
   oauth-token:
@@ -11,46 +11,14 @@ inputs:
   app-token:
     description: GitHub App installation token (used by the action for GitHub API calls)
     required: true
-  persona-path:
-    description: Path to the persona file within the Hall repo (e.g. roster/hamlet.md)
-    required: true
-  prompt:
-    description: Task prompt passed to the agent
-    required: true
   max-turns:
     description: Maximum number of agentic turns
     required: false
     default: "40"
-  repo-owner:
-    description: Owner of the target repository to check out
-    required: true
-  repo-name:
-    description: Name of the target repository
-    required: true
-  issue-number:
-    description: Issue or PR number (used by claude-code-action for context)
-    required: true
 
 runs:
   using: composite
   steps:
-    - name: Checkout target repository
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ inputs.repo-owner }}/${{ inputs.repo-name }}
-        token: ${{ inputs.app-token }}
-        fetch-depth: 0
-
-    - name: Inject persona as CLAUDE.md
-      shell: bash
-      run: |
-        # Read persona from Hall repo — it was checked out in the calling workflow
-        # before this action runs. The persona path is relative to the Hall repo root,
-        # stored as HALL_PERSONA env var by the caller.
-        cat "$HALL_WORKSPACE/${{ inputs.persona-path }}" > CLAUDE.md
-      env:
-        HALL_WORKSPACE: ${{ github.workspace }}
-
     - name: Mask OAuth token
       shell: bash
       run: echo "::add-mask::${{ inputs.oauth-token }}"
