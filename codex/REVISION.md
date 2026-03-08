@@ -115,7 +115,9 @@ onboarding workflows should be separated from general dispatching system.
 ### Multi-Agent work flow from triaging to issue resolution
 workflows are becoming quite overwhealming to review. particularly the decisional gates. Having a hall master automaton enables to leverage on it to take over decisional gating (e.g. picking the keeper's account based on weekly cap and usage, First dispatch of agent by pre analysing request, creating a context + extraction of specific constraints from target repo CLAUDE.md ). This would enable better separation between stages (ingest -> analyse(hall-master) -> dispatch right agent), resulting in better implementation of  workflows.
 
-Goal: optimize agent accuracy and quota usage
+Goal: optimize agent accuracy and quota usage.
+Possible guardrails:
+Your Analysis Agent should act as a Project Manager, not just a dispatcher. It should decompose a task if it meets any of the following "Complexity Triggers":Dependency Depth: If the change touches more than $N$ (e.g., 3) distinct Bazel packages.Logic Heterogeneity: If the task requires both a performance optimization (C++) and a structural build change (BUILD.bazel or MODULE.bazel). These are different "brain states."The "Ambiguity Check": If the Analysis Agent cannot map the issue description to a specific set of files with $>80\%$ confidence, it should stop and request more input rather than dispatching.Rule of Thumb: If the predicted diff is $>200$ lines or spans across unrelated modules, the Analysis Agent should spawn Sub-Issues. This keeps the specialized agent's context window focused and its "hallucination surface area" small.
 
 ### 🔧 Persona restructure — character sheet model
 
@@ -134,7 +136,6 @@ Proposal: split the persona into three sections:
 
 Routing (FR-9) matches on roles first, then domains. Future agents scoped to review-only or infra-only are naturally expressible without schema changes.
 
-Apply to `roster/hamlet.md` first; update `agents.yml` `capabilities` field; update `agents/base-behavior.md` and federation onboarding template.
 
 ---
 

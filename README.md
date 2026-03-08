@@ -24,14 +24,6 @@ flowchart TD
 
 ---
 
-## Current roster
-
-| Automaton | Keeper | Label | Status |
-|-----------|--------|-------|--------|
-| 🐗 Hamlet | @mksetaro | `hamlet` | Active |
-
----
-
 ## Navigation
 
 | Section | What's there |
