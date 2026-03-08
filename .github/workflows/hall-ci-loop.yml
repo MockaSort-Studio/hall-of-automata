@@ -139,7 +139,7 @@ jobs:
           CI_FAILURES: ${{ needs.detect.outputs.ci-failures }}
         shell: bash
         run: bash .hall/scripts/inject-ci-context.sh
-
+      #[lore-keeper]: inject temp claude.md of invoke.yml;
       - name: Run agent
         id: agent
         if: steps.retry.outputs.escalate != 'true'
@@ -148,6 +148,12 @@ jobs:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
+          prompt: >-
+            CI checks have failed on PR #${{ needs.detect.outputs.pr-number }}
+            in ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}.
+            The failing checks and attempt count are appended to CLAUDE.md (the workflow
+            reads task memory from cache and injects it there before invoking you).
+            Fix the failures and push to the existing branch — do not open a new PR.
 
       - name: Save updated task memory
         if: always() && steps.retry.outputs.escalate != 'true'
@@ -177,3 +183,6 @@ jobs:
           agent:        ${{ needs.detect.outputs.agent }}
           stage:        pr-opened
           pr-number:    ${{ needs.detect.outputs.pr-number }}
+
+
+#[lore-keeper]: reading the file is overwhealming, each job should be defined in its own action file

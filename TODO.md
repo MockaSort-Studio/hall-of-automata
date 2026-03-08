@@ -48,19 +48,6 @@
 
 ## Open items
 
-### 🔧 FR-9: Automatic routing (cap → least-used agent)
-
-Currently when an agent exceeds its weekly cap the Hall posts a comment and exits. The design calls for rerouting to the least-used eligible agent with matching capabilities.
-
-What needs to happen in `invoke.yml` dispatch job:
-1. After cap check fires, query the counter cache for all agents
-2. Filter by `capabilities` overlap with the requested agent (from `agents.yml`)
-3. Pick the agent with the lowest count that is still under its own cap
-4. Re-run auth + dispatch with the alternate agent
-5. Post a comment noting the reroute (`rerouted: true` in audit log)
-
-`routing.yml` `strategy: least_used` and `fallback: queue` are already parsed — implement the lookup and fallback to `hall:queued` label when all alternates are also capped.
-
 ### 🔧 Semantic `outcome` in audit log
 
 `post-dispatch` receives `outcome: ${{ steps.agent.outcome || 'skipped' }}` which is a GitHub step conclusion (`success`/`failure`/`skipped`), not the semantic outcome defined in Appendix E (`pr_created`, `comment_posted`, `awaiting_input`, `failed`).

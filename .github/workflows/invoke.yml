@@ -75,6 +75,25 @@ jobs:
       group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
       cancel-in-progress: false
     steps:
+      #[lore-keeper] if invoker not authorized -> hard fail and comment tagging invoker and refusal comment
+      #this enables to get rid of the && steps.auth.outputs.authorized in if statements
+      - name: Authorize invoker
+        id: auth
+        if: steps.cap.outputs.over-cap != 'true'
+        uses: ./.hall/actions/authorize
+        with:
+          org-read-token: ${{ steps.app-token.outputs.token }}
+          org:            ${{ needs.detect.outputs.repo-owner }}
+          team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
+          username:       ${{ needs.detect.outputs.invoker }}
+          app-token:      ${{ steps.app-token.outputs.token }}
+          repo-owner:     ${{ needs.detect.outputs.repo-owner }}
+          repo-name:      ${{ needs.detect.outputs.repo-name }}
+          issue-number:   ${{ needs.detect.outputs.issue-number }}
+          trigger-event:  ${{ needs.detect.outputs.trigger-event }}
+          label-name:     hall:${{ needs.detect.outputs.agent }}
+          agent-name:     ${{ needs.detect.outputs.agent }}
+
       - name: Create GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -131,23 +150,6 @@ jobs:
             const fn = require('./.hall/scripts/post-cap-comment.js')
             await fn({ github, core })
 
-      - name: Authorize invoker
-        id: auth
-        if: steps.cap.outputs.over-cap != 'true'
-        uses: ./.hall/actions/authorize
-        with:
-          org-read-token: ${{ steps.app-token.outputs.token }}
-          org:            ${{ needs.detect.outputs.repo-owner }}
-          team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
-          username:       ${{ needs.detect.outputs.invoker }}
-          app-token:      ${{ steps.app-token.outputs.token }}
-          repo-owner:     ${{ needs.detect.outputs.repo-owner }}
-          repo-name:      ${{ needs.detect.outputs.repo-name }}
-          issue-number:   ${{ needs.detect.outputs.issue-number }}
-          trigger-event:  ${{ needs.detect.outputs.trigger-event }}
-          label-name:     hall:${{ needs.detect.outputs.agent }}
-          agent-name:     ${{ needs.detect.outputs.agent }}
-
       - name: Update status card — dispatching
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.issue-number != ''
         uses: ./.hall/actions/status-card
@@ -181,14 +183,15 @@ jobs:
           script: |
             const fn = require('./.hall/scripts/manage-awaiting-label.js')
             await fn({ github, core })
-
+      #[lore-keeper]: CLAUDE.md of target repo must stay immutable.
+      # step must become PERSONA.md >> CLAUDE.tmp.md << CLAUDE.md (target repo if exists) --- This operation happens only on initial agent task dispatch
       - name: Inject agent persona
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
         env:
           AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
         run: cp ".hall/roster/${AGENT}.md" CLAUDE.md
-
+      #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
         id: memory
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
@@ -197,7 +200,7 @@ jobs:
           mode:      restore
           repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
           pr-number: ${{ needs.detect.outputs.pr-number }}
-
+      #[lore-keeper]: see above
       - name: Append review context to CLAUDE.md
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true' && needs.detect.outputs.trigger-event == 'pr_review'
         env:
@@ -205,7 +208,9 @@ jobs:
           REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
         shell: bash
         run: bash .hall/scripts/append-review-context.sh
-
+      #[lore-keeper]: when feeding the informations to the agent we should also ask him to synthetise the context
+      #we can list the important things to keep and let it consolidate it's knowledge
+      #this implies refactoring of Persona.md and creation of guidelines so we can be clear and analytical and easy to digest for a model
       - name: Run agent
         id: agent
         if: steps.cap.outputs.over-cap != 'true' && steps.auth.outputs.authorized == 'true'
@@ -214,6 +219,11 @@ jobs:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
+          prompt: >-
+            You have been dispatched to work on issue #${{ needs.detect.outputs.issue-number }}
+            in ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}.
+            Your persona is in CLAUDE.md. For a review re-dispatch the review feedback is also
+            appended there. Read the issue, follow your persona, and begin working.
 
       # ── Post-dispatch: find PR, save memory, update status card ───────────
 
@@ -303,3 +313,6 @@ jobs:
           team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
           outcome:            ${{ steps.agent.outcome || 'skipped' }}
           weekly-count-after: ${{ steps.increment.outputs.count }}
+
+
+#[lore-keeper]: reading the file is overwhealming, each job should be defined in its own action file

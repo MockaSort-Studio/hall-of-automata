@@ -1,28 +1,18 @@
-name: Automaton Task
-description: Invoke an automaton on a task. Fill this out completely — the agent has no context beyond what is here.
-labels: []
+name: "Hamlet — Automaton Task"
+description: Invoke Hamlet on a task. Fill this out completely — the agent has no context beyond what is here.
+labels: ["hall:hamlet"]
 body:
   - type: markdown
     attributes:
       value: |
-        **How to invoke:** After submitting, comment `@hall-of-automata[bot] hamlet` (or your agent of choice) on the issue.
-        Alternatively, apply the matching `hall:{agent}` label. The Hall will post a status card as its first response.
-
-  - type: dropdown
-    id: automaton
-    attributes:
-      label: Automaton
-      description: Which automaton to invoke.
-      options:
-        - "🐗 Hamlet"
-    validations:
-      required: true
+        Submitting this form invokes **Hamlet**. The `hall:hamlet` label is applied automatically — no extra step needed.
+        The Hall will post a status card as its first response.
 
   - type: dropdown
     id: mode
     attributes:
       label: Mode
-      description: What you need from the automaton.
+      description: What you need from Hamlet.
       options:
         - "Doing — implement this"
         - "Advising — evaluate options and recommend"
@@ -41,7 +31,7 @@ body:
     id: context
     attributes:
       label: Context
-      description: What the automaton needs to know. Relevant files, current behavior, constraints, prior decisions.
+      description: What Hamlet needs to know. Relevant files, current behavior, constraints, prior decisions.
       placeholder: |
         - File: core/lifecycle/task.hpp — base class for all tasks
         - Current behavior: X
@@ -65,7 +55,7 @@ body:
     id: out-of-scope
     attributes:
       label: Out of scope
-      description: What the automaton should NOT do or touch. Optional but useful.
+      description: What Hamlet should NOT do or touch. Optional but useful.
       placeholder: |
         - Do not modify the public API
         - Do not add dependencies

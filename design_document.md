@@ -1,9 +1,13 @@
 # Hall of Automata — Design Document
 
 **Status:** Draft\
-**Authors:** [The lore-keeper](https://github.com/mksetaro), Hamlet 🐗\
-**Version:** 0.3\
+**Authors:** Hamlet 🐗\
+**Reviewer** [The lore-keeper](https://github.com/mksetaro)  
+**Version:** 1.0\
 **Date:** March 2026
+
+
+## Review comments are inputs for post 1.0 version. That is: ignore the comments until tag 1.0 is pushed
 
 ## 1. Problem Statement
 
@@ -112,13 +116,16 @@ After pushing code, the agent comments on the PR to trigger the repository's exi
 
 A developer requests a specific agent, but that agent has hit its weekly cap of 40 invocations. The Hall checks routing rules, finds an alternate agent with capacity and overlapping capabilities, and dispatches the alternate instead. The invoker is notified of the reroute in the response comment.
 
+
 ### UC-5: Task Cleanup on Merge
 
 When the agent's PR is merged, a workflow fires that cleans up the agent's task-specific cache (working memory for the task), removes the `hall:<agent>` label, and optionally posts a summary comment on the original issue.
 
+
 ### UC-6: Queued Task on Full Capacity
 
 All eligible agents are at their weekly cap. The Hall applies a `hall:queued` label to the issue, posts a comment explaining the delay, and a scheduled workflow re-dispatches the task when counters reset on the configured day.
+
 
 ### End-to-End Lifecycle
 
@@ -306,6 +313,7 @@ flowchart TD
 **Step 3 — Load agent config.** Read `agents.yml` from the Hall repo. Resolve the agent identifier to: OAuth token secret name, persona file path, authorized teams, capability list, max turns, and retry limit.
 
 **Step 4 — Counter check.** Restore the weekly counter from Actions Cache. If the requested agent is under its cap, proceed. If over cap, apply the routing strategy from `routing.yml` to select an alternate agent. If all eligible agents are capped, queue the task (apply `hall:queued` label, post comment, exit).
+**Review comment:** se UC-1
 
 **Step 5 — Dispatch agent.** The job references the agent's GitHub Environment (e.g., `hall/hamlet`) to access the isolated OAuth token. It checks out the target repository, injects the agent's persona, and runs `anthropics/claude-code-action@v1` with the OAuth token and prompt.
 
@@ -358,6 +366,8 @@ sequenceDiagram
 ```
 
 **Triggering checks.** When the agent pushes commits or opens a PR, the target repo's existing CI workflows fire automatically (on `push` or `pull_request` events). If the repo uses comment-triggered checks (e.g., `/run-checks`), the agent posts that comment.
+
+**Review comment:** it's not very clear how checks interaction happens, do we give the agent capability to run checks through gh or we set a standard trigger which must be enforced org-wide? That also means that issue context must provide also checks instruction or pr template should. Keep in mind that some repo may not have checks
 
 **Reacting to results.** CI workflows post their results — either as PR comments (from a CI bot), as check suite conclusions, or as commit statuses. The Hall's dispatch workflow listens for these signals on agent-labeled PRs.
 

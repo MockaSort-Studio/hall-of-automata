@@ -2,6 +2,7 @@
 
 > *A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through.*
 
+#[lore-keeper]: outdated
 The Hall of Automata is MockaSort Studio's framework for deploying named AI agents across the organization. Each automaton has an identity, a keeper, a set of behaviors, and a key. Anyone the org trusts can open a portal — a GitHub issue label — and the automaton steps through to work.
 
 This is not a product. It is infrastructure we built because we needed it.

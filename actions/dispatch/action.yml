@@ -15,6 +15,10 @@ inputs:
     description: Maximum number of agentic turns
     required: false
     default: "40"
+  prompt:
+    description: Direct prompt passed to Claude (bypasses trigger-phrase/label checks)
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -29,3 +33,4 @@ runs:
         claude_code_oauth_token: ${{ inputs.oauth-token }}
         github_token: ${{ inputs.app-token }}
         claude_args: "--max-turns ${{ inputs.max-turns }}"
+        prompt: ${{ inputs.prompt }}
