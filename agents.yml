@@ -22,7 +22,8 @@ agents:
 
   old-major:
     display_name: "Old Major 🏛️"
-    agent_env: hall/old-major         # GitHub Environment: persona config + usage vars
+    agent_env: hall/old-major         # GitHub Environment: persona config only
+                                      #   (CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>)
     invoker: mksetaro
     teams: [automata-invokers]
     max_turns: 20
@@ -36,8 +37,9 @@ agents:
 
   hamlet:
     display_name: "Hamlet 🐗"
-    agent_env: hall/hamlet            # GitHub Environment: persona config + usage vars
-                                      #   (HALL_USAGE_COUNT, HALL_WEEKLY_CAP, PERSONA_GIST_URL)
+    agent_env: hall/hamlet            # GitHub Environment: persona config only
+                                      #   (CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>;
+                                      #   HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in invoker/<handle>)
     invoker: mksetaro
     teams: [automata-invokers]
     max_turns: 40

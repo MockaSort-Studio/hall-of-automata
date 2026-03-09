@@ -64,12 +64,66 @@ jobs:
             const fn = require('./.hall/scripts/detect-invoke-context.js')
             await fn({ github, context, core })
 
-  # we hardcode keeper/env for now, we implement routing afterwards
-  # ── Job 2: dispatch the resolved agent ───────────────────────────────────
-  dispatch:
-    name: Dispatch ${{ needs.detect.outputs.agent }}
+  # ── Job 2: check invoker's weekly cap ───────────────────────────────────
+  # Runs in the invoker's own environment so HALL_USAGE_COUNT and
+  # HALL_WEEKLY_CAP are injected as vars — no API read needed.
+  # Posts the cap-exceeded comment here if over cap, so the dispatch
+  # job only runs when the invoker has quota remaining.
+  check-invoker-cap:
+    name: Check invoker cap
     needs: [detect]
     if: needs.detect.outputs.agent != ''
+    runs-on: ubuntu-latest
+    environment: invoker/${{ needs.detect.outputs.invoker }}
+    outputs:
+      over-cap:      ${{ steps.cap.outputs.over-cap }}
+      cap:           ${{ steps.cap.outputs.cap }}
+      current-count: ${{ vars.HALL_USAGE_COUNT }}
+    steps:
+      - name: Check weekly cap
+        id: cap
+        shell: bash
+        env:
+          USAGE_COUNT: ${{ vars.HALL_USAGE_COUNT }}
+          WEEKLY_CAP:  ${{ vars.HALL_WEEKLY_CAP }}
+        run: |
+          COUNT="${USAGE_COUNT:-0}"
+          CAP="${WEEKLY_CAP:-25}"
+          if [ "$COUNT" -ge "$CAP" ]; then
+            echo "over-cap=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "over-cap=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "cap=$CAP" >> "$GITHUB_OUTPUT"
+
+      - name: Create App token
+        id: app-token
+        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Post cap-exceeded comment
+        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner:        '${{ needs.detect.outputs.repo-owner }}',
+              repo:         '${{ needs.detect.outputs.repo-name }}',
+              issue_number: Number('${{ needs.detect.outputs.issue-number }}'),
+              body: `**${{ needs.detect.outputs.agent }}** has reached the weekly invocation cap (${{ steps.cap.outputs.cap }} turns) for invoker @${{ needs.detect.outputs.invoker }}. The request has been queued.`
+            });
+
+  # ── Job 3: dispatch the resolved agent ───────────────────────────────────
+  # Only runs when the invoker has quota. Cap logic and comment are handled
+  # by check-invoker-cap above — no cap guards needed on individual steps.
+  dispatch:
+    name: Dispatch ${{ needs.detect.outputs.agent }}
+    needs: [detect, check-invoker-cap]
+    if: needs.detect.outputs.agent != '' && needs.check-invoker-cap.outputs.over-cap != 'true'
     runs-on: ubuntu-latest
     environment: hall/${{ needs.detect.outputs.agent }}
     concurrency:
@@ -102,36 +156,10 @@ jobs:
         shell: bash
         run: bash .hall/scripts/read-agent-config.sh
 
-      - name: Check weekly cap
-        id: cap
-        # vars.HALL_USAGE_COUNT and vars.HALL_WEEKLY_CAP are injected from the agent's
-        # GitHub Environment at job start — no cache restore or API read needed.
-        shell: bash
-        env:
-          USAGE_COUNT: ${{ vars.HALL_USAGE_COUNT }}
-          WEEKLY_CAP:  ${{ vars.HALL_WEEKLY_CAP }}
-        run: bash .hall/scripts/check-weekly-cap.sh
-
-      - name: Post cap-exceeded comment
-        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
-        env:
-          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
-          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
-          AGENT:        ${{ needs.detect.outputs.agent }}
-          CAP:          ${{ steps.cap.outputs.cap }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const fn = require('./.hall/scripts/post-cap-comment.js')
-            await fn({ github, core })
-
-      # Hard fail on unauthorized. core.setFailed() in the composite action
-      # stops this job — no authorized flag to check on subsequent steps.
+      # Hard fail on unauthorized — core.setFailed() in the composite action
+      # stops this job. Post-dispatch always() steps gate on steps.auth.outcome.
       - name: Authorize invoker
         id: auth
-        if: steps.cap.outputs.over-cap != 'true'
         uses: ./.hall/actions/authorize
         with:
           org-read-token: ${{ steps.app-token.outputs.token }}
@@ -147,7 +175,7 @@ jobs:
           agent-name:     ${{ needs.detect.outputs.agent }}
 
       - name: Update status card — dispatching
-        if: steps.cap.outputs.over-cap != 'true' && needs.detect.outputs.issue-number != ''
+        if: needs.detect.outputs.issue-number != ''
         uses: ./.hall/actions/status-card
         with:
           app-token:     ${{ steps.app-token.outputs.token }}
@@ -158,19 +186,18 @@ jobs:
           stage:         dispatching
           dispatched-at: ${{ github.event.created_at }}
 
-      - name: Increment weekly counter
-        if: steps.cap.outputs.over-cap != 'true'
+      - name: Increment invoker weekly counter
         id: increment
         uses: ./.hall/actions/counter
         with:
-          current-count:    ${{ vars.HALL_USAGE_COUNT }}
-          environment-name: hall/${{ needs.detect.outputs.agent }}
+          current-count:    ${{ needs.check-invoker-cap.outputs.current-count }}
+          environment-name: invoker/${{ needs.detect.outputs.invoker }}
           repo-owner:       ${{ needs.detect.outputs.repo-owner }}
           repo-name:        ${{ needs.detect.outputs.repo-name }}
           app-token:        ${{ steps.app-token.outputs.token }}
 
       - name: Remove awaiting-input label (if present)
-        if: steps.cap.outputs.over-cap != 'true' && needs.detect.outputs.issue-number != ''
+        if: needs.detect.outputs.issue-number != ''
         env:
           MODE:         remove
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
@@ -186,7 +213,6 @@ jobs:
       #[lore-keeper]: CLAUDE.md of target repo must stay immutable.
       # step must become PERSONA.md >> CLAUDE.tmp.md << CLAUDE.md (target repo if exists) --- This operation happens only on initial agent task dispatch
       - name: Inject agent persona
-        if: steps.cap.outputs.over-cap != 'true'
         env:
           AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
@@ -195,7 +221,7 @@ jobs:
       #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
         id: memory
-        if: steps.cap.outputs.over-cap != 'true' && needs.detect.outputs.trigger-event == 'pr_review'
+        if: needs.detect.outputs.trigger-event == 'pr_review'
         uses: ./.hall/actions/memory
         with:
           mode:      restore
@@ -204,7 +230,7 @@ jobs:
 
       #[lore-keeper]: see above
       - name: Append review context to CLAUDE.md
-        if: steps.cap.outputs.over-cap != 'true' && needs.detect.outputs.trigger-event == 'pr_review'
+        if: needs.detect.outputs.trigger-event == 'pr_review'
         env:
           PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
           REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
@@ -216,7 +242,6 @@ jobs:
       #this implies refactoring of Persona.md and creation of guidelines so we can be clear and analytical and easy to digest for a model
       - name: Run agent
         id: agent
-        if: steps.cap.outputs.over-cap != 'true'
         uses: ./.hall/actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -229,11 +254,9 @@ jobs:
             appended there. Read the issue, follow your persona, and begin working.
 
       # ── Post-dispatch: find PR, save memory, update status card ───────────
-      # always() here so these run even if the agent step fails — status card
-      # must reflect actual outcome, not be silently skipped on error.
-      # steps.auth.outcome == 'success' excludes cap-exceeded path (auth was
-      # skipped → outcome is 'skipped') and unauthorized path (auth hard-failed
-      # → job never reaches here, but guard is explicit for clarity).
+      # always() so these run even if the agent step fails — status card must
+      # reflect actual outcome. steps.auth.outcome == 'success' excludes the
+      # unauthorized path (job hard-stopped by authorize action).
 
       - name: Find PR opened by agent
         id: find-pr
