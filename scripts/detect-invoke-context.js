@@ -14,7 +14,13 @@ module.exports = async ({ context, core }) => {
   let repoOwner    = process.env.INPUT_REPO_OWNER || context.repo.owner;
   let repoName     = process.env.INPUT_REPO_NAME  || context.repo.repo;
 
-  const SYSTEM_LABELS = ['hall:awaiting-input', 'hall:queued'];
+  const SYSTEM_LABELS = [
+    'hall:awaiting-input',
+    'hall:queued',
+    'hall:onboard-invoker',
+    'hall:onboard-automaton',
+    'hall:active-invoker',
+  ];
 
   if (event === 'issues' && payload.action === 'labeled') {
     const label = payload.label?.name || '';
