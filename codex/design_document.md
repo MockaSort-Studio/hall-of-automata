@@ -113,7 +113,7 @@ A developer creates a GitHub issue and either assigns it to `@hall-of-automata` 
 **Unlabeled path (assignment trigger):** The developer assigns the issue to `@hall-of-automata` without specifying an agent. The Hall dispatches Old Major, who reads the roster catalog from the `hall/roster` deployment, analyzes the issue, selects the most capable available agent (accounting for keeper usage counts), synthesizes the task context, and triggers the specialist dispatch. If Old Major cannot map the request to a specific agent with sufficient confidence, it posts a clarifying question on the issue and enters the awaiting-input state.
 
 In both paths: the agent implements the feature, opens a PR linked to the issue, and the Hall applies a `hall:<agent>` label to bind all subsequent interactions.
-
+**Advice/research path:** If the dispatched agent determines that the task does not require a code change (e.g., a question, a design review, or a research request), it posts a response comment on the issue and writes `comment_posted` to the dispatch result. No PR is opened. The status card updates to "Response posted" and no `hall:awaiting-input` label is applied — the conversation is complete.
 ### UC-2: Agent Reacts to PR Review
 
 A reviewer requests changes on an agent-authored PR. Because the PR carries the `hall:hamlet` label, the Hall routes the review comment back to the same agent. The agent reads the feedback, makes corrections, and pushes new commits. The reviewer sees the updates and can approve or request further changes.
@@ -136,7 +136,13 @@ When the agent's PR is merged, a workflow fires that: deletes the task memory ca
 
 ### UC-6: Queued Task on Full Capacity
 
-All eligible invokers have exhausted their weekly cap. The `check-invoker-cap` job applies a `hall:queued` label to the issue, posts a comment explaining the delay and the expected cap reset time (Monday UTC per `routing.yml`), and the dispatch job does not run. The weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday and (in a future phase) will re-initiate queued dispatch.
+Two distinct queued scenarios exist:
+
+**Onboarding-time:** The invoker's token probe returns HTTP 429 (quota exhausted but token valid). Both `hall:active-invoker` and `hall:invoker-queued` labels are applied. The issue is closed with a "queued" message. The invoker is registered and will dispatch as soon as quota resets.
+
+**Dispatch-time:** The invoker's weekly cap is reached when a dispatch is attempted. The `check-invoker-cap` job posts a cap-exceeded comment and the dispatch job does not run. Alternatively, the agent itself hits a quota limit mid-dispatch and writes `quota_exceeded` to the dispatch result; the status card updates to "Queued — weekly quota reached".
+
+In all cases the weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC. Automatic retry of queued tasks is deferred to Phase C-4.
 
 
 ### End-to-End Lifecycle
@@ -205,7 +211,7 @@ flowchart LR
 
 **FR-8: Invoker Usage Tracking.** The system must track weekly invocation count per invoker environment via `HALL_USAGE_COUNT` environment variable in `invoker/<handle>` (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. Cap check runs in a dedicated `check-invoker-cap` job before dispatch, injecting the invoker's environment secrets for free.
 
-**FR-9: Automatic Routing.** When the requested agent's keeper is at cap, the system must reroute to the least-used eligible agent based on domain and role overlap with the request. On the unlabeled path, routing is part of Old Major's triage. On the directed (label) path, the Hall falls back to the unlabeled routing logic with a reroute notice posted on the issue.
+**FR-9: Automatic Routing (deferred — Phase C-4).** When an invoker's cap is reached, the system queues the request and posts a cap-exceeded comment. Automatic rerouting to the least-used eligible agent based on domain and role overlap is planned for Phase C-4. On the unlabeled path (Old Major triage), routing will be part of the triage step; Old Major will read invoker usage counts and exclude fully-capped invokers. The `routing.yml` `strategy: least_used` field is the declared intent; it is not yet evaluated at runtime.
 
 **FR-10: Task Memory.** The agent must persist task-specific working memory in Actions Cache, keyed by `hall-task-{repo}-{pr}`. The cache is the concurrency-safe working store; the issue/PR thread is the permanent fallback. On cache miss, the agent reconstructs context from the thread.
 
@@ -224,6 +230,14 @@ flowchart LR
 **FR-17: Unauthorized invocation = hard failure.** An unauthorized invocation must cause the workflow to fail (non-zero exit), post a verbose rejection comment tagging both the invoker and `@<org>/automata-invokers`, and leave no other trace (no status card, no counter increment, no label remaining).
 
 **FR-18: Org roster with hall fallback.** The roster catalog deployment may optionally be sourced from a dedicated org roster repository (configurable via a repo variable). If the org roster repo does not exist or is unreachable, the Hall's own `hall/roster` deployment is used as the fallback.
+
+**FR-19: Invoker token validation via API probe.** During invoker onboarding, the token must be validated by a direct HTTP probe to the Anthropic API (`POST /v1/messages`, `max_tokens: 1`), not by a full Claude Code Action invocation. The HTTP response code is the sole signal: `200` = valid and active; `429` = valid but quota exhausted; `401`/`403` = invalid or expired; `5xx`/timeout = inconclusive (treated as pass with a workflow warning to avoid blocking a valid invoker on infra issues). No checkout of the Hall repo and no App token are required for this step.
+
+**FR-20: Invoker onboarding — quota-exhausted queued state.** When the token probe returns HTTP 429, the invoker is fully onboarded (token is genuine) but placed in a queued state. Both `hall:active-invoker` and `hall:invoker-queued` labels must be applied. The onboarding issue must be closed with a dedicated "queued" comment (not a welcome comment and not a retry prompt). The `hall:invoker-queued` label signals the weekly-reset workflow to track pending activation.
+
+**FR-21: Agent-declared dispatch outcome contract.** At the end of every invocation, the agent must write `.hall/dispatch-result.json` containing `outcome` (one of `pr_created`, `awaiting_input`, `comment_posted`, `quota_exceeded`, `failed`), `pr_number`, and `branch`. CI reads this file first to determine the post-dispatch status card stage; if absent, it falls back to API-based PR discovery. The file is ephemeral — excluded from commits by the base contract.
+
+**FR-22: Comment-posted dispatch outcome.** When an agent completes a task by posting a response on the issue without opening a PR (advice, research, or design review), it must write `comment_posted` to the dispatch result. The status card updates to "Response posted". No `hall:awaiting-input` label is applied. The dispatch is considered complete.
 
 ### 4.2 Non-Functional Requirements
 
