@@ -35,9 +35,11 @@ jobs:
     name: Detect invocation context
     runs-on: ubuntu-latest
     outputs:
+      actor:         ${{ steps.ctx.outputs.actor }}
       agent:         ${{ steps.ctx.outputs.agent }}
       issue-number:  ${{ steps.ctx.outputs.issue-number }}
       invoker:       ${{ steps.ctx.outputs.invoker }}
+      invoker-count: ${{ steps.ctx.outputs.invoker-count }}
       trigger-event: ${{ steps.ctx.outputs.trigger-event }}
       repo-owner:    ${{ steps.ctx.outputs.repo-owner }}
       repo-name:     ${{ steps.ctx.outputs.repo-name }}
@@ -51,6 +53,13 @@ jobs:
           sparse-checkout: scripts/
           sparse-checkout-cone-mode: true
 
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Resolve invocation context
         id: ctx
         env:
@@ -60,71 +69,53 @@ jobs:
           INPUT_REPO_NAME:    ${{ inputs.repo-name }}
         uses: actions/github-script@v7
         with:
+          github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const fn = require('./.hall/scripts/detect-invoke-context.js')
             await fn({ github, context, core })
 
-  # ── Job 2: check invoker's weekly cap ───────────────────────────────────
-  # Runs in the invoker's own environment so HALL_USAGE_COUNT and
-  # HALL_WEEKLY_CAP are injected as vars — no API read needed.
-  # Posts the cap-exceeded comment here if over cap, so the dispatch
-  # job only runs when the invoker has quota remaining.
-  check-invoker-cap:
-    name: Check invoker cap
+  # ── Job 2: notify when the invoker pool is exhausted ────────────────────
+  # Detect's pool-selection already picked the best invoker (least-used, under
+  # cap). This job only runs when the pool is fully exhausted (invoker == '').
+  notify-queued:
+    name: Notify — pool exhausted
     needs: [detect]
-    if: needs.detect.outputs.agent != ''
+    if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker == ''
     runs-on: ubuntu-latest
-    environment: invoker/${{ needs.detect.outputs.invoker }}
-    outputs:
-      over-cap:      ${{ steps.cap.outputs.over-cap }}
-      cap:           ${{ steps.cap.outputs.cap }}
-      current-count: ${{ vars.HALL_USAGE_COUNT }}
     steps:
-      - name: Check weekly cap
-        id: cap
-        shell: bash
-        env:
-          USAGE_COUNT: ${{ vars.HALL_USAGE_COUNT }}
-          WEEKLY_CAP:  ${{ vars.HALL_WEEKLY_CAP }}
-        run: |
-          COUNT="${USAGE_COUNT:-0}"
-          CAP="${WEEKLY_CAP:-25}"
-          if [ "$COUNT" -ge "$CAP" ]; then
-            echo "over-cap=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "over-cap=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "cap=$CAP" >> "$GITHUB_OUTPUT"
-
-      - name: Create App token
+      - name: Create GitHub App token
         id: app-token
-        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
         uses: actions/create-github-app-token@v1
         with:
           app-id:      ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Post cap-exceeded comment
-        if: steps.cap.outputs.over-cap == 'true' && needs.detect.outputs.issue-number != ''
+      - name: Post queued comment and label
+        if: needs.detect.outputs.issue-number != ''
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
+            const owner  = '${{ needs.detect.outputs.repo-owner }}';
+            const repo   = '${{ needs.detect.outputs.repo-name }}';
+            const number = Number('${{ needs.detect.outputs.issue-number }}');
             await github.rest.issues.createComment({
-              owner:        '${{ needs.detect.outputs.repo-owner }}',
-              repo:         '${{ needs.detect.outputs.repo-name }}',
-              issue_number: Number('${{ needs.detect.outputs.issue-number }}'),
-              body: `**${{ needs.detect.outputs.agent }}** has reached the weekly invocation cap (${{ steps.cap.outputs.cap }} turns) for invoker @${{ needs.detect.outputs.invoker }}. The request has been queued.`
+              owner, repo, issue_number: number,
+              body: `**${{ needs.detect.outputs.agent }}** request received, but all invokers are currently at their weekly capacity. The request has been queued — it will be retried when capacity is available.`
+            });
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: number,
+              labels: ['hall:invoker-queued']
             });
 
   # ── Job 3: dispatch the resolved agent ───────────────────────────────────
   # Runs in invoker/<invoker> so secrets.CLAUDE_CODE_OAUTH_TOKEN injects from
-  # the invoker's environment. Agent-specific config (persona gist ID etc.) lives
-  # in hall/<agent> as plain variables, fetched via API using the app token.
+  # the pool-selected invoker's environment. Invoker is chosen by detect: the
+  # least-used registered member currently under their weekly cap.
   dispatch:
     name: Dispatch ${{ needs.detect.outputs.agent }}
-    needs: [detect, check-invoker-cap]
-    if: needs.detect.outputs.agent != '' && needs.check-invoker-cap.outputs.over-cap != 'true'
+    needs: [detect]
+    if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != ''
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.detect.outputs.invoker }}
     concurrency:
@@ -166,7 +157,7 @@ jobs:
           org-read-token: ${{ steps.app-token.outputs.token }}
           org:            ${{ needs.detect.outputs.repo-owner }}
           team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
-          username:       ${{ needs.detect.outputs.invoker }}
+          username:       ${{ needs.detect.outputs.actor }}
           app-token:      ${{ steps.app-token.outputs.token }}
           repo-owner:     ${{ needs.detect.outputs.repo-owner }}
           repo-name:      ${{ needs.detect.outputs.repo-name }}
@@ -191,7 +182,7 @@ jobs:
         id: increment
         uses: ./.hall/actions/counter
         with:
-          current-count:    ${{ needs.check-invoker-cap.outputs.current-count }}
+          current-count:    ${{ needs.detect.outputs.invoker-count }}
           environment-name: invoker/${{ needs.detect.outputs.invoker }}
           repo-owner:       ${{ needs.detect.outputs.repo-owner }}
           repo-name:        ${{ needs.detect.outputs.repo-name }}
