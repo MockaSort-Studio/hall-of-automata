@@ -59,7 +59,8 @@ jobs:
             while (true) {
               const res = await github.request('GET /repos/{owner}/{repo}/environments',
                 { owner, repo, per_page: 100, page });
-              const batch = (res.data.environments || []).filter(e => e.name.startsWith('invoker/'));
+              // TODO: remove keeper/ filter once all keeper/* envs are migrated to invoker/*
+              const batch = (res.data.environments || []).filter(e => e.name.startsWith('invoker/') || e.name.startsWith('keeper/'));
               envs = envs.concat(batch);
               if ((res.data.environments || []).length < 100) break;
               page++;
@@ -76,7 +77,7 @@ jobs:
                 'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
                 { owner, repo, environment_name: enc, variable_name: 'HALL_WEEKLY_CAP' }
               )).data.value || '25', 10); } catch (_) {}
-              if (count < cap) candidates.push({ handle: env.name.replace('invoker/', ''), count });
+              if (count < cap) candidates.push({ handle: env.name.replace(/^(?:invoker|keeper)\//, ''), count });
             }
             if (candidates.length === 0) {
               core.setFailed('No invoker available — all at cap. Old Major cannot be dispatched.');
