@@ -63,7 +63,7 @@ graph TB
         direction TB
         CACHE[("Actions Cache• Weekly counters• Task memory")]
         ARTIFACTS[("Actions Artifacts• Invocation logs")]
-        ENVS[("Environments• hall/hamlet secrets• hall/ophelia secrets")]
+        ENVS[("Environments• invoker/<handle> secrets (OAuth token)• hall/<agent> vars (PERSONA_GIST_ID)")]
     end
 
     subgraph FED["Federated Agents"]
@@ -526,7 +526,8 @@ The issue/PR thread is never modified on cleanup — it remains as the permanent
 | Roster catalog | Deployment payload | `hall/roster` env — singleton deployment | Updated by Old Major on agent onboarding or persona change. |
 | Agent persona | GitHub Gist | ID in deployment payload | Created at onboarding. Updated when persona is revised. |
 | Agent dashboard | GitHub Gist | ID in deployment payload | Appended after each dispatch (audit entry) and on PR close (task summary). |
-| OAuth tokens | GitHub Environment secret | `hall/<agent>` env | Managed by keeper. Rotated via `claude setup-token`. |
+| Agent persona gist ID | Env Variable (`PERSONA_GIST_ID`) | `hall/<agent>` environment | Written by Old Major at automaton onboarding. Read via REST API at dispatch time. Not a secret; plain variables are API-readable with the app token. |
+| OAuth tokens | GitHub Environment secret | `invoker/<handle>` env | Managed by the invoker. Donated to the Hall at invoker onboarding. Rotated via `claude setup-token`. |
 
 ---
 

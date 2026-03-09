@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
-# Bootstrap Old Major and the hall/roster environment.
+# Bootstrap the hall/roster environment.
 #
-# Old Major is Hall-native: his persona lives in roster/old-major.md (repo file).
-# No gist or deployment payload is needed — he is a special case, not a
-# federated automaton. This script only needs to create the two environments
-# that invoke.yml and onboard-automaton.yml require to function.
+# hall/roster is the only environment the Hall needs before any workflow runs.
+# It holds the singleton deployment payload that Old Major writes the automaton
+# catalog into at automaton-onboarding time.
 #
-# Run once (idempotent — safe to re-run if partially complete):
+# hall/<agent> environments are created automatically by Old Major during
+# automaton onboarding. They hold PERSONA_GIST_ID as a plain variable.
+#
+# hall/old-major does NOT need to exist: Old Major is Hall-native and his
+# persona is read directly from roster/old-major.md at dispatch time.
+# His OAuth token belongs to the invoker who registers him, lives in
+# invoker/<handle>, and is never stored in a hall/* environment.
+#
+# Run once (idempotent — safe to re-run):
 #   bash scripts/bootstrap-old-major.sh
 #
 # Prerequisites:
 #   - gh CLI authenticated (your normal GitHub session is enough)
-#   - Your CLAUDE_CODE_OAUTH_TOKEN ready (from `claude setup-token`)
 #
 # APP_ID and APP_PRIVATE_KEY are repo-level secrets needed by the workflows,
 # not by this script. Set them once in repo Settings → Secrets when you
 # register the GitHub App — this script does not touch them.
 #
 # What this creates:
-#   hall/old-major   — Old Major's environment (secret slot only, no usage vars)
-#   hall/roster      — singleton environment for the automaton catalog deployment
+#   hall/roster  — singleton environment for the automaton catalog deployment
 
 set -euo pipefail
 
@@ -62,35 +67,22 @@ seed_deployment() {
 }
 
 echo
-echo "=== Hall of Automata — Old Major bootstrap ==="
+echo "=== Hall of Automata — bootstrap ==="
 echo "Repository: $REPO"
 echo
 
-# ── 1. hall/old-major ─────────────────────────────────────────────────────────
-echo "[1/2] hall/old-major environment"
-create_env "hall/old-major"
-echo "  done."
-echo
-
-# ── 2. hall/roster ───────────────────────────────────────────────────────────
-echo "[2/2] hall/roster environment + seed deployment"
+# ── 1. hall/roster ───────────────────────────────────────────────────────────
+echo "[1/1] hall/roster environment + seed deployment"
 create_env "hall/roster"
-seed_deployment "hall/roster" "Roster catalog seed — empty, updated by Old Major on automaton onboarding"
+seed_deployment "hall/roster" "Roster catalog seed — empty, written by Old Major on automaton onboarding"
 echo "  done."
 echo
 
 # ── Done ─────────────────────────────────────────────────────────────────────
-ENV_URL="https://github.com/$REPO/settings/environments"
 echo "=== Bootstrap complete ==="
 echo
-echo "One manual step required:"
-echo "  1. Open ${ENV_URL}"
-echo "  2. Select 'hall/old-major'"
-echo "  3. Add secret: CLAUDE_CODE_OAUTH_TOKEN"
-echo "     (value from: claude setup-token)"
+echo "hall/roster is ready. Old Major can now onboard automata."
 echo
-echo "Old Major's persona is loaded from roster/old-major.md at dispatch time."
-echo "No gist or deployment payload is needed for him."
-echo
-echo "After adding the secret, automaton onboarding (hall:onboard-automaton)"
-echo "will work. Invoker onboarding requires NO hall/* environment — run it now."
+echo "Next: register yourself as an invoker via the onboarding issue template."
+echo "The onboarding workflow runs without any hall/* environment."
+echo "APP_ID and APP_PRIVATE_KEY must be set as repo-level secrets separately."

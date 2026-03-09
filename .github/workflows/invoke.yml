@@ -118,14 +118,15 @@ jobs:
             });
 
   # ── Job 3: dispatch the resolved agent ───────────────────────────────────
-  # Only runs when the invoker has quota. Cap logic and comment are handled
-  # by check-invoker-cap above — no cap guards needed on individual steps.
+  # Runs in invoker/<invoker> so secrets.CLAUDE_CODE_OAUTH_TOKEN injects from
+  # the invoker's environment. Agent-specific config (persona gist ID etc.) lives
+  # in hall/<agent> as plain variables, fetched via API using the app token.
   dispatch:
     name: Dispatch ${{ needs.detect.outputs.agent }}
     needs: [detect, check-invoker-cap]
     if: needs.detect.outputs.agent != '' && needs.check-invoker-cap.outputs.over-cap != 'true'
     runs-on: ubuntu-latest
-    environment: hall/${{ needs.detect.outputs.agent }}
+    environment: invoker/${{ needs.detect.outputs.invoker }}
     concurrency:
       group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
       cancel-in-progress: false
