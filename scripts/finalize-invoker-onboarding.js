@@ -68,7 +68,7 @@ module.exports = async ({ github, core }) => {
       body: [
         `@${username} **multiclassed — invoker.**`,
         ``,
-        `Token validated. Dispatch any registered automaton by applying a \`hall:<agent>\` label to an issue or PR in a target repository.`,
+        `Token validated. Dispatch any registered automaton by applying a \`hall:<agent>\` label to an issue in the Hall repo, or by mentioning \`@hall-of-automata[bot] <agent>\` in a comment.`,
         ``,
         `— [Hall-Master | Old Major] · the Hall recognises you; spend quota with intent`,
       ].join('\n'),
