@@ -71,7 +71,9 @@ runs:
             'analyzing':      'Analyzing...',
             'awaiting-input': 'Awaiting context — question posted',
             'comment-posted': 'Response posted',
+            'queued':         'Queued — weekly quota reached',
             'working':        `Working — \`${branch}\``,
+
             'pr-opened':      `PR opened — ${pr}`,
             'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
             'escalated':      `Escalated — keeper notified`,

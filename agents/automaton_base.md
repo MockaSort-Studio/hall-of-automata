@@ -68,7 +68,7 @@ At the end of every invocation — whether you opened a PR, posted a question, o
 
 ```json
 {
-  "outcome": "<pr_created | awaiting_input | comment_posted | failed>",
+  "outcome": "<pr_created | awaiting_input | comment_posted | quota_exceeded | failed>",
   "pr_number": "<PR number as string, or empty string>",
   "branch": "<branch name, or empty string>"
 }
@@ -79,6 +79,7 @@ At the end of every invocation — whether you opened a PR, posted a question, o
 | `pr_created` | You opened a PR on `hall/<agent>/issue-<N>` |
 | `awaiting_input` | You posted a clarifying question; no PR |
 | `comment_posted` | You responded on a review re-dispatch; no new PR |
+| `quota_exceeded` | The Claude API returned a quota/rate-limit error; request will be retried when quota resets |
 | `failed` | You could not proceed; you must also have posted a comment explaining why |
 
 The Hall CI reads this file to update the status card. Do not commit it — it is ephemeral and scoped to this run.

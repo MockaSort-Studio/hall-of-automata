@@ -34,28 +34,46 @@ module.exports = async ({ github, core }) => {
     return;
   }
 
-  // Token is valid — apply active-invoker label, welcome, close
-  // quotaExceeded means usage is currently exhausted but the token itself is good
+  // Token is valid — apply active-invoker label always (token itself is good)
   try {
     await github.rest.issues.addLabels({
       owner, repo, issue_number: issueNum, labels: ['hall:active-invoker'],
     });
   } catch { /* label may not exist yet; non-fatal */ }
 
-  const quotaNote = quotaExceeded
-    ? `\n> **Note:** Your weekly quota is currently exhausted. Dispatch will resume automatically when it resets on Monday (UTC). Your token is valid and will be used as soon as quota is available.\n`
-    : ``;
+  if (quotaExceeded) {
+    // Token validated but weekly quota is exhausted — invoker is queued.
+    // hall:invoker-queued signals the weekly-reset workflow to unqueue on Monday.
+    try {
+      await github.rest.issues.addLabels({
+        owner, repo, issue_number: issueNum, labels: ['hall:invoker-queued'],
+      });
+    } catch { /* non-fatal */ }
 
-  await github.rest.issues.createComment({
-    owner, repo, issue_number: issueNum,
-    body: [
-      `@${username} **multiclassed — invoker.**`,
-      ``,
-      `Token validated. Dispatch any registered automaton by applying a \`hall:<agent>\` label to an issue or PR in a target repository.`,
-      quotaNote,
-      `— [Hall-Master | Old Major] · the Hall recognises you; spend quota with intent`,
-    ].filter(line => line !== undefined).join('\n'),
-  });
+    await github.rest.issues.createComment({
+      owner, repo, issue_number: issueNum,
+      body: [
+        `@${username} **multiclassed — invoker.** Token validated.`,
+        ``,
+        `Your weekly quota is currently exhausted. You are **queued** — dispatch will activate automatically when the cap resets on Monday (UTC).`,
+        ``,
+        `No action needed on your part.`,
+        ``,
+        `— [Hall-Master | Old Major] · the Hall recognises you; quota resets at dawn`,
+      ].join('\n'),
+    });
+  } else {
+    await github.rest.issues.createComment({
+      owner, repo, issue_number: issueNum,
+      body: [
+        `@${username} **multiclassed — invoker.**`,
+        ``,
+        `Token validated. Dispatch any registered automaton by applying a \`hall:<agent>\` label to an issue or PR in a target repository.`,
+        ``,
+        `— [Hall-Master | Old Major] · the Hall recognises you; spend quota with intent`,
+      ].join('\n'),
+    });
+  }
 
   await github.rest.issues.update({ owner, repo, issue_number: issueNum, state: 'closed' });
 };

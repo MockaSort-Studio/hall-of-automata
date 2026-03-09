@@ -3,6 +3,7 @@
 # Required env: TRIGGER, FIND_PR, DETECT_PR, BRANCH
 # Optional env: AGENT_OUTCOME — value from dispatch-result.json (see automaton_base.md).
 #   When present, the agent's declared outcome takes precedence over inference.
+#   Valid values: pr_created | awaiting_input | comment_posted | quota_exceeded | failed
 # Outputs: stage, pr-number, branch
 set -euo pipefail
 
@@ -18,6 +19,12 @@ elif [ "${AGENT_OUTCOME:-}" = "comment_posted" ]; then
   # Advice or research mode — agent replied on the issue, conversation complete.
   # Do not apply hall:awaiting-input; the thread is done.
   echo "stage=comment-posted"    >> "$GITHUB_OUTPUT"
+  echo "pr-number="              >> "$GITHUB_OUTPUT"
+  echo "branch="                 >> "$GITHUB_OUTPUT"
+elif [ "${AGENT_OUTCOME:-}" = "quota_exceeded" ]; then
+  # Claude API quota exhausted mid-dispatch. Request is queued; no PR, no question.
+  # Routing (least_used) will be implemented in C-4 to auto-retry with another key.
+  echo "stage=queued"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 elif [ "${AGENT_OUTCOME:-}" = "failed" ]; then
