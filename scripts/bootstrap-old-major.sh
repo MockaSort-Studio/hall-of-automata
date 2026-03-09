@@ -10,9 +10,12 @@
 #   bash scripts/bootstrap-old-major.sh
 #
 # Prerequisites:
-#   - gh CLI authenticated with a token that has environments:write permission
-#   - GitHub App registered; APP_ID and APP_PRIVATE_KEY set as repo secrets
+#   - gh CLI authenticated (your normal GitHub session is enough)
 #   - Your CLAUDE_CODE_OAUTH_TOKEN ready (from `claude setup-token`)
+#
+# APP_ID and APP_PRIVATE_KEY are repo-level secrets needed by the workflows,
+# not by this script. Set them once in repo Settings → Secrets when you
+# register the GitHub App — this script does not touch them.
 #
 # What this creates:
 #   hall/old-major   — Old Major's environment (secret slot only, no usage vars)
