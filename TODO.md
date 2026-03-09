@@ -67,17 +67,16 @@ The system works end-to-end for a single named-agent dispatch. Before implementi
 
 These must exist before any workflow run that routes to Old Major.
 
-- [ ] Create GitHub Environment `hall/old-major` in repo Settings → Environments
-  - Secret: `CLAUDE_CODE_OAUTH_TOKEN` — mksetaro's Claude OAuth token (`claude setup-token`)
-  - _(No usage vars — HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in `invoker/<handle>`, not `hall/<agent>`)_
-- [ ] Create GitHub Environment `hall/roster` in repo Settings → Environments
+- [ ] Create GitHub Environment `hall/roster` in repo Settings → Environments (or run `bash scripts/bootstrap-old-major.sh`)
   - No secrets needed at this stage — Old Major writes the deployment payload
-  - Create an initial inactive deployment so the environment exists: `gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`
+  - Seed deployment created automatically by bootstrap script
+- [ ] Register at least one invoker via the onboarding issue template before running automaton onboarding
+  - Old Major (onboard-automaton.yml) uses the invoker pool for its token — no dedicated `hall/old-major` env
 - [ ] Verify the GitHub App has permissions: `environments: write`, `deployments: write`, `contents: write`, `issues: write`
 
 **First test — onboarding smoke:**
 1. File a `new-automaton` issue using the template (fill in a real or dummy character sheet)
-2. Template auto-applies `hall:old-major` → `invoke.yml` fires, dispatch job runs in `hall/old-major` env
+2. Template auto-applies `hall:onboard-automaton` → `onboard-automaton.yml` fires; `select-invoker` picks least-used invoker from pool; `analyze` job runs in `invoker/<handle>` env
 3. Old Major reads the issue, creates the persona gist, creates the keeper environment, seeds the roster deployment, updates `agents.yml`, posts keeper instructions on the issue
 4. Verify each artifact exists before proceeding to Phase 5 code tasks
 
@@ -86,7 +85,7 @@ These must exist before any workflow run that routes to Old Major.
 ### �🔧 Code tasks — new invocation path (Old Major triage)
 
 - [ ] `invoke.yml`: add `assignment` trigger (`issues.assigned` to `@hall-of-automata`)
-- [ ] `invoke.yml`: add `triage` job — runs in `hall/old-major` env, reads roster catalog from `hall/roster` deployment, outputs `selected_agent` + `task_context`
+- [ ] `invoke.yml`: add `triage` job — pool-selects invoker (same pattern as detect job), runs in pool-selected `invoker/<handle>` env, reads roster catalog from `hall/roster` deployment, outputs `selected_agent` + `task_context`
 - [ ] `invoke.yml`: dispatch job reads from both detect (labeled path) and triage (assignment path) outputs
 - [ ] `scripts/detect-invoke-context.js`: add assignment path detection
 - [ ] `roster/old-major.md`: persona already written; Old Major env + deployment must be provisioned (👤)
@@ -94,8 +93,9 @@ These must exist before any workflow run that routes to Old Major.
 ### ✅ Code tasks — keeper env variables (replace Actions Cache counter)
 
 - [x] `actions/counter/action.yml`: replace cache-based counter with Environments API read/write on `HALL_USAGE_COUNT`
-- [x] Cap check in dedicated `check-invoker-cap` job (runs in `invoker/<handle>` env); dispatch job guarded at job level
-- [x] `scripts/check-weekly-cap.sh`: inlined into `check-invoker-cap` job; file retained but no longer called
+- [x] Cap check in `detect` job via REST API (pool-based: all `invoker/*` envs queried, least-used under-cap member selected); `check-invoker-cap` job removed — superseded
+- [x] `notify-queued` job added: fires when pool is exhausted (invoker == ''), posts comment + applies `hall:invoker-queued`
+- [x] Pool-based invoker selection: `detect-invoke-context.js` queries all `invoker/*` envs, filters at-cap members, sorts by usage, picks first; outputs `actor` (for authz) and `invoker` (selected pool member)
 - [x] Weekly reset: `weekly-reset.yml` scheduled workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC
 
 ### 🔧 Code tasks — deployment lifecycle
@@ -154,8 +154,7 @@ These must exist before any workflow run that routes to Old Major.
 
 > Blocking. Nothing else is testable without registered invokers and automata.
 
-- [ ] 👤 Provision `hall/old-major` environment (secret `CLAUDE_CODE_OAUTH_TOKEN` only — no usage vars)
-- [ ] 👤 Provision `hall/roster` environment + seed deployment
+- [ ] 👤 Provision `hall/roster` environment + seed deployment (run `bash scripts/bootstrap-old-major.sh`)
 - [ ] 👤 Create all labels (`hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued`, `hall:invoker-queued`)
 - [ ] 👤 Verify GitHub App permissions (environments, deployments, contents, issues: write)
 - [ ] Run TC-INV-01 through TC-INV-05 (invoker onboarding)

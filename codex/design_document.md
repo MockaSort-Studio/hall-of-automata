@@ -98,7 +98,7 @@ graph TB
     style ENVS fill:#0f172a,stroke:#334155,color:#94a3b8
 ```
 
-The Hall tracks every invocation against a weekly counter per agent. When an agent exceeds its cap, the Hall automatically reroutes the task to the least-used eligible agent. This counter data enables future heuristics for intelligent routing without requiring any changes to the invocation interface.
+The Hall tracks weekly invocations against a pre-registered invoker pool. Each contributor donates quota from their Claude Pro/Max subscription by registering as an invoker. At dispatch time, the Hall's detect job queries all registered invoker environments via the REST API, reads `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` for each, filters out over-cap members, and selects the least-used eligible invoker. Automatic rerouting to a different *agent* when the desired agent's invokers are exhausted is planned for Phase C-4.
 
 ---
 
@@ -124,9 +124,9 @@ After pushing code, the agent comments on the PR to trigger the repository's exi
 
 ### UC-4: Cap-Based Automatic Routing
 
-The weekly cap is tracked per invoker — the person dispatching the agent via their Claude Pro/Max OAuth token. Each invoker environment (`invoker/<handle>`) stores the current usage (`HALL_USAGE_COUNT`) and cap (`HALL_WEEKLY_CAP`) as environment variables.
+The weekly cap is tracked per invoker — each contributor in the pool who has donated their Claude Pro/Max OAuth token. Each invoker environment (`invoker/<handle>`) stores the current usage (`HALL_USAGE_COUNT`) and cap (`HALL_WEEKLY_CAP`) as plain environment variables.
 
-When an invoker's usage count reaches their cap, the dispatch workflow posts a cap-exceeded comment and does not dispatch. Automatic rerouting to a least-used eligible agent is deferred to Phase C-4. If Old Major is performing triage (unlabeled path), routing includes a usage check across invoker environments. If no invoker has capacity, the task is queued.
+At dispatch time, the `detect` job queries all `invoker/*` environments via the REST API (using the app token), reads usage and cap for each, filters out over-cap members, and selects the least-used eligible invoker (ascending sort by `HALL_USAGE_COUNT`). If no invoker has remaining capacity, the `notify-queued` job posts a pool-exhausted comment and applies `hall:invoker-queued`. The dispatch job does not run. Automatic rerouting to a different *agent* when the desired agent's pool is exhausted is planned for Phase C-4.
 
 
 ### UC-5: Task Cleanup on Merge
@@ -140,7 +140,7 @@ Two distinct queued scenarios exist:
 
 **Onboarding-time:** The invoker's token probe returns HTTP 429 (quota exhausted but token valid). Both `hall:active-invoker` and `hall:invoker-queued` labels are applied. The issue is closed with a "queued" message. The invoker is registered and will dispatch as soon as quota resets.
 
-**Dispatch-time:** The invoker's weekly cap is reached when a dispatch is attempted. The `check-invoker-cap` job posts a cap-exceeded comment and the dispatch job does not run. Alternatively, the agent itself hits a quota limit mid-dispatch and writes `quota_exceeded` to the dispatch result; the status card updates to "Queued — weekly quota reached".
+**Dispatch-time:** The entire invoker pool is at cap when a dispatch is attempted. The `detect` job finds no eligible invoker; the `notify-queued` job posts a pool-exhausted comment and applies `hall:invoker-queued`. The dispatch job does not run. Alternatively, the agent itself hits a quota limit mid-dispatch and writes `quota_exceeded` to the dispatch result; the status card updates to "Queued — weekly quota reached".
 
 In all cases the weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC. Automatic retry of queued tasks is deferred to Phase C-4.
 
@@ -156,9 +156,9 @@ flowchart LR
     subgraph DISPATCH["Dispatch"]
         MN --> AU{"Authorized?"}
         AU -->|No| RJ["Rejected"]
-        AU -->|Yes| CAP{"Under cap?"}
-        CAP -->|Over| RT["Reroute / Queue"]
-        CAP -->|Yes| AG["Agent dispatched"]
+        AU -->|Yes| POOL{"Invoker<br/>available?"}
+        POOL -->|"Pool exhausted"| RT["Request queued"]
+        POOL -->|Selected| AG["Agent dispatched"]
     end
 
     subgraph WORK["Agent Work"]
@@ -209,7 +209,7 @@ flowchart LR
 
 **FR-7: Review Interaction.** When a reviewer posts comments or requests changes on an agent-labeled PR, the bound agent must be re-dispatched with the review context to address feedback.
 
-**FR-8: Invoker Usage Tracking.** The system must track weekly invocation count per invoker environment via `HALL_USAGE_COUNT` environment variable in `invoker/<handle>` (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. Cap check runs in a dedicated `check-invoker-cap` job before dispatch, injecting the invoker's environment secrets for free.
+**FR-8: Invoker Usage Tracking.** The system must track weekly invocation count per invoker environment via `HALL_USAGE_COUNT` environment variable in `invoker/<handle>` (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. At dispatch time, the `detect` job queries all `invoker/*` environments via REST API, reads `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` for each, excludes over-cap members, and selects the least-used eligible invoker. Pool exhaustion (all at cap) triggers the `notify-queued` job.
 
 **FR-9: Automatic Routing (deferred — Phase C-4).** When an invoker's cap is reached, the system queues the request and posts a cap-exceeded comment. Automatic rerouting to the least-used eligible agent based on domain and role overlap is planned for Phase C-4. On the unlabeled path (Old Major triage), routing will be part of the triage step; Old Major will read invoker usage counts and exclude fully-capped invokers. The `routing.yml` `strategy: least_used` field is the declared intent; it is not yet evaluated at runtime.
 
@@ -327,36 +327,31 @@ flowchart TD
 
     AUTH -->|Yes| PARSE["2. Parse invocationextract agent + prompt"]
     PARSE --> LOAD["3. Load agent configfrom agents.yml"]
-    LOAD --> COUNTER{"4. Counter checkagent under weekly cap?"}
+    LOAD --> POOL{"3. Invoker pool<br/>Any available?"}
+    POOL -->|"Pool exhausted"| QUEUE["notify-queued job<br/>Post queued comment<br/>Apply hall:invoker-queued"] --> STOP
 
-    COUNTER -->|Under cap| DISPATCH
-    COUNTER -->|Over cap| REROUTE{"Eligible alternateagent available?"}
-    REROUTE -->|Yes| SWAP["Select least-usedeligible agent"] --> DISPATCH
-    REROUTE -->|No| QUEUE["Apply hall:queued labelPost delay comment"] --> STOP
+    POOL -->|"Least-used selected"| DISPATCH["4. Dispatch agent<br/>Environment: invoker/<handle><br/>Authorize actor ∈ agent teams<br/>Inject persona + prompt<br/>Run claude-code-action"]
+    DISPATCH -->|Unauthorized| REJECT
 
-    DISPATCH["5. Dispatch agent• Access Environment secrets• Inject persona• Run claude-code-action"]
-
-    DISPATCH --> POST["6. Post-dispatch• Increment counter → Cache• Upload log → Artifact• Apply hall:agent label to PR"]
+    DISPATCH --> POST["5. Post-dispatch<br/>Increment counter via Env API<br/>Upload log → Artifact<br/>Apply hall:agent label to PR<br/>Update status card"]
     POST --> STOP
 
     style AUTH fill:#b45309,stroke:#f59e0b,color:#fff
     style DISPATCH fill:#1e40af,stroke:#3b82f6,color:#fff
     style REJECT fill:#991b1b,stroke:#ef4444,color:#fff
     style QUEUE fill:#854d0e,stroke:#eab308,color:#fff
-    style SWAP fill:#166534,stroke:#22c55e,color:#fff
+    style POOL fill:#166534,stroke:#22c55e,color:#fff
 ```
 
-**Step 1 — Authorization (gate).** Before any other logic, the workflow validates the invoker's GitHub team membership against the agent's authorized teams list. If unauthorized, the workflow posts a rejection comment on the target repo and exits. No counter is incremented. No cache is read. This is the first step, not an intermediate one.
+**Step 1 — Detect context + select invoker.** The `detect` job resolves the trigger event (label / comment / PR review) to: agent identifier, actor (the GitHub user who triggered the event), target repo, and issue/PR number. It then queries all `invoker/*` GitHub Environments via REST API using the App token, reads `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` for each, filters out at-cap members, and selects the invoker with the lowest count. The selected invoker's handle and current count are passed as job outputs. If no invoker is available, the `notify-queued` job posts a pool-exhausted comment and applies `hall:invoker-queued`; dispatch does not run.
 
-**Step 2 — Parse invocation.** Extract the agent identifier and prompt from the comment body (if triggered by mention) or from the label name (if triggered by label application). The prompt is everything after the agent name in a mention, or the issue body for label-triggered dispatch. The issue or PR body provides additional context.
+**Step 2 — Parse invocation.** The agent identifier comes from the label name (directed path) or from the `@mention` body (comment path). The issue or PR body and prior thread provide task context.
 
-**Step 3 — Load agent config.** Read `agents.yml` from the Hall repo. Resolve the agent identifier to: OAuth token secret name, persona file path, authorized teams, capability list, max turns, and retry limit.
+**Step 3 — Load agent config.** Read `agents.yml` from the Hall repo. Resolve the agent identifier to: authorized teams, persona gist (via `PERSONA_GIST_ID` variable in `hall/<agent>` env), max turns, and retry limit.
 
-**Step 4 — Counter check.** The `check-invoker-cap` job runs in the invoker's own environment (`invoker/<handle>`) so `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` are injected as vars without an API call. If the invoker is under cap, the dispatch job runs. If over cap, the cap-exceeded comment is posted from `check-invoker-cap` and the dispatch job is skipped (job-level `if` guard). Automatic routing to a least-used alternate (FR-9) is deferred to Phase C-4.
+**Step 4 — Dispatch agent.** The `dispatch` job runs in `environment: invoker/<handle>` so `secrets.CLAUDE_CODE_OAUTH_TOKEN` resolves from the pool-selected invoker's environment. Authorization of the *actor* (who triggered the event) against the agent's teams list is the first step inside the dispatch job — hard fail if unauthorized. The target repository is checked out, the agent persona is injected as `CLAUDE.md` (fetched from gist via `PERSONA_GIST_ID` for automata; from `roster/old-major.md` for Old Major), and `anthropics/claude-code-action@v1` runs with the OAuth token and prompt.
 
-**Step 5 — Dispatch agent.** The job references the agent's GitHub Environment (e.g., `hall/hamlet`) to access the isolated OAuth token. It checks out the target repository, injects the agent's persona, and runs `anthropics/claude-code-action@v1` with the OAuth token and prompt.
-
-**Step 6 — Post-dispatch.** Increment the invoker counter via Environments API (`invoker/<handle>` env). Upload the invocation log as an Actions Artifact. If the agent opened a PR, apply the `hall:<agent>` label to bind future events. Agent declares its outcome in `.hall/dispatch-result.json` (outcome: `pr_created | awaiting_input | comment_posted | quota_exceeded | failed`); CI reads this file to determine the status card stage.
+**Step 5 — Post-dispatch.** Increment the invoker counter via `PATCH /environments/invoker%2F{handle}/variables/HALL_USAGE_COUNT`. Upload the invocation log as an Actions Artifact. If the agent opened a PR, apply the `hall:<agent>` label to bind future events. Agent declares its outcome in `.hall/dispatch-result.json` (outcome: `pr_created | awaiting_input | comment_posted | quota_exceeded | failed`); post-dispatch reads this file to determine the status card stage.
 
 ### 5.3 CI Orchestration Loop
 
@@ -627,8 +622,8 @@ The keeper receives a GitHub notification, lands on the PR, and has the full thr
 agents:
   hamlet:
     display_name: "Hamlet \U0001F417"      # shown in status cards and comments
-    agent_env: hall/hamlet                 # GitHub Environment: CLAUDE_CODE_OAUTH_TOKEN secret only
-                                           # (HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in invoker/<handle>)
+    agent_env: hall/hamlet                 # GitHub Environment: PERSONA_GIST_ID variable only
+                                           # (OAuth token lives in invoker/<handle>; no usage counters here)
     keeper: mksetaro
     teams: [automata-invokers]
     max_turns: 40

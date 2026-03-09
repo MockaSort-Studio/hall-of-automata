@@ -10,12 +10,14 @@ OAuth token lifecycle for automata in the Hall. Each automaton runs on its keepe
 
 ## Token inventory
 
-| Environment | Secret | Keeper | Notes |
-|-------------|--------|--------|-------|
-| `hall/old-major` | `CLAUDE_CODE_OAUTH_TOKEN` | @mksetaro | Rotate on offboarding |
-| `hall/hamlet` | `CLAUDE_CODE_OAUTH_TOKEN` | @mksetaro | Rotate on offboarding |
+All OAuth tokens live in `invoker/<handle>` GitHub Environments. There are no
+per-automaton token environments — automata run under pool-selected invoker credentials.
 
-Update this table when keepers change or new automata are onboarded.
+| Environment | Secret | Holder | Notes |
+|-------------|--------|--------|-------|
+| `invoker/<handle>` | `CLAUDE_CODE_OAUTH_TOKEN` | contributor | One env per registered invoker. Rotated via `claude setup-token`. |
+
+Update this table when invokers are added or removed.
 
 The Hall App secrets (`APP_ID`, `APP_PRIVATE_KEY`) are separate infrastructure credentials managed by the org admin — not OAuth tokens, not in this table.
 

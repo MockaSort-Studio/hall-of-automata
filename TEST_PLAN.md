@@ -14,8 +14,8 @@ These must exist before running any Phase A test. Create them manually in repo S
 |-------------|--------|
 | GitHub App installed | `hall-of-automata` installed on MockaSort-Studio org |
 | App secrets | `APP_ID` and `APP_PRIVATE_KEY` set in hall repo secrets |
-| `hall/old-major` environment | Exists with `CLAUDE_CODE_OAUTH_TOKEN` (Old Major's token) — persona env only, no usage counters |
-| `hall/roster` environment | Exists; initial inactive deployment seeded (`gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`) |
+| `hall/roster` environment | Exists; initial inactive deployment seeded (`gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`) — or run `bash scripts/bootstrap-old-major.sh` |
+| At least one registered invoker | `invoker/<handle>` environment with `CLAUDE_CODE_OAUTH_TOKEN` — automaton onboarding uses the invoker pool; run TC-INV-01/03 first |
 | Labels | `hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued`, `hall:invoker-queued` all created in the repo |
 | GitHub App permissions | `environments: write`, `deployments: write`, `contents: write`, `issues: write` |
 | Test invoker account | A GitHub account not yet registered as an invoker |
@@ -46,7 +46,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 2. Submit — template auto-applies `hall:onboard-invoker`
 
 **Expected:**
-- `onboard-invoker.yml` fires (labeled trigger); `setup` job runs in `hall/old-major` env
+- `onboard-invoker.yml` fires (labeled trigger); `setup` job runs with **no declared environment** (uses repo-level app secrets only)
 - `invoker/<handle>` GitHub Environment is created
 - `HALL_WEEKLY_CAP` variable set (hours × 3)
 - Old Major posts a comment with a direct link to the environment settings page and instructions to add `CLAUDE_CODE_OAUTH_TOKEN`
@@ -144,7 +144,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 **Trigger:** Open a `New Automaton` issue using the issue template; fill a complete, valid character sheet (slug, display_name, invoker, character, domains, scope, scope_summary all present and coherent). Template auto-applies `hall:onboard-automaton`.
 
 **Expected:**
-- `onboard-automaton.yml` fires; `analyze` job runs in `hall/old-major` env
+- `onboard-automaton.yml` fires; `select-invoker` job pool-selects least-used invoker; `analyze` job runs in `invoker/<handle>` env
 - Old Major evaluates the sheet; all fields pass
 - Persona gist created (public or secret)
 - `hall/<slug>` GitHub Environment created

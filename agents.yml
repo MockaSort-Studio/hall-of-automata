@@ -22,8 +22,9 @@ agents:
 
   old-major:
     display_name: "Old Major 🏛️"
-    agent_env: hall/old-major         # GitHub Environment: persona config only
-                                      #   (CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>)
+    # No agent_env: Old Major has no dedicated GitHub Environment.
+    # Persona: roster/old-major.md (repo file, not a gist).
+    # Token:  pool-selected invoker/<handle> at dispatch time.
     invoker: mksetaro
     teams: [automata-invokers]
     max_turns: 20

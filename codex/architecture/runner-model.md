@@ -9,8 +9,8 @@ icon: material/robot
 | Layer | Where it runs | What it does |
 |-------|--------------|-------------|
 | **Detect job** | GitHub-hosted runner | Thin event parsing: trigger type, invoker, agent (if labeled), issue/PR number |
-| **Old Major triage job** | GitHub-hosted runner (`hall/old-major` env) | Reads roster catalog, analyzes task, selects agent, synthesizes context. Only runs on the assignment path. |
-| **Dispatch job** | GitHub-hosted runner (`hall/<agent>` env) | Persona injection, Claude Code Action, status card, counter update, audit log |
+| **Old Major triage job** | GitHub-hosted runner (pool-selected `invoker/<handle>` env) | Reads roster catalog, analyzes task, selects agent, synthesizes context. Only runs on the assignment path. |
+| **Dispatch job** | GitHub-hosted runner (pool-selected `invoker/<handle>` env) | Persona injection, Claude Code Action, status card, counter update, audit log |
 | **Claude inference** | Anthropic infrastructure | Language model processing; called by the Claude Code Action via OAuth token |
 
 The GitHub runner checks out the target repository, assembles the CLAUDE.md context file from the base contract and agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner.
