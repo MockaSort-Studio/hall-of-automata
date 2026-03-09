@@ -70,10 +70,12 @@ runs:
             'dispatching':    'Dispatching agent...',
             'analyzing':      'Analyzing...',
             'awaiting-input': 'Awaiting context — question posted',
+            'comment-posted': 'Response posted',
             'working':        `Working — \`${branch}\``,
             'pr-opened':      `PR opened — ${pr}`,
             'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
             'escalated':      `Escalated — keeper notified`,
+            'failed':         'Failed — see comments',
             'done':           `Done — ${pr} merged`
           }[stage] ?? stage;
 
