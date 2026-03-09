@@ -1,0 +1,68 @@
+[project]
+name = "hall-of-automata"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+site_name = "Hall of Automata"
+site_url = "http://localhost:8000"
+site_description = "Federated AI agent orchestration for GitHub organisations — built on Claude Code and GitHub Actions."
+site_author = "MockaSort Studio"
+docs_dir = "codex"
+extra_css = ["stylesheets/extra.css"]
+extra_javascript = ["javascripts/mermaid-zoom.js"]
+nav = [
+    {"Home" = "index.md"},
+    {"Design" = [
+        {"System Specification" = "design_document.md"},
+        {"Architectural Decisions" = "design-options.md"},
+        {"Security" = "security.md"},
+    ]},
+    {"Architecture" = [
+        {"Overview" = "architecture/README.md"},
+        {"Runner Model" = "architecture/runner-model.md"},
+        {"Permissions" = "architecture/permissions-model.md"},
+        {"Secrets & Storage" = "architecture/secrets-model.md"},
+    ]},
+    {"Operations" = [
+        {"Token Management" = "key-management.md"},
+        {"Incident Response" = "incident-response.md"},
+    ]},
+    {"Federation" = [
+        {"Overview" = "federation/README.md"},
+        {"Joining the Hall" = "federation/joining.md"},
+        {"Leaving the Hall" = "federation/revoking.md"},
+    ]},
+    {"Onboarding" = [
+        {"Invokers" = "invoker-onboarding.md"},
+        {"Automata" = "automaton-onboarding.md"},
+    ]},
+]
+
+[dependency-groups]
+dev = [
+    "zensical>=0.0.2",
+]
+
+[project.theme]
+font.text = "Crimson Pro"
+font.code = "JetBrains Mono"
+palette.scheme = "slate"
+palette.primary = "custom"
+palette.accent = "custom"
+features = [
+    "navigation.instant",
+    "navigation.instant.progress",
+    "navigation.tracking",
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.sections",
+    "navigation.indexes",
+    "navigation.top",
+    "toc.follow",
+    "search.highlight",
+    "search.suggest",
+    "content.code.copy",
+    "content.code.annotate",
+]

@@ -1,0 +1,503 @@
+/* ═══════════════════════════════════════════════════════════════
+   HALL OF AUTOMATA — Theme
+   D&D Sourcebook × Neobrutalism
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Design tokens ── */
+:root {
+  --hall-gold:          #c9a84c;
+  --hall-gold-dim:      #8a6e2a;
+  --hall-gold-glow:     #e2cc88;
+  --hall-crimson:       #9b1a1a;
+  --hall-crimson-light: #cc3333;
+  --hall-shadow-hard:   4px 4px 0 rgba(201, 168, 76, 0.45);
+  --hall-shadow-soft:   2px 2px 0 rgba(201, 168, 76, 0.28);
+}
+
+/* ── Warm dungeon hue override on slate scheme ── */
+[data-md-color-scheme="slate"] {
+  --md-hue:                         37;
+  --md-default-bg-color:            hsl(37, 28%, 8%);
+  --md-default-bg-color--light:     hsl(37, 24%, 11%);
+  --md-default-bg-color--lighter:   hsl(37, 22%, 15%);
+  --md-default-bg-color--lightest:  hsl(37, 19%, 19%);
+  --md-default-fg-color:            hsl(37, 30%, 83%);
+  --md-default-fg-color--light:     hsl(37, 24%, 62%);
+  --md-default-fg-color--lighter:   hsl(37, 18%, 44%);
+  --md-default-fg-color--lightest:  hsl(37, 14%, 28%);
+  --md-primary-fg-color:            #c9a84c;
+  --md-primary-fg-color--light:     #e2cc88;
+  --md-primary-fg-color--dark:      #8a6e2a;
+  --md-primary-bg-color:            hsl(37, 28%, 8%);
+  --md-primary-bg-color--light:     hsl(37, 24%, 12%);
+  --md-accent-fg-color:             #cc3333;
+  --md-accent-fg-color--transparent: rgba(204, 51, 51, .12);
+  --md-accent-bg-color:             hsl(37, 28%, 8%);
+  --md-accent-bg-color--light:      hsl(37, 22%, 14%);
+  --md-code-bg-color:               hsl(37, 28%, 5%);
+  --md-code-fg-color:               hsl(37, 26%, 80%);
+  --md-typeset-a-color:             #c9a84c;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TYPOGRAPHY
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-typeset {
+  font-family: "Crimson Pro", Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+  font-family: "Cinzel", Georgia, serif;
+  letter-spacing: 0.03em;
+}
+
+.md-typeset h1 {
+  font-weight: 900;
+  font-size: 2em;
+  color: var(--hall-gold);
+  border-bottom: 2px solid var(--hall-gold);
+  padding-bottom: 0.4em;
+  margin-bottom: 0.9em;
+  text-shadow: 0 0 40px rgba(201, 168, 76, 0.15);
+}
+
+.md-typeset h2 {
+  font-weight: 700;
+  font-size: 1.45em;
+  color: var(--hall-gold-glow);
+  border-bottom: 1px solid rgba(201, 168, 76, 0.35);
+  padding-bottom: 0.2em;
+  margin-top: 1.8em;
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.2em;
+  color: #c0a458;
+  margin-top: 1.4em;
+}
+
+.md-typeset h4 {
+  font-weight: 600;
+  color: #a88e46;
+  font-style: italic;
+}
+
+.md-typeset a {
+  color: var(--hall-gold);
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.md-typeset a:hover {
+  color: var(--hall-gold-glow);
+  border-bottom-color: var(--hall-gold-glow);
+}
+
+.md-typeset strong {
+  color: var(--hall-gold-glow);
+  font-weight: 600;
+}
+
+.md-typeset em {
+  font-style: italic;
+  color: hsl(37, 26%, 72%);
+}
+
+.md-typeset hr {
+  border-color: rgba(201, 168, 76, 0.3);
+  margin: 2em 0;
+}
+
+.md-typeset blockquote {
+  border-left: 3px solid var(--hall-gold);
+  background-color: hsl(37, 28%, 7%);
+  font-style: italic;
+  padding: 0.7em 1.2em;
+  color: hsl(37, 24%, 66%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HEADER — thick neobrutalist bar
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-header {
+  background-color: hsl(37, 28%, 5%) !important;
+  border-bottom: 2px solid var(--hall-gold);
+  box-shadow: 0 3px 0 rgba(201, 168, 76, 0.2);
+}
+
+.md-header__title {
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hall-gold);
+}
+
+.md-header__button {
+  color: var(--hall-gold) !important;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+
+.md-header__button:hover {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NAVIGATION TABS
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-tabs {
+  background-color: hsl(37, 28%, 5%);
+  border-bottom: 1px solid rgba(201, 168, 76, 0.3);
+}
+
+.md-tabs__link {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: hsl(37, 22%, 54%) !important;
+  opacity: 1 !important;
+  transition: color 0.15s;
+}
+
+.md-tabs__link:hover,
+.md-tabs__link--active,
+.md-tabs__item--active .md-tabs__link {
+  color: var(--hall-gold) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR NAVIGATION
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-nav__title {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hall-gold) !important;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.22);
+}
+
+.md-nav__link {
+  transition: color 0.12s, padding-left 0.12s;
+}
+
+.md-nav__link:hover {
+  color: var(--hall-gold) !important;
+}
+
+.md-nav__item--active > .md-nav__link {
+  color: var(--hall-gold) !important;
+  font-weight: 600;
+  border-left: 2px solid var(--hall-gold);
+  padding-left: 0.5em;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CODE BLOCKS — typewriter frame
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-typeset pre {
+  background-color: var(--md-code-bg-color);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-left: 3px solid var(--hall-gold);
+  border-radius: 0;
+  box-shadow: var(--hall-shadow-hard);
+}
+
+.md-typeset pre > code {
+  font-family: "JetBrains Mono", "Courier New", monospace;
+  font-size: 0.82em;
+  border-radius: 0;
+}
+
+.md-typeset :not(pre) > code {
+  font-family: "JetBrains Mono", "Courier New", monospace;
+  font-size: 0.82em;
+  border-radius: 0;
+  border: 1px solid rgba(201, 168, 76, 0.28);
+  background-color: hsl(37, 28%, 6%);
+  padding: 0 0.28em;
+  color: var(--hall-gold-glow);
+}
+
+.md-clipboard {
+  color: rgba(201, 168, 76, 0.45);
+  transition: color 0.15s;
+}
+
+.md-clipboard:hover {
+  color: var(--hall-gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLES — ledger / manuscript style
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-typeset table:not([class]) {
+  border: 1px solid rgba(201, 168, 76, 0.38);
+  border-radius: 0;
+  box-shadow: var(--hall-shadow-hard);
+  font-size: 0.9rem;
+  font-family: "Crimson Pro", Georgia, serif;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: hsl(37, 28%, 5%);
+  color: var(--hall-gold);
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--hall-gold);
+  font-weight: 700;
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid rgba(201, 168, 76, 0.14);
+}
+
+.md-typeset table:not([class]) tr:hover > td {
+  background-color: rgba(201, 168, 76, 0.05);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ADMONITIONS — scroll panels
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid rgba(201, 168, 76, 0.32);
+  border-left: 3px solid var(--hall-gold);
+  border-radius: 0;
+  box-shadow: var(--hall-shadow-soft);
+  background-color: hsl(37, 28%, 7%);
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  background-color: rgba(201, 168, 76, 0.07);
+}
+
+.md-typeset .admonition.warning,
+.md-typeset .admonition.danger,
+.md-typeset details.warning {
+  border-left-color: var(--hall-crimson-light);
+}
+
+.md-typeset .admonition.warning > .admonition-title,
+.md-typeset .admonition.danger > .admonition-title {
+  background-color: rgba(153, 27, 27, 0.1);
+  color: var(--hall-crimson-light) !important;
+}
+
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  border-left-color: hsl(37, 60%, 55%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MERMAID DIAGRAMS — framed, pannable, zoomable
+   ═══════════════════════════════════════════════════════════════ */
+
+.mermaid {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(201, 168, 76, 0.38);
+  border-left: 3px solid var(--hall-gold);
+  box-shadow: var(--hall-shadow-hard);
+  background: hsl(37, 28%, 5%);
+  margin: 1.6em 0;
+  cursor: grab;
+}
+
+.mermaid:active {
+  cursor: grabbing;
+}
+
+/* Hint overlay */
+.mermaid::after {
+  content: "scroll · zoom  ·  drag · pan";
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: rgba(201, 168, 76, 0.35);
+  pointer-events: none;
+}
+
+.mermaid > svg {
+  display: block;
+  margin: 0 auto;
+  max-width: none !important;
+}
+
+/* svg-pan-zoom control button theming */
+.mermaid .svg-pan-zoom-control rect {
+  fill: hsl(37, 28%, 8%) !important;
+  stroke: rgba(201, 168, 76, 0.5) !important;
+}
+
+.mermaid .svg-pan-zoom-control path,
+.mermaid .svg-pan-zoom-control polygon {
+  fill: rgba(201, 168, 76, 0.7) !important;
+}
+
+.mermaid .svg-pan-zoom-control:hover rect {
+  fill: hsl(37, 28%, 12%) !important;
+  stroke: var(--hall-gold) !important;
+}
+
+.mermaid .svg-pan-zoom-control:hover path,
+.mermaid .svg-pan-zoom-control:hover polygon {
+  fill: var(--hall-gold) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEARCH
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-search__input {
+  border-radius: 0;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  background-color: hsl(37, 28%, 6%);
+  color: hsl(37, 30%, 83%);
+  font-family: "Crimson Pro", Georgia, serif;
+}
+
+.md-search__input::placeholder {
+  color: rgba(201, 168, 76, 0.32);
+  font-style: italic;
+}
+
+.md-search__input:focus {
+  border-color: var(--hall-gold);
+  box-shadow: 0 0 0 1px rgba(201, 168, 76, 0.35);
+}
+
+.md-search-result__title {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.85rem;
+}
+
+.md-search-result__article {
+  border-top: 1px solid rgba(201, 168, 76, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLE OF CONTENTS
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-nav--secondary .md-nav__title {
+  letter-spacing: 0.12em;
+  border-bottom: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.md-nav--secondary .md-nav__link--active {
+  color: var(--hall-gold) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-footer {
+  border-top: 2px solid rgba(201, 168, 76, 0.35);
+  background-color: hsl(37, 28%, 5%);
+}
+
+.md-footer-meta {
+  background-color: hsl(37, 28%, 3%);
+}
+
+.md-footer__link,
+.md-footer-nav__title {
+  font-family: "Cinzel", Georgia, serif;
+}
+
+.md-footer-nav__direction {
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 76, 0.45);
+}
+
+.md-footer-nav__title {
+  color: var(--hall-gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MISCELLANEOUS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Back-to-top */
+.md-top {
+  border-radius: 0;
+  border: 1px solid var(--hall-gold);
+  box-shadow: 3px 3px 0 rgba(201, 168, 76, 0.4);
+  background-color: hsl(37, 28%, 8%);
+  color: var(--hall-gold);
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: hsl(37, 28%, 6%); }
+::-webkit-scrollbar-thumb        { background: rgba(201, 168, 76, 0.38); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover  { background: var(--hall-gold); }
+
+/* ── Navigation icons ── */
+.md-nav__link .md-icon,
+.md-nav__link svg {
+  color: var(--hall-gold-dim);
+  opacity: 0.75;
+  transition: color 0.15s, opacity 0.15s;
+}
+
+.md-nav__item--active > .md-nav__link .md-icon,
+.md-nav__item--active > .md-nav__link svg,
+.md-nav__link:hover .md-icon,
+.md-nav__link:hover svg {
+  color: var(--hall-gold);
+  opacity: 1;
+}
+
+/* Anchor headerlinks */
+.md-typeset .headerlink {
+  color: rgba(201, 168, 76, 0.28);
+}
+
+.md-typeset .headerlink:hover {
+  color: var(--hall-gold);
+}
+
+/* Progress bar */
+.md-progress-bar {
+  background-color: var(--hall-gold);
+}
