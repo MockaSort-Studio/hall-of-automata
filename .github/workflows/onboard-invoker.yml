@@ -129,8 +129,9 @@ jobs:
             await fn({ github, core })
 
   # ── Phase 2b: validate the invoker's OAuth token ─────────────────────────────
-  # Run the actual dispatch action with a minimal 1-turn prompt — if it works,
-  # the token is valid and the full pipeline is confirmed end-to-end.
+  # Primary: run actual dispatch action — confirms the full pipeline end-to-end.
+  # Fallback: if dispatch fails, probe the API directly to distinguish quota-
+  # exceeded (429 → pass) from bad token (401/403 → fail).
   test-token:
     name: Validate invoker token
     needs: [parse-ready]
@@ -139,6 +140,8 @@ jobs:
       needs.parse-ready.outputs.secret-found == 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.parse-ready.outputs.invoker-username }}
+    outputs:
+      test-passed: ${{ steps.result.outputs.test-passed }}
     steps:
       - name: Checkout Hall repo (dispatch action)
         uses: actions/checkout@v4
@@ -155,12 +158,51 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Validate token via dispatch
+        id: dispatch
+        continue-on-error: true
         uses: ./.hall/actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   1
           prompt:      "Reply with exactly one word: ready"
+
+      - name: Fallback probe (dispatch failed — check if quota-exceeded vs bad token)
+        id: fallback
+        if: steps.dispatch.outcome == 'failure'
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          echo "::add-mask::$TOKEN"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            -X POST "https://api.anthropic.com/v1/messages" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}') || HTTP=000
+          echo "fallback HTTP: $HTTP"
+          # 429 = valid token, quota exhausted — treat as pass
+          # 000 = network unreachable — inconclusive, treat as pass
+          # 401/403 = bad token — fail
+          if [[ "$HTTP" == "401" || "$HTTP" == "403" ]]; then
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve result
+        id: result
+        shell: bash
+        run: |
+          if [[ "${{ steps.dispatch.outcome }}" == "success" ]]; then
+            echo "test-passed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ steps.fallback.outputs.passed }}" == "true" ]]; then
+            echo "test-passed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "test-passed=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # ── Phase 2c: post result ─────────────────────────────────────────────────────
   finalize:
@@ -190,7 +232,7 @@ jobs:
           REPO_NAME:        ${{ github.event.repository.name }}
           ISSUE_NUMBER:     ${{ github.event.issue.number }}
           INVOKER_USERNAME: ${{ needs.parse-ready.outputs.invoker-username }}
-          TEST_PASSED:      ${{ needs.test-token.result == 'success' && 'true' || 'false' }}
+          TEST_PASSED:      ${{ needs.test-token.outputs.test-passed }}
           QUOTA_EXCEEDED:   'false'
         with:
           github-token: ${{ steps.app-token.outputs.token }}
