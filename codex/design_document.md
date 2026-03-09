@@ -124,9 +124,9 @@ After pushing code, the agent comments on the PR to trigger the repository's exi
 
 ### UC-4: Cap-Based Automatic Routing
 
-The weekly cap is tracked per keeper — the person whose Claude Pro/Max subscription backs the agent. Each agent environment (`hall/<agent>`) stores the keeper's current usage (`HALL_USAGE_COUNT`) and cap (`HALL_WEEKLY_CAP`) as environment variables.
+The weekly cap is tracked per invoker — the person dispatching the agent via their Claude Pro/Max OAuth token. Each invoker environment (`invoker/<handle>`) stores the current usage (`HALL_USAGE_COUNT`) and cap (`HALL_WEEKLY_CAP`) as environment variables.
 
-When a keeper's usage count reaches their cap, the Hall reroutes the task to the least-used eligible agent whose keeper still has capacity and whose catalog domains overlap with the request. The invoker is notified of the reroute in a comment. If Old Major is performing triage (unlabeled path), routing happens as part of the triage step — Old Major reads all keeper usage counts from the roster catalog and selects an agent with available capacity. If no agent has capacity, the task is queued.
+When an invoker's usage count reaches their cap, the dispatch workflow posts a cap-exceeded comment and does not dispatch. Automatic rerouting to a least-used eligible agent is deferred to Phase C-4. If Old Major is performing triage (unlabeled path), routing includes a usage check across invoker environments. If no invoker has capacity, the task is queued.
 
 
 ### UC-5: Task Cleanup on Merge
@@ -136,7 +136,7 @@ When the agent's PR is merged, a workflow fires that: deletes the task memory ca
 
 ### UC-6: Queued Task on Full Capacity
 
-All eligible keepers have exhausted their weekly cap. Old Major applies a `hall:queued` label to the issue, posts a comment explaining the delay and the expected cap reset time (from `routing.yml` reset schedule), and a scheduled workflow re-initiates the Old Major triage flow when caps reset on the configured day.
+All eligible invokers have exhausted their weekly cap. The `check-invoker-cap` job applies a `hall:queued` label to the issue, posts a comment explaining the delay and the expected cap reset time (Monday UTC per `routing.yml`), and the dispatch job does not run. The weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday and (in a future phase) will re-initiate queued dispatch.
 
 
 ### End-to-End Lifecycle
@@ -203,13 +203,13 @@ flowchart LR
 
 **FR-7: Review Interaction.** When a reviewer posts comments or requests changes on an agent-labeled PR, the bound agent must be re-dispatched with the review context to address feedback.
 
-**FR-8: Keeper Usage Tracking.** The system must track Weekly invocation count per keeper environment via `HALL_USAGE_COUNT` environment variable (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. Granularity is per keeper environment; Old Major aggregates across environments when evaluating routing.
+**FR-8: Invoker Usage Tracking.** The system must track weekly invocation count per invoker environment via `HALL_USAGE_COUNT` environment variable in `invoker/<handle>` (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. Cap check runs in a dedicated `check-invoker-cap` job before dispatch, injecting the invoker's environment secrets for free.
 
 **FR-9: Automatic Routing.** When the requested agent's keeper is at cap, the system must reroute to the least-used eligible agent based on domain and role overlap with the request. On the unlabeled path, routing is part of Old Major's triage. On the directed (label) path, the Hall falls back to the unlabeled routing logic with a reroute notice posted on the issue.
 
 **FR-10: Task Memory.** The agent must persist task-specific working memory in Actions Cache, keyed by `hall-task-{repo}-{pr}`. The cache is the concurrency-safe working store; the issue/PR thread is the permanent fallback. On cache miss, the agent reconstructs context from the thread.
 
-**FR-11: Cleanup.** On PR close (merged or not), the system must delete the task memory cache, remove the `hall:<agent>` label, post a mandatory summary comment on the originating issue, and append a completed-task entry to the agent's dashboard gist.
+**FR-11: Cleanup.** On PR close (merged or not), the system must delete the task memory cache, remove the `hall:<agent>` label, post a **mandatory** summary comment on the originating issue, and append a completed-task entry to the agent's dashboard gist.
 
 **FR-12: Immutable target CLAUDE.md.** The target repository's `CLAUDE.md` must never be committed to or modified. At dispatch time it is stashed as `.hall-local.md`. The agent reads it to extract hard constraints but does not modify or commit it.
 
@@ -338,12 +338,11 @@ flowchart TD
 
 **Step 3 — Load agent config.** Read `agents.yml` from the Hall repo. Resolve the agent identifier to: OAuth token secret name, persona file path, authorized teams, capability list, max turns, and retry limit.
 
-**Step 4 — Counter check.** Restore the weekly counter from Actions Cache. If the requested agent is under its cap, proceed. If over cap, apply the routing strategy from `routing.yml` to select an alternate agent. If all eligible agents are capped, queue the task (apply `hall:queued` label, post comment, exit).
-**Review comment:** se UC-1
+**Step 4 — Counter check.** The `check-invoker-cap` job runs in the invoker's own environment (`invoker/<handle>`) so `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` are injected as vars without an API call. If the invoker is under cap, the dispatch job runs. If over cap, the cap-exceeded comment is posted from `check-invoker-cap` and the dispatch job is skipped (job-level `if` guard). Automatic routing to a least-used alternate (FR-9) is deferred to Phase C-4.
 
 **Step 5 — Dispatch agent.** The job references the agent's GitHub Environment (e.g., `hall/hamlet`) to access the isolated OAuth token. It checks out the target repository, injects the agent's persona, and runs `anthropics/claude-code-action@v1` with the OAuth token and prompt.
 
-**Step 6 — Post-dispatch.** Increment the counter and save to Actions Cache. Upload the invocation log as an Actions Artifact. If the agent opened a PR, apply the `hall:<agent>` label to bind future events.
+**Step 6 — Post-dispatch.** Increment the invoker counter via Environments API (`invoker/<handle>` env). Upload the invocation log as an Actions Artifact. If the agent opened a PR, apply the `hall:<agent>` label to bind future events. Agent declares its outcome in `.hall/dispatch-result.json` (outcome: `pr_created | awaiting_input | comment_posted | quota_exceeded | failed`); CI reads this file to determine the status card stage.
 
 ### 5.3 CI Orchestration Loop
 
@@ -507,8 +506,8 @@ The issue/PR thread is never modified on cleanup — it remains as the permanent
 | State | Storage | Key / Location | Lifecycle |
 |-------|---------|----------------|----------|
 | Task working memory | Actions Cache | `hall-task-{repo}-{pr_number}` | Created on first dispatch, deleted on PR close. 7-day inactivity eviction; agent reconstructs from thread on miss. |
-| Keeper usage count | Env Variable (`HALL_USAGE_COUNT`) | `hall/<agent>` environment | Incremented via Environments API after each dispatch. Reset to 0 on `routing.yml` reset day. |
-| Keeper weekly cap | Env Variable (`HALL_WEEKLY_CAP`) | `hall/<agent>` environment | Set at onboarding. Updated manually by keeper admin. |
+| Keeper usage count | Env Variable (`HALL_USAGE_COUNT`) | `invoker/<handle>` environment | Incremented via Environments API after each dispatch. Reset to 0 by `weekly-reset.yml` on Monday 00:00 UTC. |
+| Keeper weekly cap | Env Variable (`HALL_WEEKLY_CAP`) | `invoker/<handle>` environment | Set at invoker onboarding. Updated manually by invoker or keeper admin. |
 | Agent lifecycle (gist refs) | Deployment payload | `hall/<agent>` env — singleton deployment | Created at onboarding. Updated (not recreated) at each invocation. |
 | Roster catalog | Deployment payload | `hall/roster` env — singleton deployment | Updated by Old Major on agent onboarding or persona change. |
 | Agent persona | GitHub Gist | ID in deployment payload | Created at onboarding. Updated when persona is revised. |
@@ -575,6 +574,9 @@ Stage values across the full lifecycle:
 | PR opened | PR opened — #58 |
 | CI fix loop active | CI fix in progress (attempt 2 / 3) |
 | Retries exhausted | Escalated — @{keeper} notified |
+| Response posted (advice/research) | Response posted |
+| Quota exhausted | Queued — weekly quota reached |
+| Agent error | Failed — see comments |
 | PR merged | Done — PR #58 merged |
 
 ### 6.5 Escalation to Keeper
@@ -610,8 +612,8 @@ The keeper receives a GitHub notification, lands on the PR, and has the full thr
 agents:
   hamlet:
     display_name: "Hamlet \U0001F417"      # shown in status cards and comments
-    keeper_env: hall/hamlet                # GitHub Environment: CLAUDE_CODE_OAUTH_TOKEN secret
-                                           #   + HALL_USAGE_COUNT and HALL_WEEKLY_CAP variables
+    agent_env: hall/hamlet                 # GitHub Environment: CLAUDE_CODE_OAUTH_TOKEN secret only
+                                           # (HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in invoker/<handle>)
     keeper: mksetaro
     teams: [automata-invokers]
     max_turns: 40
@@ -630,18 +632,9 @@ The `CLAUDE_CODE_OAUTH_TOKEN` secret name is a fixed convention for all agents �
 
 ```yaml
 routing:
-  weekly_cap: 25                        # default per-agent
-  reset_day: monday
-
-  overrides:
-    hamlet:
-      weekly_cap: 40
-    ophelia:
-      weekly_cap: 15
-
-  fallback: queue                       # queue | reject
-
-  strategy: least_used
+  reset_day: monday       # weekly-reset.yml zeros HALL_USAGE_COUNT every Monday 00:00 UTC
+  fallback: queue         # queue | reject (when invoker cap is exceeded)
+  strategy: least_used    # alternate key selection when routing is implemented (Phase C-4)
 ```
 
 ### Persona File (roster/hamlet.md)
@@ -671,21 +664,9 @@ When reacting to reviewer feedback:
 
 ---
 
-## 10. Appendix D: Invocation Counter Schema
+## 10. Appendix D: Invocation Counter
 
-Stored in Actions Cache under key `hall-counters-{YYYY}-W{WW}`.
-
-```json
-{
-  "week": "2026-W10",
-  "counts": {
-    "hamlet": 18,
-    "ophelia": 7
-  }
-}
-```
-
-The `invocations` detail is captured per-dispatch in Actions Artifacts, not in the counter. The counter is kept minimal to reduce cache read/write overhead and avoid hitting cache size limits under heavy usage.
+Usage is stored as an environment variable `HALL_USAGE_COUNT` in the invoker's `invoker/<handle>` GitHub Environment. It is a plain integer, updated via `PATCH /repos/{owner}/{repo}/environments/{name}/variables/HALL_USAGE_COUNT` after each successful dispatch. The weekly-reset workflow (`weekly-reset.yml`) sets it back to `0` every Monday 00:00 UTC by iterating all `invoker/*` environments.
 
 ---
 
