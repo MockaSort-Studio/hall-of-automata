@@ -64,7 +64,7 @@ seed_deployment() {
     -f ref=main \
     -f "environment=$env_name" \
     -f "description=$description" \
-    -f auto_merge=false \
+    -F auto_merge=false \
     -F "required_contexts[]=" \
     > /dev/null
 }
