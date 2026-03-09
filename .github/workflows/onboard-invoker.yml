@@ -129,12 +129,8 @@ jobs:
             await fn({ github, core })
 
   # ── Phase 2b: validate the invoker's OAuth token ─────────────────────────────
-  # Lightweight API probe — no full Claude invocation needed.
-  # Anthropic validates auth before anything else, so:
-  #   200 = valid token, quota available
-  #   429 = valid token, quota exhausted → still onboarding success
-  #   401/403 = invalid / expired / revoked → fail
-  #   5xx/timeout = Anthropic infra issue → inconclusive pass (don't block invoker)
+  # Run the actual dispatch action with a minimal 1-turn prompt — if it works,
+  # the token is valid and the full pipeline is confirmed end-to-end.
   test-token:
     name: Validate invoker token
     needs: [parse-ready]
@@ -143,56 +139,34 @@ jobs:
       needs.parse-ready.outputs.secret-found == 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.parse-ready.outputs.invoker-username }}
-    outputs:
-      test-passed:    ${{ steps.probe.outputs.test-passed }}
-      quota-exceeded: ${{ steps.probe.outputs.quota-exceeded }}
     steps:
-      - name: Mask token
-        shell: bash
-        run: echo "::add-mask::${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+      - name: Checkout Hall repo (dispatch action)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: actions/
+          sparse-checkout-cone-mode: true
 
-      - name: Probe Anthropic API
-        id: probe
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          set +e
-          HTTP=$(curl -s -o /tmp/probe.json -w "%{http_code}" \
-            --max-time 15 \
-            -X POST "https://api.anthropic.com/v1/messages" \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "Content-Type: application/json" \
-            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}')
-          set -e
-          echo "HTTP ${HTTP}"
-          case "$HTTP" in
-            200|429)
-              echo "test-passed=true"                                                      >> "$GITHUB_OUTPUT"
-              echo "quota-exceeded=$([ "$HTTP" = "429" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-              ;;
-            401|403)
-              echo "test-passed=false"    >> "$GITHUB_OUTPUT"
-              echo "quota-exceeded=false" >> "$GITHUB_OUTPUT"
-              cat /tmp/probe.json
-              exit 1
-              ;;
-            *)
-              # 5xx or network error — inconclusive, pass with warning so infra
-              # issues don't permanently block a valid invoker
-              echo "test-passed=true"    >> "$GITHUB_OUTPUT"
-              echo "quota-exceeded=false" >> "$GITHUB_OUTPUT"
-              echo "::warning::Unexpected HTTP ${HTTP} from Anthropic API — inconclusive pass"
-              cat /tmp/probe.json
-              ;;
-          esac
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Validate token via dispatch
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   1
+          prompt:      "Reply with exactly one word: ready"
 
   # ── Phase 2c: post result ─────────────────────────────────────────────────────
   finalize:
     name: Post onboarding result
     needs: [parse-ready, test-token]
-    if: always() && needs.parse-ready.outputs.is-ready == 'true' && needs.parse-ready.outputs.secret-found == 'true'
+    if: always() && needs.parse-ready.outputs.is-ready == 'true' && needs.parse-ready.outputs.secret-found == 'true' && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (scripts only)
@@ -216,8 +190,8 @@ jobs:
           REPO_NAME:        ${{ github.event.repository.name }}
           ISSUE_NUMBER:     ${{ github.event.issue.number }}
           INVOKER_USERNAME: ${{ needs.parse-ready.outputs.invoker-username }}
-          TEST_PASSED:      ${{ needs.test-token.outputs.test-passed }}
-          QUOTA_EXCEEDED:   ${{ needs.test-token.outputs.quota-exceeded }}
+          TEST_PASSED:      ${{ needs.test-token.result == 'success' && 'true' || 'false' }}
+          QUOTA_EXCEEDED:   'false'
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
