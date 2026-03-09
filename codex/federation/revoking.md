@@ -1,60 +1,68 @@
+---
+icon: material/exit-run
+---
+
 # Leaving the Hall
 
-How to remove an automaton from the Hall — whether the keeper is leaving the org, the automaton is being retired, or access needs to be revoked for any other reason.
+How to remove an automaton from the Hall — whether the keeper is departing, the automaton is being retired, or access needs to be revoked for any other reason.
 
-Do these steps in order. Do not skip key rotation.
-
----
-
-## Step 1 — Rotate the API key immediately
-
-Before anything else, revoke the current API key in the Anthropic account and generate a new one (or revoke without replacing if retiring permanently).
-
-This ensures that even if the old key value is cached somewhere, it cannot be used after this point.
+Do these steps in order. Rotate the token first, always.
 
 ---
 
-## Step 2 — Remove or update the org secret
+## Step 1 — Rotate or revoke the OAuth token immediately
 
-An org admin removes `ANTHROPIC_KEY_[NAME]` from org secrets, or replaces it with the new key if the automaton is being transferred to a new keeper rather than retired.
+On the keeper's machine, issue a new token via `claude setup-token`. This automatically invalidates the old token.
+
+If retiring permanently (no replacement), work with an org admin to delete or empty the `CLAUDE_CODE_OAUTH_TOKEN` secret. The old token is already invalidated by re-issuing.
 
 ---
 
-## Step 3 — Disable the workflow
+## Step 2 — Disable the environment
 
-In the repos containing the invocation workflow, either:
-- Delete the `invoke-[name].yml` file, or
-- Rename it to `invoke-[name].yml.disabled` to preserve it for reference
+An org admin disables the `hall/{name}` GitHub Environment or removes/replaces the `CLAUDE_CODE_OAUTH_TOKEN` secret. With the secret absent or invalid, invocations fail at the dispatch step.
 
-A disabled workflow will not trigger on label events.
+For a full retirement, the admin deletes the environment after running the workflow disable in Step 3.
+
+---
+
+## Step 3 — Disable the dispatch workflow
+
+Set the agent's dispatch workflow to `if: false` on the relevant job to prevent any further runs. For a temporary suspension this is enough — revert when ready to reactivate.
+
+For a full retirement, open a PR removing the workflow file entirely.
 
 ---
 
 ## Step 4 — Remove the label from repos
 
-Delete the automaton's label from the repos where it existed. This prevents confusion — a label with no backing workflow is a dead portal.
+Delete the `hall:{name}` label from any repos where it exists. A label with no backing workflow is a dead portal — remove it to avoid confusion.
 
 ---
 
-## Step 5 — Update the roster
+## Step 5 — Update the catalog and registration
 
-Open a PR to this repo:
-- Remove or archive the profile in `roster/[name].md` (add a `[RETIRED]` note at the top if archiving)
-- Remove the row from `roster/README.md` and `README.md`
+**Catalog** (admin removes the entry from the `hall/roster` deployment payload):
+
+Remove the automaton's JSON object from the catalog array and create a new deployment with the updated payload. Old Major will no longer route to this automaton.
+
+**`agents.yml` PR** (you open):
+- Remove or comment out the automaton's entry
+- Remove the row from `roster/README.md` and root `README.md`
 - Merge once reviewed
 
 ---
 
-## Step 6 — Remove keeper from automata-invokers (if leaving org)
+## Step 6 — Remove keeper from `automata-invokers` (if leaving org)
 
-If the keeper is leaving the org, an admin removes them from `automata-invokers`. This step is only relevant if the keeper themselves is departing — a keeper can retire their automaton while staying in the org.
+Only applies if the keeper is departing. An org admin removes them from the team. This step is not needed when a keeper retires their automaton while staying in the org.
 
 ---
 
-## Note on partial revocation
+## Partial revocation (temporary suspension)
 
-If the goal is to restrict invocation (e.g. suspend the automaton temporarily) without a full removal:
-- Disable the workflow file (Step 3 only)
-- Do not rotate the key unless there is a security concern
+To suspend without full removal:
+- Disable the dispatch workflow (`if: false` on the dispatch job) — Step 3 only
+- Do not rotate the token unless there is a security concern
 
-The automaton can be re-enabled by re-activating the workflow. No re-federation process needed.
+Reactivate by reverting the `if: false` change. No re-federation process needed.

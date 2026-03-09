@@ -1,3 +1,7 @@
+---
+icon: material/sword-cross
+---
+
 # Security
 
 The threat model, hardening measures, and ongoing obligations for the Hall of Automata.
@@ -38,43 +42,35 @@ Any change to workflow files requires approval from the `admins` team. This is t
 
 ## Secret hygiene
 
-**Key masking in every workflow:**
+**Mask the OAuth token in every workflow:**
 
 ```yaml
-- name: Mask key
-  run: echo "::add-mask::${{ secrets.ANTHROPIC_KEY_HAMLET }}"
+- name: Mask keeper token
+  run: echo "::add-mask::${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
 ```
 
-This must be the first step after authorization passes, before any step that uses the key. Once masked, the value is redacted from all subsequent log output.
+This must be the first step after authorization passes, before any step that uses the token. Once masked, the value is redacted from all subsequent log output.
 
-**Never print secrets explicitly.** No `echo $SECRET`, no debug steps that dump environment variables. If `ACTIONS_STEP_DEBUG` is ever enabled (it reveals more log detail), disable it in production.
+**Never print secrets explicitly.** No `echo $SECRET`, no debug steps that dump environment variables. If `ACTIONS_STEP_DEBUG` is ever enabled, disable it before running any invocation job.
 
 **Minimal workflow permissions:**
 
 ```yaml
 permissions:
-  issues: write    # post result comments
-  contents: read   # checkout if needed
+  issues: write          # post result comments
+  pull-requests: write   # open PRs, post review responses
+  contents: write        # create branches, push commits
 ```
 
 Nothing else. The `GITHUB_TOKEN` should not have write access to anything it does not need.
 
 ---
 
-## Fail-closed authorization
+## Team membership check
 
-The team membership check returns `false` on any error — API failure, user not found, token issue. The invocation does not proceed on ambiguity.
+The Hall App holds **Members: read** org permission. No separate `ORG_READ_TOKEN` PAT is required. Authorization runs against the App's own installation token.
 
-```javascript
-try {
-  const res = await github.rest.teams.getMembershipForUserInOrg({ ... });
-  return res.data.state === 'active';
-} catch {
-  return false;  // fail closed
-}
-```
-
-An attacker cannot bypass the check by triggering an API error.
+Authorization is fail-closed: any API error (network, token issue, user not found) blocks the invocation. See [`architecture/permissions-model.md`](architecture/permissions-model.md) for the full flow.
 
 ---
 

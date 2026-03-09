@@ -1,14 +1,19 @@
+---
+icon: material/robot
+---
+
 # Runner Model
 
 ## Execution layers
 
 | Layer | Where it runs | What it does |
 |-------|--------------|-------------|
-| **Dispatch workflow** | GitHub-hosted runner (Hall repo) | Auth, cap check, routing, persona injection, status card, counter, audit log |
-| **Agent (Claude Code Action)** | GitHub-hosted runner (target repo checkout) | Reads issue, writes code, opens PR, pushes commits |
+| **Detect job** | GitHub-hosted runner | Thin event parsing: trigger type, invoker, agent (if labeled), issue/PR number |
+| **Old Major triage job** | GitHub-hosted runner (`hall/old-major` env) | Reads roster catalog, analyzes task, selects agent, synthesizes context. Only runs on the assignment path. |
+| **Dispatch job** | GitHub-hosted runner (`hall/<agent>` env) | Persona injection, Claude Code Action, status card, counter update, audit log |
 | **Claude inference** | Anthropic infrastructure | Language model processing; called by the Claude Code Action via OAuth token |
 
-The GitHub runner checks out the target repository, injects the agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner. The runner is not stateless for the duration of a dispatch; it holds the working tree.
+The GitHub runner checks out the target repository, assembles the CLAUDE.md context file from the base contract and agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner.
 
 ---
 
@@ -53,11 +58,28 @@ Each agent's OAuth token lives in a GitHub Environment (`hall/{agent}`). The dis
 
 ---
 
+## Persona injection
+
+At dispatch time, the workflow assembles the agent's operating context:
+
+1. Read `agents/automaton_base.md` from the Hall repo (checked out in the workflow)
+2. Fetch the agent's persona character sheet from its Gist (ID read from the `hall/<agent>` deployment payload)
+3. Concatenate base contract + persona → write to `CLAUDE.md` in the workspace root
+4. If the target repo has its own `CLAUDE.md`: move it to `.hall-local.md` before writing the Hall's CLAUDE.md
+5. Pass task context as the `prompt` input to the Claude Code Action, including an instruction to read `.hall-local.md` and extract hard constraints
+
+`CLAUDE.md` and `.hall-local.md` are never committed. The runner is ephemeral — they exist only for the duration of the dispatch job. The base contract (`automaton_base.md`) explicitly prohibits the agent from committing either file.
+
+---
+
 ## State persistence
 
 The runner is ephemeral, but task state persists between runs via:
 
-- **Actions Cache:** weekly invocation counters (`hall-counters-{YYYY}-W{WW}`) and per-task memory (`hall-task-{repo}-{pr}`)
+- **Actions Cache:** per-task working memory (`hall-task-{repo}-{pr}`). Keyed by PR so multiple concurrent tasks on different PRs never collide.
+- **GitHub Deployments:** automaton lifecycle. `hall/<agent>` env holds a singleton deployment whose payload maps `persona_gist_id` and `dashboard_gist_id`. Updated (not recreated) on each invocation.
+- **GitHub Gists:** persona and dashboard content. Dashboard gist is appended after each dispatch with an audit log entry and updated metrics.
+- **Environment variables (`HALL_USAGE_COUNT`, `HALL_WEEKLY_CAP`):** keeper usage tracking. Written by the workflow via the GitHub API after each successful dispatch.
 - **Actions Artifacts:** immutable invocation audit logs (`hall-log-{agent}-{issue}-{run_id}`)
 - **GitHub issue/PR thread:** permanent human-readable task history; serves as fallback context if cache expires
 

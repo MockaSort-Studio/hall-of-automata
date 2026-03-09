@@ -2,44 +2,60 @@
 
 > *A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through.*
 
-#[lore-keeper]: outdated
-The Hall of Automata is MockaSort Studio's framework for deploying named AI agents across the organization. Each automaton has an identity, a keeper, a set of behaviors, and a key. Anyone the org trusts can open a portal — a GitHub issue label — and the automaton steps through to work.
-
-This is not a product. It is infrastructure we built because we needed it.
+Hall of Automata is MockaSort Studio's federated AI agent orchestration layer, built on GitHub Actions. Contributors donate their Claude Pro/Max subscription quota to a shared pool. The Hall dispatches named agents on demand, tracks keeper usage, enforces caps, and provides a unified bot identity across the org — no API keys, no shared billing accounts.
 
 ---
 
-## How it works
+## How invocation works
 
-Agents are invoked via GitHub issue labels. A label is a portal. The automaton on the other side receives the issue context, does the work, and posts results back. Authorization is enforced by GitHub teams — not every member of the org can invoke every agent. Federation is explicit opt-in.
+**Directed:** Apply a `hall:<agent>` label to any issue or PR. The named agent is dispatched directly.
+
+**Unlabeled:** Assign the issue or PR to `@hall-of-automata`. Old Major (the Hall Master) analyzes the task, selects the right specialist from the roster, synthesizes context, and dispatches.
+
+In both cases: authorization is checked first. Non-members of `automata-invokers` are hard-rejected. The agent works, opens a PR, and the Hall manages the lifecycle through CI, review, and merge.
 
 ```mermaid
-flowchart TD
-    A[Label applied to issue] --> B{Sender authorized?}
-    B -- No --> C[Label removed]
-    C --> D[Comment: not authorized]
-    B -- Yes --> E[Agent invoked with issue context]
-    E --> F[Result posted back to issue]
+flowchart LR
+    subgraph INVOKE["Invocation"]
+        LB["hall:agent label"] --> DIRECT["Direct dispatch"]
+        AS["Assign to @hall-of-automata"] --> OM["Old Major triage"]
+        OM --> DIRECT
+    end
+    subgraph DISPATCH["Dispatch"]
+        DIRECT --> AUTH{"Authorized?"}
+        AUTH -->|No| FAIL["Hard fail\n+ rejection comment"]
+        AUTH -->|Yes| CAP{"Keeper under cap?"}
+        CAP -->|Over| ROUTE["Reroute or queue"]
+        CAP -->|Yes| AGENT["Agent dispatched"]
+    end
+    subgraph LIFECYCLE["Lifecycle"]
+        AGENT --> PR["Opens PR\nhall:agent label"]
+        PR --> CI["CI loop"]
+        PR --> RV["Review loop"]
+        PR --> MERGE["Merge → cleanup"]
+    end
 ```
 
 ---
 
-## Navigation
+## Repository layout
 
-| Section | What's there |
-|---------|-------------|
-| [`roster/`](roster/) | Active automata, their profiles and capabilities |
-| [`architecture/`](architecture/) | System design — runners, permissions, secrets |
-| [`agents/`](agents/) | Behavioral contract all automata share + personality layer |
-| [`federation/`](federation/) | How to join, how to leave |
-| [`codex/`](codex/) | Design decisions, security posture, incident response |
-| [`.github/workflows/`](.github/workflows/) | The actual workflow machinery |
+| Path | What's there |
+|------|-------------|
+| [`agents/`](agents/) | Base behavioral contract all automata share; persona format template |
+| [`roster/`](roster/) | Old Major's persona (Hall infrastructure — lives in repo). Specialist personas live in Gists. |
+| [`actions/`](actions/) | Reusable GitHub composite actions (authorize, dispatch, memory, cleanup…) |
+| [`scripts/`](scripts/) | JS/bash helpers called by workflows |
+| [`.github/workflows/`](.github/workflows/) | Dispatch, CI loop, cleanup workflows |
+| [`agents.yml`](agents.yml) | Agent registration record and routing defaults |
+| [`routing.yml`](routing.yml) | Routing strategy and cap overrides |
+| [`codex/`](codex/) | Full documentation — design, architecture, operations, federation |
+
+## Documentation
+
+The [`codex/`](codex/) folder is the single source of truth for design decisions, architecture, and operations. Start at [`codex/index.md`](codex/index.md).
 
 ---
 
-*MockaSort Studio — [github.com/MockaSort-Studio](https://github.com/MockaSort-Studio)*
+*MockaSort Studio · [github.com/MockaSort-Studio](https://github.com/MockaSort-Studio)*
 
-```
-// proudly AI-generated, human-reviewed
-// Hamlet 🐗 -- built the hall, lives in it
-```

@@ -1,66 +1,65 @@
-# Key Management
+---
+icon: material/key
+---
 
-API key lifecycle for automata in the Hall. Every key in org secrets has a keeper responsible for it. This document defines the obligations.
+# Token Management
+
+OAuth token lifecycle for automata in the Hall. Each automaton runs on its keeper's Claude Pro/Max subscription. The OAuth token is the credential — treat it accordingly.
 
 ---
 
-## Key inventory
+## Token inventory
 
-| Secret name | Purpose | Keeper | Rotation due |
-|-------------|---------|--------|-------------|
-| `ORG_READ_TOKEN` | Team membership checks | org admin | 90 days |
-| `ANTHROPIC_KEY_HAMLET` | Hamlet invocation | @mksetaro | 90 days |
+| Environment | Secret | Keeper | Notes |
+|-------------|--------|--------|-------|
+| `hall/old-major` | `CLAUDE_CODE_OAUTH_TOKEN` | @mksetaro | Rotate on offboarding |
+| `hall/hamlet` | `CLAUDE_CODE_OAUTH_TOKEN` | @mksetaro | Rotate on offboarding |
 
-Update this table when keys are added, rotated, or removed.
+Update this table when keepers change or new automata are onboarded.
 
----
-
-## Rotation schedule
-
-All keys rotate on a **90-day cycle**. No exceptions for keys that "haven't been used much" or seem low-risk. Rotation is not a response to incidents — it is baseline hygiene.
-
-Rotation is the keeper's responsibility. The org does not enforce it automatically. Keepers track their own schedule.
-
-**Rotation procedure:**
-
-1. Generate a new key in the Anthropic account
-2. Update the org secret with the new value
-3. Verify the next invocation succeeds
-4. Revoke the old key in the Anthropic account
-5. Update the rotation date in the table above
-
-Do steps 1–2 before revoking the old key. There is a brief window where both keys are valid — this is intentional to avoid downtime.
+The Hall App secrets (`APP_ID`, `APP_PRIVATE_KEY`) are separate infrastructure credentials managed by the org admin — not OAuth tokens, not in this table.
 
 ---
 
-## Key compromise
+## Token model
 
-If a key is compromised or suspected compromised:
+OAuth tokens are generated via `claude setup-token` on the keeper's machine. They authenticate against the keeper's Claude Pro/Max subscription. Anthropic automatically invalidates the old token when a new one is issued for the same account — no separate revocation step needed.
 
-1. **Revoke immediately** in the Anthropic account — do not wait
-2. Generate a replacement and update the org secret
-3. Review Actions logs for anomalous invocations in the preceding window
-4. Follow [`incident-response.md`](incident-response.md) if unauthorized usage is confirmed
+Unlike API keys, there is no fixed rotation schedule. Tokens are rotated on personnel change or confirmed/suspected compromise.
 
-Treat "suspected" the same as "confirmed" for revocation purposes. The cost of a false positive (a brief invocation failure) is lower than the cost of leaving a compromised key active.
+---
+
+## Rotation procedure
+
+1. On the keeper's machine: `claude setup-token` (browser auth flow — token shown once, copy it)
+2. Hall repo → Settings → Environments → `hall/<agent>` → `CLAUDE_CODE_OAUTH_TOKEN` → Update secret
+3. Verify: trigger a test invocation and confirm it succeeds
+
+The old token is invalidated automatically when the new one is issued.
 
 ---
 
 ## Personnel change
 
-When a keeper leaves the org:
+**Keeper leaving:**
+1. Rotate the token immediately (keeper may retain local copies)
+2. Follow [`federation/revoking.md`](../federation/revoking.md) for full offboarding
 
-1. Rotate the key immediately (keeper may have local copies)
-2. Follow the full offboarding process in [`federation/revoking.md`](../federation/revoking.md)
-
-When a keeper is added (new automaton federating):
-
-1. Keeper generates a fresh key — never reuse an existing key
-2. Key stored per [`federation/joining.md`](../federation/joining.md) Step 2
+**Keeper onboarding (new automaton):**
+1. Keeper generates a fresh token on their machine via `claude setup-token`
+2. Token stored per [`federation/joining.md`](../federation/joining.md)
 3. Add a row to the inventory table above
 
 ---
 
-## ORG_READ_TOKEN
+## Compromise response
 
-Managed by org admin, not by individual keepers. Same 90-day rotation applies. Scope is `read:org` only — if this token leaked, an attacker can read org membership data. That is the full blast radius.
+Treat suspected the same as confirmed. The cost of a false positive (brief invocation failure) is lower than leaving a live token exposed.
+
+Full procedure: [`incident-response.md`](incident-response.md) — Scenario 2.
+
+---
+
+## App secrets (`APP_ID`, `APP_PRIVATE_KEY`)
+
+Managed by org admin as Hall repo secrets. Rotate `APP_PRIVATE_KEY` via GitHub App Settings → Private keys → Generate a new key, then revoke the old one. Blast radius if leaked: attacker can mint installation tokens with App-granted permissions. Rotate immediately on any suspected exposure.

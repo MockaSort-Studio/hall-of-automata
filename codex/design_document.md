@@ -1,3 +1,7 @@
+---
+icon: material/book-open-page-variant
+---
+
 # Hall of Automata — Design Document
 
 **Status:** Draft\
@@ -102,7 +106,13 @@ The Hall tracks every invocation against a weekly counter per agent. When an age
 
 ### UC-1: On-Demand Implementation
 
-A developer creates a GitHub issue describing a feature. They either comment `@hall-of-automata hamlet` on the issue or apply the `hamlet` label directly. The Hall validates the developer's team membership, dispatches the agent with the issue body as context, and the agent implements the feature, opens a PR linked to the issue. The Hall applies a `hall:hamlet` label to the PR so all subsequent interactions route back to the same agent.
+A developer creates a GitHub issue and either assigns it to `@hall-of-automata` (unlabeled path) or applies a `hall:<agent>` label directly (directed path).
+
+**Directed path (label trigger):** The developer applies `hall:hamlet` to the issue. The Hall validates authorization and dispatches the named agent directly. No triage step.
+
+**Unlabeled path (assignment trigger):** The developer assigns the issue to `@hall-of-automata` without specifying an agent. The Hall dispatches Old Major, who reads the roster catalog from the `hall/roster` deployment, analyzes the issue, selects the most capable available agent (accounting for keeper usage counts), synthesizes the task context, and triggers the specialist dispatch. If Old Major cannot map the request to a specific agent with sufficient confidence, it posts a clarifying question on the issue and enters the awaiting-input state.
+
+In both paths: the agent implements the feature, opens a PR linked to the issue, and the Hall applies a `hall:<agent>` label to bind all subsequent interactions.
 
 ### UC-2: Agent Reacts to PR Review
 
@@ -114,17 +124,19 @@ After pushing code, the agent comments on the PR to trigger the repository's exi
 
 ### UC-4: Cap-Based Automatic Routing
 
-A developer requests a specific agent, but that agent has hit its weekly cap of 40 invocations. The Hall checks routing rules, finds an alternate agent with capacity and overlapping capabilities, and dispatches the alternate instead. The invoker is notified of the reroute in the response comment.
+The weekly cap is tracked per keeper — the person whose Claude Pro/Max subscription backs the agent. Each agent environment (`hall/<agent>`) stores the keeper's current usage (`HALL_USAGE_COUNT`) and cap (`HALL_WEEKLY_CAP`) as environment variables.
+
+When a keeper's usage count reaches their cap, the Hall reroutes the task to the least-used eligible agent whose keeper still has capacity and whose catalog domains overlap with the request. The invoker is notified of the reroute in a comment. If Old Major is performing triage (unlabeled path), routing happens as part of the triage step — Old Major reads all keeper usage counts from the roster catalog and selects an agent with available capacity. If no agent has capacity, the task is queued.
 
 
 ### UC-5: Task Cleanup on Merge
 
-When the agent's PR is merged, a workflow fires that cleans up the agent's task-specific cache (working memory for the task), removes the `hall:<agent>` label, and optionally posts a summary comment on the original issue.
+When the agent's PR is merged, a workflow fires that: deletes the task memory cache entry, removes the `hall:<agent>` label from the PR, posts a mandatory summary comment on the originating issue (the comment is not optional), and appends a completed-task entry to the agent's dashboard gist.
 
 
 ### UC-6: Queued Task on Full Capacity
 
-All eligible agents are at their weekly cap. The Hall applies a `hall:queued` label to the issue, posts a comment explaining the delay, and a scheduled workflow re-dispatches the task when counters reset on the configured day.
+All eligible keepers have exhausted their weekly cap. Old Major applies a `hall:queued` label to the issue, posts a comment explaining the delay and the expected cap reset time (from `routing.yml` reset schedule), and a scheduled workflow re-initiates the Old Major triage flow when caps reset on the configured day.
 
 
 ### End-to-End Lifecycle
@@ -177,31 +189,45 @@ flowchart LR
 
 ### 4.1 Functional Requirements
 
-**FR-1: Invocation.** The system must dispatch an agent when (a) a comment containing `@hall-of-automata <agent>` is posted on an issue or PR, or (b) a GitHub label matching a registered agent name is applied to an issue, in any org repository where the app is installed.
+**FR-1: Invocation.** The system must support two invocation paths: (a) directed — a `hall:<agent>` label is applied to an issue or PR, dispatching the named agent directly; (b) unlabeled — the issue or PR is assigned to `@hall-of-automata`, triggering Old Major to read the roster catalog, select the appropriate agent, and dispatch it with synthesized task context.
 
-**FR-2: Authorization.** The system must validate that the invoker is a member of at least one GitHub team authorized for the requested agent before any workflow logic executes. Unauthorized invocations must be rejected immediately with a clear response.
+**FR-2: Authorization.** The system must validate that the invoker is a member of at least one GitHub team authorized for the requested agent before any workflow logic executes. Unauthorized invocations must result in a hard workflow failure, a verbose rejection comment tagging the `@automata-invokers` team, and no further action.
 
-**FR-3: Agent Resolution.** The system must resolve the agent identifier (from mention or label) to a specific OAuth token and persona file defined in the Hall repository's agent registry.
+**FR-3: Agent Resolution.** On the directed path, the agent is resolved from the label name. On the unlabeled path, Old Major resolves the agent by reading the roster catalog from the `hall/roster` deployment and matching task characteristics against each agent's `roles`, `domains`, and `scope_summary`. Resolution includes a keeper usage check; agents whose keeper is at cap are excluded.
 
-**FR-4: Dispatch.** The system must invoke the Claude Code Action with the resolved agent's OAuth token and persona, targeting the repository where the mention occurred.
+**FR-4: Dispatch.** The system must invoke the Claude Code Action with the resolved agent's OAuth token and synthesized context (base contract + persona from gist + task context from Old Major), targeting the repository where the invocation occurred.
 
 **FR-5: PR Labeling.** When an agent opens a PR, the system must apply a GitHub label (e.g., `hall:hamlet`) that binds all subsequent PR events (review comments, CI results) to the same agent for the lifetime of that PR.
 
-**FR-6: CI Orchestration.** The agent must be able to trigger existing CI checks on the target repository (via comment or commit push) and must be re-dispatched when CI results are posted, with the failure context included in the prompt.
+**FR-6: CI Orchestration.** The agent must be re-dispatched when CI failures are detected on its labeled PR, with the failure context included in the prompt. The agent operates within the target repository's existing CI infrastructure.
 
 **FR-7: Review Interaction.** When a reviewer posts comments or requests changes on an agent-labeled PR, the bound agent must be re-dispatched with the review context to address feedback.
 
-**FR-8: Weekly Counting.** The system must track the number of invocations per agent per week and enforce configurable caps.
+**FR-8: Keeper Usage Tracking.** The system must track Weekly invocation count per keeper environment via `HALL_USAGE_COUNT` environment variable (updated via the GitHub Environments API after each successful dispatch). Configurable cap is stored as `HALL_WEEKLY_CAP` on the same environment. Granularity is per keeper environment; Old Major aggregates across environments when evaluating routing.
 
-**FR-9: Automatic Routing.** When the requested agent exceeds its weekly cap, the system must reroute to the least-used eligible agent based on capability match.
+**FR-9: Automatic Routing.** When the requested agent's keeper is at cap, the system must reroute to the least-used eligible agent based on domain and role overlap with the request. On the unlabeled path, routing is part of Old Major's triage. On the directed (label) path, the Hall falls back to the unlabeled routing logic with a reroute notice posted on the issue.
 
-**FR-10: Task Memory.** The agent must be able to persist task-specific working memory in Actions Cache for the duration of the task, keyed by issue/PR number. The whole dispatch-to-merge flow is fully async and may span days or weeks; if the cache entry expires during an inactive period, the agent must reconstruct its context by re-reading the issue or PR thread, which serves as the permanent, human-readable history of the task.
+**FR-10: Task Memory.** The agent must persist task-specific working memory in Actions Cache, keyed by `hall-task-{repo}-{pr}`. The cache is the concurrency-safe working store; the issue/PR thread is the permanent fallback. On cache miss, the agent reconstructs context from the thread.
 
-**FR-11: Cleanup.** On PR merge, the system must delete the agent's task-specific cache, remove the `hall:<agent>` label, and optionally post a summary on the originating issue.
+**FR-11: Cleanup.** On PR close (merged or not), the system must delete the task memory cache, remove the `hall:<agent>` label, post a mandatory summary comment on the originating issue, and append a completed-task entry to the agent's dashboard gist.
+
+**FR-12: Immutable target CLAUDE.md.** The target repository's `CLAUDE.md` must never be committed to or modified. At dispatch time it is stashed as `.hall-local.md`. The agent reads it to extract hard constraints but does not modify or commit it.
+
+**FR-13: No permanent Hall content in target repo.** Agent persona and task context are ephemeral: assembled in the runner workspace for the duration of the dispatch job and never committed. `CLAUDE.md` and all `.hall-*` files are excluded from commits by the base contract.
+
+**FR-14: Persona format.** All automaton personas must follow the character sheet format defined in `agents/automaton_template.md`: three sections (Character, Domains, Scope) with no tool enumeration. The base contract (`agents/automaton_base.md`) is prepended to every persona at dispatch time.
+
+**FR-15: Persona creation via onboarding workflow.** New automaton personas are submitted via a dedicated issue template. Old Major reviews the submission, verifies format compliance, creates the keeper environment, provisions the deployment and gists, and registers the automaton in the roster catalog. Roster changes are accepted only by `automata-invokers`.
+
+**FR-16: Co-authorship.** Every commit made by an automaton must include a `Co-authored-by` trailer with the automaton's name and the Hall bot email (`hall-of-automata[bot]@users.noreply.github.com`).
+
+**FR-17: Unauthorized invocation = hard failure.** An unauthorized invocation must cause the workflow to fail (non-zero exit), post a verbose rejection comment tagging both the invoker and `@<org>/automata-invokers`, and leave no other trace (no status card, no counter increment, no label remaining).
+
+**FR-18: Org roster with hall fallback.** The roster catalog deployment may optionally be sourced from a dedicated org roster repository (configurable via a repo variable). If the org roster repo does not exist or is unreachable, the Hall's own `hall/roster` deployment is used as the fallback.
 
 ### 4.2 Non-Functional Requirements
 
-**NFR-1: No runtime artifacts in the Hall repo.** All runtime state (counters, task memory, audit logs) must be stored in GitHub infrastructure: Actions Cache for mutable state, Actions Artifacts for immutable logs.
+**NFR-1: No runtime artifacts in the Hall repo.** All runtime state must be stored in GitHub infrastructure: Actions Cache for task working memory; GitHub Deployments for automaton lifecycle metadata; GitHub Gists for persona and dashboard HMI content; Environment Variables for keeper usage and cap tracking. The Hall repo contains only code, configuration schemas, the base contract, and Old Major's persona.
 
 **NFR-2: Org-scoped.** The app must be installable at the organization level and operate across all repositories where it is installed.
 
@@ -234,7 +260,7 @@ The app is the Hall's identity on GitHub. It is registered as a GitHub App at th
 |---|---|---|
 | **Actions** | Read | Read workflow run status for CI loop detection |
 | **Checks** | Read | Read check suite results on `hall/*` branches |
-| **Contents** | Read & Write | Create branches, push commits, write `CLAUDE.md` |
+| **Contents** | Read & Write | Create branches, push commits to target repos |
 | **Issues** | Read & Write | Read issue body; post comments; manage labels |
 | **Metadata** | Read | Required by GitHub for all Apps |
 | **Pull requests** | Read & Write | Open PRs, post review responses, read PR context |
@@ -478,12 +504,16 @@ The issue/PR thread is never modified on cleanup — it remains as the permanent
 
 ### 5.6 Runtime State Storage
 
-| State | Storage | Key Pattern | Lifecycle |
-|-------|---------|-------------|-----------|
-| Weekly counters | Actions Cache | `hall-counters-{YYYY}-W{WW}` | Resets weekly (key expires naturally) |
-| Task memory | Actions Cache | `hall-task-{repo}-{pr_number}` | Created on first dispatch, deleted on PR close |
-| Invocation logs | Actions Artifacts | `hall-log-{agent}-{issue}-{timestamp}` | Immutable, retained per GitHub policy (90 days) |
-| Agent secrets | GitHub Environments | `hall/{agent}` | Managed by Hall maintainers |
+| State | Storage | Key / Location | Lifecycle |
+|-------|---------|----------------|----------|
+| Task working memory | Actions Cache | `hall-task-{repo}-{pr_number}` | Created on first dispatch, deleted on PR close. 7-day inactivity eviction; agent reconstructs from thread on miss. |
+| Keeper usage count | Env Variable (`HALL_USAGE_COUNT`) | `hall/<agent>` environment | Incremented via Environments API after each dispatch. Reset to 0 on `routing.yml` reset day. |
+| Keeper weekly cap | Env Variable (`HALL_WEEKLY_CAP`) | `hall/<agent>` environment | Set at onboarding. Updated manually by keeper admin. |
+| Agent lifecycle (gist refs) | Deployment payload | `hall/<agent>` env — singleton deployment | Created at onboarding. Updated (not recreated) at each invocation. |
+| Roster catalog | Deployment payload | `hall/roster` env — singleton deployment | Updated by Old Major on agent onboarding or persona change. |
+| Agent persona | GitHub Gist | ID in deployment payload | Created at onboarding. Updated when persona is revised. |
+| Agent dashboard | GitHub Gist | ID in deployment payload | Appended after each dispatch (audit entry) and on PR close (task summary). |
+| OAuth tokens | GitHub Environment secret | `hall/<agent>` env | Managed by keeper. Rotated via `claude setup-token`. |
 
 ---
 
@@ -574,25 +604,27 @@ The keeper receives a GitHub notification, lands on the PR, and has the full thr
 ### agents.yml
 
 ```yaml
+# agents.yml is the registration record — not read at dispatch time.
+# The runtime catalog lives in the hall/roster deployment payload.
+
 agents:
   hamlet:
-    secret: CLAUDE_CODE_OAUTH_TOKEN     # secret name within the agent's environment
-    persona: personas/hamlet.md
-    teams: [core-devs]
+    display_name: "Hamlet \U0001F417"      # shown in status cards and comments
+    keeper_env: hall/hamlet                # GitHub Environment: CLAUDE_CODE_OAUTH_TOKEN secret
+                                           #   + HALL_USAGE_COUNT and HALL_WEEKLY_CAP variables
+    keeper: mksetaro
+    teams: [automata-invokers]
     max_turns: 40
     max_retries: 3
-    capabilities: [implement, review, fix, refactor]
-    keeper: mksetaro                    # GitHub handle to @mention on retry exhaustion
-
-  ophelia:
-    secret: CLAUDE_CODE_OAUTH_TOKEN
-    persona: personas/ophelia.md
-    teams: [core-devs, reviewers]
-    max_turns: 20
-    max_retries: 2
-    capabilities: [review, comment]
-    keeper: mksetaro
+    catalog:
+      roles: [implement, fix, refactor]   # functional position — maps to invocation modes
+      domains: [cpp, build-systems, devops] # named capability bundles — imply toolset
+      scope_summary: >                    # one-paragraph plain-language scope for Old Major
+        Deep implementation in C++ and build systems. Strong on structural fixes,
+        refactors, and CI configuration. Not the right call for UI, docs, or ops.
 ```
+
+The `CLAUDE_CODE_OAUTH_TOKEN` secret name is a fixed convention for all agents — it is not repeated per entry. The agent's full persona lives in a GitHub Gist; the `persona_gist_id` is stored in the `hall/<agent>` deployment payload, not in `agents.yml`.
 
 ### routing.yml
 
