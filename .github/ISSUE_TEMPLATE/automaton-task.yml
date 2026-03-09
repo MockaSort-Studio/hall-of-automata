@@ -1,18 +1,30 @@
-name: "Hamlet — Automaton Task"
-description: Invoke Hamlet on a task. Fill this out completely — the agent has no context beyond what is here.
-labels: ["hall:hamlet"]
+name: "Automaton Task"
+description: Invoke an automaton on a task. Fill this out completely — the agent has no context beyond what is here.
+labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        Submitting this form invokes **Hamlet**. The `hall:hamlet` label is applied automatically — no extra step needed.
+        Submitting this form creates a task issue. Assign it to `@hall-of-automata` or apply `hall:<agent>` to invoke directly.
         The Hall will post a status card as its first response.
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      description: Which automaton should handle this task. Leave blank to let Old Major decide.
+      options:
+        - "(let Old Major decide)"
+        - "hamlet"
+      default: 0
+    validations:
+      required: false
 
   - type: dropdown
     id: mode
     attributes:
       label: Mode
-      description: What you need from Hamlet.
+      description: What you need from the agent.
       options:
         - "Doing — implement this"
         - "Advising — evaluate options and recommend"
@@ -31,7 +43,7 @@ body:
     id: context
     attributes:
       label: Context
-      description: What Hamlet needs to know. Relevant files, current behavior, constraints, prior decisions.
+      description: What the agent needs to know. Relevant files, current behavior, constraints, prior decisions.
       placeholder: |
         - File: core/lifecycle/task.hpp — base class for all tasks
         - Current behavior: X
@@ -55,7 +67,7 @@ body:
     id: out-of-scope
     attributes:
       label: Out of scope
-      description: What Hamlet should NOT do or touch. Optional but useful.
+      description: What the agent should NOT do or touch. Optional but useful.
       placeholder: |
         - Do not modify the public API
         - Do not add dependencies
@@ -66,3 +78,4 @@ body:
       label: Sign-off required before action
       options:
         - label: "This task requires human review before any code is pushed"
+
