@@ -1,0 +1,39 @@
+name: "🤖 Assemble Automaton"
+description: "Create a new specialist by defining its Role, Inventory, and Personality."
+title: "[Automaton]: <Identifier Name>"
+labels: ["onboarding"]
+body:
+  - type: dropdown
+    id: role
+    attributes:
+      label: "Operational Role"
+      options: [implement, fix, review, refactor, advise, research]
+    validations:
+      required: true
+
+  - type: input
+    id: archetype
+    attributes:
+      label: "Technical Archetype"
+      description: "e.g., High-Performance C++, Bazel Build Specialist, Python Data Engineer..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: inventory
+    attributes:
+      label: "Inventory (Tools & Standards)"
+      description: "List the 'tools of the trade' this agent masters."
+      placeholder: "e.g., C++17, Bazel, GitHub CLI, Valgrind, Google Test..."
+
+  - type: input
+    id: personality
+    attributes:
+      label: "Personality Traits"
+      description: "A few keywords. e.g., Surgical, Academic, Pragmatic, Blunt."
+
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: "Boundaries (Do & Don't)"
+      placeholder: "DO: Suggest memory optimizations. DON'T: Change business logic."

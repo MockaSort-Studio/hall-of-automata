@@ -64,6 +64,7 @@ jobs:
             const fn = require('./.hall/scripts/detect-invoke-context.js')
             await fn({ github, context, core })
 
+  # we hardcode keeper/env for now, we implement routing afterwards
   # ── Job 2: dispatch the resolved agent ───────────────────────────────────
   dispatch:
     name: Dispatch ${{ needs.detect.outputs.agent }}

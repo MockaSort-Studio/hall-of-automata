@@ -93,14 +93,13 @@ leverage on deploy as lifecycle for existing automaton and keeper secrets.
 
 in particular: when creating new automata, through issue form that defines persona. New env e new deploy gets dispatched, which in it's payload contains the information mapping of the resources it contains: 
 - Gist with persona definition
-- Gist with memory of currently working task (otherwise empty)
 - Gist with dashboard conaining metric, history, audit log
 
 Keeper env instead features:
 - Secrets (github and claude token)
 - Weekly Cap counter
 
-Deploy get's updated through github deployment api by hall of automata at each invocation
+Deploy get's updated through github deployment api by hall of automata at each invocation. Singleton deployment, 1 per env updated
 
 ### Escation edit
 When max retries have been attempted escalate to issue creator
