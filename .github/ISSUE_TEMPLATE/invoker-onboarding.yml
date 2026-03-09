@@ -1,0 +1,31 @@
+name: "🧙 New Invoker"
+description: "Register yourself as an invoker. Grants you dispatch rights over registered automata."
+title: "[Invoker]: <your-github-handle>"
+labels: ["hall:onboard-invoker"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Complete these prerequisites before filing this issue:**
+        - Join the `automata-invokers` GitHub team (ask an org admin)
+        - Run `claude setup-token` locally — you'll need the OAuth token in step 2
+
+        Old Major will provision your personal environment. You then add the token as a secret and reply `ready`.
+
+  - type: input
+    id: github-handle
+    attributes:
+      label: "GitHub handle"
+      description: "Your GitHub username. Becomes `invoker/<handle>` environment."
+      placeholder: "username"
+    validations:
+      required: true
+
+  - type: input
+    id: weekly-cap
+    attributes:
+      label: "Weekly cap (hours)"
+      description: "Hours of Claude usage you're comfortable committing per week. Converted to turns internally (1h ≈ 3 turns)."
+      placeholder: "5"
+    validations:
+      required: true

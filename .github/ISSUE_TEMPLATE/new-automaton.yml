@@ -1,39 +1,105 @@
-name: "🤖 Assemble Automaton"
-description: "Create a new specialist by defining its Role, Inventory, and Personality."
-title: "[Automaton]: <Identifier Name>"
-labels: ["onboarding"]
+name: "🤖 New Automaton"
+description: "Register a new specialist. Fill out the character sheet — this becomes the basis of the persona gist."
+title: "[Automaton]: <slug>"
+labels: ["onboarding", "hall:onboard-automaton"]
 body:
-  - type: dropdown
-    id: role
+  - type: markdown
     attributes:
-      label: "Operational Role"
-      options: [implement, fix, review, refactor, advise, research]
+      value: |
+        Fill out all three sections. An org admin will provision the environment; you handle the gist.
+        See [`agents/automaton_template.md`](../../agents/automaton_template.md) for guidance on each section.
+
+  - type: input
+    id: slug
+    attributes:
+      label: "Slug"
+      description: "Lowercase, no spaces. This becomes `hall/<slug>` environment and `hall:<slug>` label."
+      placeholder: "ophelia"
     validations:
       required: true
 
   - type: input
-    id: archetype
+    id: display_name
     attributes:
-      label: "Technical Archetype"
-      description: "e.g., High-Performance C++, Bazel Build Specialist, Python Data Engineer..."
+      label: "Display name"
+      description: "Human-readable. Shown in status cards and comments."
+      placeholder: "Ophelia"
+    validations:
+      required: true
+
+  - type: input
+    id: invoker
+    attributes:
+      label: "Invoker (GitHub handle)"
+      description: "The registered invoker donating quota and responsible for this automaton."
+      placeholder: "@username"
     validations:
       required: true
 
   - type: textarea
-    id: inventory
+    id: character
     attributes:
-      label: "Inventory (Tools & Standards)"
-      description: "List the 'tools of the trade' this agent masters."
-      placeholder: "e.g., C++17, Bazel, GitHub CLI, Valgrind, Google Test..."
-
-  - type: input
-    id: personality
-    attributes:
-      label: "Personality Traits"
-      description: "A few keywords. e.g., Surgical, Academic, Pragmatic, Blunt."
+      label: "Character"
+      description: |
+        Tone adjectives, voice notes, automaton-specific rules, and signature.
+        Keep it dense — LLM reads this as a behavioral contract, not a description.
+      placeholder: |
+        Tone: precise, terse, no hedging
+        Voice: second person imperative
+        Rules:
+        - Never modify public API without explicit sign-off
+        - Co-author all commits as Ophelia <ophelia@hall-of-automata>
+        Signature: — Ophelia
+    validations:
+      required: true
 
   - type: textarea
-    id: boundaries
+    id: domains
     attributes:
-      label: "Boundaries (Do & Don't)"
-      placeholder: "DO: Suggest memory optimizations. DON'T: Change business logic."
+      label: "Domains"
+      description: |
+        Named capability bundles. Use recognized technology/domain names — the name implies affordances.
+        Do NOT enumerate tools. Domains are routing signals, not tool lists.
+      placeholder: |
+        - python: data pipelines, pandas, pytest, type-annotated APIs
+        - devops: GitHub Actions, Docker, Fly.io deployment
+        - code-review: architectural critique, security patterns
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Scope"
+      description: |
+        Three subsections: right-call-for, not-right-call-for, ambiguity gate.
+        The ambiguity gate is what the automaton does when a request falls in a grey zone.
+      placeholder: |
+        Right call for:
+        - Python data pipeline work in MockaSort-Studio repos
+        - CI/CD configuration and deployment scripts
+
+        Not right call for:
+        - C++ or systems-level work (use Hamlet)
+        - Anything requiring production database access
+
+        Ambiguity gate:
+        Post a scoping question before acting. State what you can do and what falls outside scope.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope_summary
+    attributes:
+      label: "Scope summary (one sentence)"
+      description: "Old Major reads this when picking between agents. Make it decision-useful."
+      placeholder: "Python data engineering and DevOps specialist for MockaSort pipelines."
+    validations:
+      required: true
+
+  - type: input
+    id: weekly_cap
+    attributes:
+      label: "Proposed weekly cap (turns)"
+      description: "How many Claude turns per week you are comfortable committing. Default: 40."
+      placeholder: "40"

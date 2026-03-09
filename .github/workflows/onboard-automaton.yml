@@ -1,0 +1,108 @@
+name: Onboard Automaton
+
+# Two-phase flow:
+#   Phase 1 — issue labeled hall:onboard-automaton → Old Major analyzes, provisions or asks
+#   Phase 2 — invoker replies after feedback       → Old Major re-evaluates and provisions
+
+concurrency:
+  group: onboard-automaton-${{ github.event.issue.number || github.run_id }}
+  cancel-in-progress: false
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # ── Phase 1: analyze submission and provision if it passes ────────────────────
+  analyze:
+    name: "Old Major — analyze submission"
+    if: >-
+      github.event_name == 'issues' &&
+      github.event.label.name == 'hall:onboard-automaton'
+    runs-on: ubuntu-latest
+    environment: hall/old-major
+    steps:
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Inject Old Major persona
+        run: cp .hall/roster/old-major.md CLAUDE.md
+
+      - name: Dispatch Old Major — onboarding analysis
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   15
+          prompt: >-
+            You are handling automaton onboarding for issue #${{ github.event.issue.number }}
+            in ${{ github.repository }}, submitted by @${{ github.event.issue.user.login }}.
+
+            Evaluate the character sheet in the issue body against these criteria:
+            slug (lowercase-kebab, unique in agents.yml), display_name, invoker (active invoker handle),
+            character (tone/voice/rules/signature — behavioural contract not biography),
+            domains (named capability bundles, routing signals not tool lists),
+            scope (right-for / not-right-for / ambiguity-gate all present),
+            scope_summary (one sentence, optimised for routing decisions).
+
+            If any required field is missing or unusable: post a comment listing exactly what
+            needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
+
+            If the sheet passes: create the persona gist, create the hall/<slug> environment,
+            update the roster gist via the hall/roster deployment payload with the new catalog entry,
+            post a provisioning summary comment confirming registration and including the gist URL,
+            then close the issue.
+
+  # ── Phase 2: re-evaluate after invoker addresses feedback ─────────────────────
+  re-analyze:
+    name: "Old Major — re-evaluate after feedback"
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.sender.type != 'Bot' &&
+      contains(github.event.issue.labels.*.name, 'hall:onboard-automaton') &&
+      contains(github.event.issue.labels.*.name, 'hall:awaiting-input')
+    runs-on: ubuntu-latest
+    environment: hall/old-major
+    steps:
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Inject Old Major persona
+        run: cp .hall/roster/old-major.md CLAUDE.md
+
+      - name: Dispatch Old Major — re-evaluate
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   15
+          prompt: >-
+            The invoker has updated the automaton onboarding request on
+            issue #${{ github.event.issue.number }} in ${{ github.repository }}.
+
+            Re-read the issue body (character sheet) and all comments.
+            If all outstanding issues from your previous review are resolved:
+            remove the hall:awaiting-input label, then proceed with full provisioning
+            (gist, hall/<slug> environment, roster gist update via hall/roster,
+            summary comment, close issue).
+            If gaps remain, post updated feedback. Do not provision until the sheet is complete.
