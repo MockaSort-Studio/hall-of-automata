@@ -1,0 +1,51 @@
+name: Weekly Counter Reset
+
+# Fires every Monday at 00:00 UTC. Resets HALL_USAGE_COUNT to 0 for every
+# hall/* and invoker/* GitHub Environment that has that variable. This replaces
+# the implicit reset that the old cache-key approach achieved through weekly key
+# expiry.
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:  # allow manual trigger for testing or missed resets
+
+jobs:
+  reset:
+    name: Zero HALL_USAGE_COUNT for all agent environments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Reset counters
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO:     ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESET_COUNT=0
+
+          for ENV_NAME in $(gh api "/repos/${REPO}/environments" --paginate \
+              --jq '.environments[].name' | grep -E '^(hall|invoker)/'); do
+
+            ENV_ENCODED="${ENV_NAME//\//%2F}"
+
+            # Check variable exists; skip silently if not
+            if gh api "/repos/${REPO}/environments/${ENV_ENCODED}/variables/HALL_USAGE_COUNT" \
+                --silent 2>/dev/null; then
+              gh api --method PATCH \
+                "/repos/${REPO}/environments/${ENV_ENCODED}/variables/HALL_USAGE_COUNT" \
+                -f name=HALL_USAGE_COUNT \
+                -f value=0
+              echo "Reset: ${ENV_NAME}"
+              RESET_COUNT=$(( RESET_COUNT + 1 ))
+            fi
+          done
+
+          echo "Weekly reset complete: ${RESET_COUNT} environment(s) zeroed."

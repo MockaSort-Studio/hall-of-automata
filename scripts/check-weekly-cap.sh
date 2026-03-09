@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Checks the agent's weekly invocation cap against routing.yml.
-# Required env: AGENT, COUNT
+# Checks the agent's weekly invocation cap.
+# Required env: USAGE_COUNT, WEEKLY_CAP
+# Cap and count are read from GitHub Environment variables in the calling job
+# (vars.HALL_USAGE_COUNT and vars.HALL_WEEKLY_CAP) — no routing.yml, no yq.
 # Outputs: over-cap, cap
 set -euo pipefail
 
-DEFAULT=$(yq '.routing.weekly_cap' .hall/routing.yml)
-OVERRIDE=$(yq ".routing.overrides.${AGENT}.weekly_cap // \"\"" .hall/routing.yml)
-CAP=${OVERRIDE:-$DEFAULT}
+COUNT="${USAGE_COUNT:-0}"
+CAP="${WEEKLY_CAP:-25}"
 
 if [ "$COUNT" -ge "$CAP" ]; then
   echo "over-cap=true"  >> "$GITHUB_OUTPUT"
