@@ -61,12 +61,9 @@ seed_deployment() {
   # GitHub requires at least one deployment for the environment page to be useful.
   # We use auto_merge=false and empty required_contexts so it creates immediately.
   gh api "/repos/$REPO/deployments" \
-    -f ref=main \
-    -f "environment=$env_name" \
-    -f "description=$description" \
-    -F auto_merge=false \
-    -F "required_contexts[]=" \
-    > /dev/null
+    --input - <<JSON > /dev/null
+{"ref":"main","environment":"$env_name","description":"$description","auto_merge":false,"required_contexts":[]}
+JSON
 }
 
 echo
