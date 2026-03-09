@@ -1,8 +1,10 @@
 name: Authorize Invoker
 description: >
   Validates that the invoker is a member of the agent's authorized GitHub team.
-  On failure: posts a rejection comment, removes the trigger label (if label-triggered),
-  and sets authorized=false. Caller must exit the job on false.
+  On failure: removes the trigger label (if label-triggered), posts a rejection
+  comment tagging @<org>/automata-invokers, and calls core.setFailed() — which
+  hard-stops the calling job. No output is set; callers do not need to gate on
+  an authorized flag.
 
 inputs:
   org-read-token:
@@ -40,11 +42,6 @@ inputs:
     description: Display name of the agent, used in the rejection comment
     required: true
 
-outputs:
-  authorized:
-    description: "true if the invoker is an active team member, false otherwise"
-    value: ${{ steps.check.outputs.result }}
-
 runs:
   using: composite
   steps:
@@ -66,28 +63,27 @@ runs:
           }
         result-encoding: string
 
-    - name: Reject — remove label if label-triggered
-      if: steps.check.outputs.result != 'true' && inputs.trigger-event == 'issue_labeled' && inputs.label-name != ''
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ inputs.app-token }}
-        script: |
-          await github.rest.issues.removeLabel({
-            owner: '${{ inputs.repo-owner }}',
-            repo: '${{ inputs.repo-name }}',
-            issue_number: Number('${{ inputs.issue-number }}'),
-            name: '${{ inputs.label-name }}'
-          });
-
-    - name: Reject — post comment
+    - name: Reject — remove label, post comment, hard fail
       if: steps.check.outputs.result != 'true'
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.app-token }}
         script: |
+          // Remove trigger label so it can be reapplied once the invoker is authorized
+          if ('${{ inputs.trigger-event }}' === 'issue_labeled' && '${{ inputs.label-name }}') {
+            try {
+              await github.rest.issues.removeLabel({
+                owner: '${{ inputs.repo-owner }}',
+                repo:  '${{ inputs.repo-name }}',
+                issue_number: Number('${{ inputs.issue-number }}'),
+                name: '${{ inputs.label-name }}'
+              });
+            } catch { /* label may already be gone */ }
+          }
           await github.rest.issues.createComment({
             owner: '${{ inputs.repo-owner }}',
-            repo: '${{ inputs.repo-name }}',
+            repo:  '${{ inputs.repo-name }}',
             issue_number: Number('${{ inputs.issue-number }}'),
-            body: `@${{ inputs.username }} not authorized to invoke ${{ inputs.agent-name }}. Contact an org admin to request access.`
+            body: `@${{ inputs.username }} is not authorized to invoke **${{ inputs.agent-name }}**.\n\nMembership of @${{ inputs.org }}/automata-invokers is required. Contact an org admin to request access.`
           });
+          core.setFailed(`Invoker @${{ inputs.username }} is not a member of ${{ inputs.org }}/automata-invokers — dispatch blocked.`);
