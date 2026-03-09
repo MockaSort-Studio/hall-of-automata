@@ -144,16 +144,62 @@ These must exist before any workflow run that routes to Old Major.
 
 ## Order of remaining work
 
-```
-Smoke test (TEST_PLAN.md)
-  → Phase 5 code: unauthorized hardening + cleanup fixes (smallest scope, highest safety impact)
-  → Phase 5 code: keeper env variables (counter replacement)
-  → Phase 5 code: persona injection model (gist fetch + CLAUDE.md stash)
-  → Phase 5 code: Old Major triage job + assignment trigger
-  → Phase 5 code: deployment lifecycle actions
-  → Webhook relay (Fly.io)
-  → Full org test
-```
+### Phase A — Onboarding smoke (TEST_PLAN.md Phase A)
+
+> Blocking. Nothing else is testable without registered invokers and automata.
+
+- [ ] 👤 Provision `hall/old-major` environment (secret + HALL_USAGE_COUNT + HALL_WEEKLY_CAP)
+- [ ] 👤 Provision `hall/roster` environment + seed deployment
+- [ ] 👤 Create all labels (hall:onboard-invoker, hall:onboard-automaton, hall:active-invoker, hall:awaiting-input, hall:queued)
+- [ ] 👤 Verify GitHub App permissions (environments, deployments, contents, issues: write)
+- [ ] Run TC-INV-01 through TC-INV-05 (invoker onboarding)
+- [ ] Run TC-AUT-01 through TC-AUT-04 (automaton onboarding)
+
+### Phase B — Task dispatch baseline (TEST_PLAN.md Phase B)
+
+> Requires at least one registered invoker and `hall/hamlet` provisioned via onboarding.
+
+- [ ] Run TC-01 (label trigger, authorized)
+- [ ] Run TC-02 (@mention trigger)
+- [ ] Run TC-03 (unauthorized hard-fail)
+- [ ] Run TC-04 (cap exceeded)
+- [ ] Run TC-05 + TC-06 (awaiting-input state + re-dispatch)
+- [ ] Run TC-07 (PR review → re-dispatch)
+- [ ] Run TC-08 + TC-09 (CI loop + escalation)
+- [ ] Run TC-10 + TC-11 (cleanup on merge and close)
+- [ ] Run TC-12 (weekly counter)
+
+### Phase C — Code tasks (post Phase B green)
+
+In priority order:
+
+1. **Unauthorized hardening + cleanup fixes** — smallest scope, highest safety impact
+   - `actions/authorize`: hard `core.setFailed()` + tag `@automata-invokers` in rejection
+   - Remove `if: steps.auth.outputs.authorized == 'true'` guards (hard fail makes them redundant)
+   - `actions/cleanup`: make summary comment mandatory; extract detect JS; fix `outcome` semantics
+
+2. **Keeper env variables** — replace Actions Cache counter
+   - `actions/counter`: read/write `HALL_USAGE_COUNT` via Environments API
+   - Remove `check-weekly-cap.sh` gate from dispatch job; cap check moves to pre-dispatch guard
+   - Add weekly reset scheduled workflow
+
+3. **Persona injection model**
+   - Fetch persona from gist URL in deployment payload instead of repo file copy
+   - Stash target repo `CLAUDE.md` as `.hall-local.md` before overwriting
+   - Remove `inject-ci-context.sh` and `append-review-context.sh` (context synthesis moves to Old Major)
+
+4. **Old Major triage + assignment trigger**
+   - `invoke.yml`: add `issues.assigned` trigger; add `triage` job (Old Major selects agent + context)
+   - `detect-invoke-context.js`: assignment path detection
+
+5. **Deployment lifecycle**
+   - `actions/post-dispatch`: update `hall/<agent>` deployment after each dispatch
+   - `actions/cleanup`: append completed-task entry to dashboard gist on PR close
+
+### Phase D — Webhook relay + full org test
+
+- Fly.io relay for cross-repo event routing
+- Full org smoke test across multiple target repos
 
 ### Prerequisites (👤)
 - GitHub App registered (`hall-of-automata[bot]`), App ID and private key stored as repo secrets

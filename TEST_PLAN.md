@@ -1,25 +1,199 @@
 # Hall of Automata — Test Plan
 
-Manual end-to-end test plan. No automated test runner exists — every case requires a real GitHub environment with the App installed, the `hall/hamlet` Environment configured, and at least one target repo available.
+Manual end-to-end test plan. No automated test runner exists — every case requires a real GitHub environment with the App installed and the correct environments provisioned.
 
-Run through **all cases in the Release Checklist** before tagging a release. After any change to `invoke.yml`, `hall-ci-loop.yml`, `hall-cleanup.yml`, or the `scripts/` or `actions/` directories, run the cases marked with ★.
+Run through all cases in **Phase A** before any other phase. Cases marked ★ must be re-run after any change to `invoke.yml`, `hall-ci-loop.yml`, `hall-cleanup.yml`, or anything under `scripts/` or `actions/`.
 
 ---
 
-## Environment setup
+## Environment setup — Phase A (onboarding prerequisites)
+
+These must exist before running any Phase A test. Create them manually in repo Settings → Environments.
 
 | Requirement | Detail |
 |-------------|--------|
 | GitHub App installed | `hall-of-automata` installed on MockaSort-Studio org |
 | App secrets | `APP_ID` and `APP_PRIVATE_KEY` set in hall repo secrets |
-| Agent environment | `hall/hamlet` GitHub Environment exists with `CLAUDE_CODE_OAUTH_TOKEN` |
-| Invoker team | Test user is a member of `automata-invokers` |
-| Unauthorized user | A second account that is NOT in `automata-invokers` |
+| `hall/old-major` environment | Exists with `CLAUDE_CODE_OAUTH_TOKEN` (Old Major's token), `HALL_USAGE_COUNT=0`, `HALL_WEEKLY_CAP=25` |
+| `hall/roster` environment | Exists; initial inactive deployment seeded (`gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`) |
+| Labels | `hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued` all created in the repo |
+| GitHub App permissions | `environments: write`, `deployments: write`, `contents: write`, `issues: write` |
+| Test invoker account | A GitHub account not yet registered as an invoker |
+| Unauthorized account | A GitHub account that is NOT in `automata-invokers` |
+
+## Environment setup — Phase B (task dispatch prerequisites)
+
+Run after Phase A completes. These are produced by Phase A — do not create them manually.
+
+| Requirement | Detail |
+|-------------|--------|
+| Registered invoker | At least one account completed Phase A TC-INV-03 successfully (`hall:active-invoker` applied) |
+| `invoker/<handle>` environment | Created by onboarding; holds `CLAUDE_CODE_OAUTH_TOKEN` for the test invoker |
+| `hall/hamlet` environment | Either registered via onboarding or manually provisioned for the Hamlet smoke test |
 | Target repo | Any repo in the org where the App is installed |
+| Unauthorized user | A second account NOT in `automata-invokers` |
 
 ---
 
-## TC-01 ★ — Label trigger, authorized invoker
+## Phase A — Onboarding
+
+### TC-INV-01 — Invoker onboarding: environment provisioned on label
+
+**Trigger:** Open a `New Invoker` issue using the issue template (fills `hall:onboard-invoker` automatically).
+
+**Steps:**
+1. Open the issue template, enter a GitHub handle and a weekly cap in hours
+2. Submit — template auto-applies `hall:onboard-invoker`
+
+**Expected:**
+- `onboard-invoker.yml` fires (labeled trigger); `setup` job runs in `hall/old-major` env
+- `invoker/<handle>` GitHub Environment is created
+- `HALL_WEEKLY_CAP` variable set (hours × 3)
+- Old Major posts a comment with a direct link to the environment settings page and instructions to add `CLAUDE_CODE_OAUTH_TOKEN`
+
+**Verify:**
+- Repo Settings → Environments: `invoker/<handle>` exists
+- `HALL_WEEKLY_CAP` variable is present with correct value
+- Issue has a comment from `hall-of-automata[bot]` with an environment link
+
+---
+
+### TC-INV-02 — Invoker onboarding: secret check gates test-token job
+
+**Precondition:** TC-INV-01 complete. Do NOT add `CLAUDE_CODE_OAUTH_TOKEN` yet.
+
+**Trigger:** Reply `ready` on the onboarding issue.
+
+**Expected:**
+- `parse-ready` job fires; `verify-invoker-setup.js` checks the secret slot
+- Secret not found → Old Major posts a retry prompt telling the invoker to add the secret first
+- `test-token` job does NOT run
+
+**Verify:** issue has a "secret not found" comment; no `test-token` run visible in Actions for this trigger.
+
+---
+
+### TC-INV-03 ★ — Invoker onboarding: successful token validation and finalization
+
+**Precondition:** TC-INV-01 complete. Add a valid `CLAUDE_CODE_OAUTH_TOKEN` to `invoker/<handle>`.
+
+**Trigger:** Reply `ready` on the onboarding issue.
+
+**Expected:**
+- `parse-ready` fires; secret slot found → `test-token` job runs in `invoker/<handle>` env
+- 1-turn Claude call succeeds; `test-passed=true` output set
+- `finalize` job runs: welcome comment posted, `hall:active-invoker` label applied, issue closed
+
+**Verify:**
+- Issue has welcome comment ("multiclassed — invoker")
+- Issue is closed
+- `hall:active-invoker` label on the issue
+
+---
+
+### TC-INV-04 — Invoker onboarding: bad token produces retry prompt
+
+**Precondition:** TC-INV-01 complete. Add an intentionally invalid value as `CLAUDE_CODE_OAUTH_TOKEN` (e.g., the string `invalid`).
+
+**Trigger:** Reply `ready` on the onboarding issue.
+
+**Expected:**
+- `test-token` job runs; Claude call fails; `test-passed=false`
+- `finalize` posts retry prompt: token invalid, re-run `claude setup-token` and update the secret
+- Issue remains open; `hall:active-invoker` NOT applied
+
+**Verify:** issue has retry comment; issue open; no `hall:active-invoker` label.
+
+---
+
+### TC-INV-05 — Invoker onboarding: duplicate ready reply does not race
+
+**Precondition:** TC-INV-03 in progress (test-token job running).
+
+**Trigger:** Reply `ready` a second time on the same issue before the first run finishes.
+
+**Expected:**
+- Concurrency group `onboard-invoker-{issue.number}` queues (not cancels) the second run
+- Second run waits; does not produce a duplicate welcome comment
+
+**Verify:** only one welcome comment posted; Actions shows second run queued not failed.
+
+---
+
+### TC-AUT-01 ★ — Automaton onboarding: character sheet passes, full provisioning
+
+**Trigger:** Open a `New Automaton` issue using the issue template; fill a complete, valid character sheet (slug, display_name, invoker, character, domains, scope, scope_summary all present and coherent). Template auto-applies `hall:onboard-automaton`.
+
+**Expected:**
+- `onboard-automaton.yml` fires; `analyze` job runs in `hall/old-major` env
+- Old Major evaluates the sheet; all fields pass
+- Persona gist created (public or secret)
+- `hall/<slug>` GitHub Environment created
+- Roster gist updated via `hall/roster` deployment payload with new catalog entry
+- Provisioning summary comment posted; issue closed
+
+**Verify:**
+- Repo Settings → Environments: `hall/<slug>` exists
+- `hall/roster` environment has an updated deployment
+- Gist URL referenced in the summary comment is accessible
+- Issue is closed; no `hall:awaiting-input` label
+
+---
+
+### TC-AUT-02 — Automaton onboarding: incomplete sheet → clarifying questions
+
+**Trigger:** Open a `New Automaton` issue with a character sheet missing required fields (e.g., no `scope_summary`, placeholder `domains`).
+
+**Expected:**
+- `analyze` job runs; Old Major identifies the gaps
+- Comment posted listing exactly what needs fixing
+- `hall:awaiting-input` label applied to the issue
+- No gist created; no environment created; no roster update
+
+**Verify:**
+- Issue has clarifying-questions comment
+- `hall:awaiting-input` label present
+- No new environment in Settings
+
+---
+
+### TC-AUT-03 — Automaton onboarding: invoker addresses feedback, provisioning completes
+
+**Precondition:** TC-AUT-02 complete; issue has `hall:onboard-automaton` + `hall:awaiting-input`.
+
+**Trigger:** Reply on the issue with the corrected character sheet fields.
+
+**Expected:**
+- `re-analyze` job fires (issue_comment trigger with both labels present)
+- Old Major re-evaluates; sheet now passes
+- `hall:awaiting-input` label removed
+- Full provisioning proceeds (gist, environment, roster, summary comment, close)
+
+**Verify:** same as TC-AUT-01 verify; `hall:awaiting-input` gone.
+
+---
+
+### TC-AUT-04 — Automaton onboarding: re-analyze still finds gaps
+
+**Precondition:** TC-AUT-02 complete.
+
+**Trigger:** Reply with a correction that still leaves a required field missing.
+
+**Expected:**
+- `re-analyze` runs; gaps remain
+- Updated clarifying comment posted
+- `hall:awaiting-input` label stays
+- No provisioning
+
+**Verify:** issue still has `hall:awaiting-input`; no new environment.
+
+---
+
+## Phase B — Task dispatch
+
+### TC-01 ★ — Label trigger, authorized invoker
+
+**Precondition:** Phase A complete; `hall/hamlet` environment exists; test invoker is `hall:active-invoker`.
 
 **Trigger:** Apply label `hall:hamlet` to an issue on the hall repo (or a target repo once relay is live).
 
