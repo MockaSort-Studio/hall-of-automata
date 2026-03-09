@@ -1,10 +1,51 @@
+# Hall of Automata — Agent Registry
+#
+# STATIC SEED — this file is not modified at runtime.
+# The live catalog is a gist referenced by the singleton deployment
+# payload of the `hall/roster` GitHub Environment. Old Major reads
+# from and writes to that gist; this file is the human-readable
+# reference for bootstrapping and auditing only.
+#
+# To add a new automaton: open the onboarding issue template.
+# Old Major handles persona gist creation, hall/<slug> environment
+# creation, and roster gist registration — no repo commit is made.
+#
+# Token model: CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>
+# environments. Automata do not hold their own tokens — they run
+# under the registering invoker's credential.
+
+meta:
+  roster_environment: hall/roster    # Singleton deployment; payload = full catalog JSON
+  onboarding_template: .github/ISSUE_TEMPLATE/new-automaton.yml
+
 agents:
+
+  old-major:
+    display_name: "Old Major 🏛️"
+    agent_env: hall/old-major         # GitHub Environment: persona config + usage vars
+    invoker: mksetaro
+    teams: [automata-invokers]
+    max_turns: 20
+    max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
+    catalog:
+      roles: [triage, route, onboard, synthesize]
+      domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding]
+      scope_summary: >
+        Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
+        specialist, synthesizes task context. Does not implement code or open PRs.
+
   hamlet:
-    environment: hall/hamlet          # GitHub Environment holding the OAuth token
-    secret: CLAUDE_CODE_OAUTH_TOKEN
-    persona: roster/hamlet.md
+    display_name: "Hamlet 🐗"
+    agent_env: hall/hamlet            # GitHub Environment: persona config + usage vars
+                                      #   (HALL_USAGE_COUNT, HALL_WEEKLY_CAP, PERSONA_GIST_URL)
+    invoker: mksetaro
     teams: [automata-invokers]
     max_turns: 40
     max_retries: 3
-    capabilities: [implement, fix, refactor]
-    keeper: mksetaro
+    catalog:
+      roles: [implement, fix, refactor]
+      domains: [cpp, build-systems, devops]
+      scope_summary: >
+        Deep implementation work in C++ and build systems. Strong on structural fixes,
+        refactors, and CI configuration. Not the right call for UI, documentation,
+        or infrastructure provisioning.
