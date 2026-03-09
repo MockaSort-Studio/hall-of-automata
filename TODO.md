@@ -69,8 +69,7 @@ These must exist before any workflow run that routes to Old Major.
 
 - [ ] Create GitHub Environment `hall/old-major` in repo Settings → Environments
   - Secret: `CLAUDE_CODE_OAUTH_TOKEN` — mksetaro's Claude OAuth token (`claude setup-token`)
-  - Variable: `HALL_USAGE_COUNT` = `0`
-  - Variable: `HALL_WEEKLY_CAP` = `25`
+  - _(No usage vars — HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in `invoker/<handle>`, not `hall/<agent>`)_
 - [ ] Create GitHub Environment `hall/roster` in repo Settings → Environments
   - No secrets needed at this stage — Old Major writes the deployment payload
   - Create an initial inactive deployment so the environment exists: `gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`
@@ -92,12 +91,12 @@ These must exist before any workflow run that routes to Old Major.
 - [ ] `scripts/detect-invoke-context.js`: add assignment path detection
 - [ ] `roster/old-major.md`: persona already written; Old Major env + deployment must be provisioned (👤)
 
-### 🔧 Code tasks — keeper env variables (replace Actions Cache counter)
+### ✅ Code tasks — keeper env variables (replace Actions Cache counter)
 
-- [ ] `actions/counter/action.yml`: replace cache-based counter with Environments API read/write on `HALL_USAGE_COUNT`
-- [ ] `invoke.yml` dispatch job: remove `check-weekly-cap.sh` shell gate; cap check moves to Old Major triage (unlabeled path) and to a single pre-dispatch guard (labeled path)
-- [ ] `scripts/check-weekly-cap.sh`: deprecate or scope to labeled-path pre-dispatch guard only
-- [ ] Add weekly reset logic (scheduled workflow to zero `HALL_USAGE_COUNT` on reset day)
+- [x] `actions/counter/action.yml`: replace cache-based counter with Environments API read/write on `HALL_USAGE_COUNT`
+- [x] Cap check in dedicated `check-invoker-cap` job (runs in `invoker/<handle>` env); dispatch job guarded at job level
+- [x] `scripts/check-weekly-cap.sh`: inlined into `check-invoker-cap` job; file retained but no longer called
+- [x] Weekly reset: `weekly-reset.yml` scheduled workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC
 
 ### 🔧 Code tasks — deployment lifecycle
 
@@ -113,21 +112,28 @@ These must exist before any workflow run that routes to Old Major.
 - [ ] `actions/dispatch`: pass task context as `prompt` input (currently unused path)
 - [ ] Remove `scripts/inject-ci-context.sh` and `scripts/append-review-context.sh` — context synthesis moves to Old Major or prompt construction
 
-### 🔧 Code tasks — unauthorized invocation hardening (FR-17)
+### ✅ Code tasks — unauthorized invocation hardening (FR-17)
 
-- [ ] `actions/authorize`: change failure mode from soft-exit to hard `core.setFailed()` + tag `@automata-invokers` team in rejection comment
-- [ ] Remove all `if: steps.auth.outputs.authorized == 'true'` guards in `invoke.yml` (hard fail makes them unnecessary)
+- [x] `actions/authorize`: hard `core.setFailed()` + label removal + comment in one combined step
+- [x] All `if: steps.auth.outputs.authorized == 'true'` guards removed from `invoke.yml`
 
-### 🔧 Code tasks — co-authorship (FR-16)
+### ✅ Code tasks — dispatch outcome contract
 
-- [ ] Add co-authored-by instruction to `automaton_base.md` prompt (done) — verify claude-code-action honors commit trailers
-- [ ] Add git commit hook or post-dispatch check if needed
+- [x] `automaton_base.md`: agent must write `.hall/dispatch-result.json` with full outcome enum (`pr_created`, `awaiting_input`, `comment_posted`, `quota_exceeded`, `failed`)
+- [x] `scripts/find-agent-pr.js`: reads dispatch-result.json first, falls back to API branch query
+- [x] `scripts/resolve-final-stage.sh`: maps all outcome values to status-card stages incl. `queued`
+- [x] `actions/status-card/action.yml`: `comment-posted`, `queued`, `failed` stage labels added
+- [x] `post-dispatch`: `outcome` input uses `steps.final.outputs.stage` (semantic) not step conclusion
 
-### 🔧 Code tasks — cleanup finalization
+### ✅ Code tasks — co-authorship (FR-16)
 
+- [x] Co-authored-by instruction in `automaton_base.md`; verify claude-code-action honours commit trailers in live test
+
+### ✅ Code tasks — cleanup finalization
+
+- [x] `post-dispatch`: semantic `outcome` fixed (uses `steps.final.outputs.stage`)
 - [ ] `actions/cleanup`: make summary comment mandatory (remove `if: inputs.issue-number != ''` guard for comment step)
 - [ ] `hall-cleanup.yml` detect step: extract inline JS to `scripts/detect-cleanup-context.js`
-- [ ] `post-dispatch`: fix semantic `outcome` (use `steps.final.outputs.stage` not step conclusion)
 
 ---
 
@@ -148,9 +154,9 @@ These must exist before any workflow run that routes to Old Major.
 
 > Blocking. Nothing else is testable without registered invokers and automata.
 
-- [ ] 👤 Provision `hall/old-major` environment (secret + HALL_USAGE_COUNT + HALL_WEEKLY_CAP)
+- [ ] 👤 Provision `hall/old-major` environment (secret `CLAUDE_CODE_OAUTH_TOKEN` only — no usage vars)
 - [ ] 👤 Provision `hall/roster` environment + seed deployment
-- [ ] 👤 Create all labels (hall:onboard-invoker, hall:onboard-automaton, hall:active-invoker, hall:awaiting-input, hall:queued)
+- [ ] 👤 Create all labels (`hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued`, `hall:invoker-queued`)
 - [ ] 👤 Verify GitHub App permissions (environments, deployments, contents, issues: write)
 - [ ] Run TC-INV-01 through TC-INV-05 (invoker onboarding)
 - [ ] Run TC-AUT-01 through TC-AUT-04 (automaton onboarding)

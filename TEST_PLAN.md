@@ -14,9 +14,9 @@ These must exist before running any Phase A test. Create them manually in repo S
 |-------------|--------|
 | GitHub App installed | `hall-of-automata` installed on MockaSort-Studio org |
 | App secrets | `APP_ID` and `APP_PRIVATE_KEY` set in hall repo secrets |
-| `hall/old-major` environment | Exists with `CLAUDE_CODE_OAUTH_TOKEN` (Old Major's token), `HALL_USAGE_COUNT=0`, `HALL_WEEKLY_CAP=25` |
+| `hall/old-major` environment | Exists with `CLAUDE_CODE_OAUTH_TOKEN` (Old Major's token) — persona env only, no usage counters |
 | `hall/roster` environment | Exists; initial inactive deployment seeded (`gh api repos/{owner}/{repo}/deployments -f ref=main -f environment=hall/roster -f description="Roster seed" -f auto_merge=false -F required_contexts=[]`) |
-| Labels | `hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued` all created in the repo |
+| Labels | `hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued`, `hall:invoker-queued` all created in the repo |
 | GitHub App permissions | `environments: write`, `deployments: write`, `contents: write`, `issues: write` |
 | Test invoker account | A GitHub account not yet registered as an invoker |
 | Unauthorized account | A GitHub account that is NOT in `automata-invokers` |
@@ -81,7 +81,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 **Expected:**
 - `parse-ready` fires; secret slot found → `test-token` job runs in `invoker/<handle>` env
-- 1-turn Claude call succeeds; `test-passed=true` output set
+- Curl probe to `api.anthropic.com` returns HTTP 200; `test-passed=true`, `quota-exceeded=false`
 - `finalize` job runs: welcome comment posted, `hall:active-invoker` label applied, issue closed
 
 **Verify:**
@@ -98,11 +98,30 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 **Trigger:** Reply `ready` on the onboarding issue.
 
 **Expected:**
-- `test-token` job runs; Claude call fails; `test-passed=false`
+- `test-token` job runs; curl probe returns HTTP 401 or 403; `test-passed=false`
 - `finalize` posts retry prompt: token invalid, re-run `claude setup-token` and update the secret
 - Issue remains open; `hall:active-invoker` NOT applied
 
 **Verify:** issue has retry comment; issue open; no `hall:active-invoker` label.
+
+---
+
+### TC-INV-06 — Invoker onboarding: valid token, quota exhausted → queued
+
+**Precondition:** TC-INV-01 complete. Add a valid `CLAUDE_CODE_OAUTH_TOKEN` whose Anthropic quota is currently at zero (429 response).
+
+**Trigger:** Reply `ready` on the onboarding issue.
+
+**Expected:**
+- `test-token` job runs; curl probe returns HTTP 429; `test-passed=true`, `quota-exceeded=true`
+- `finalize` job: `hall:active-invoker` AND `hall:invoker-queued` labels applied
+- "Queued" comment posted (not the full welcome); issue closed
+- No retry prompt — token is valid
+
+**Verify:**
+- Issue is closed
+- Both `hall:active-invoker` and `hall:invoker-queued` labels present
+- Comment says invoker is queued until Monday reset, not that the token is invalid
 
 ---
 
@@ -384,13 +403,13 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 **Steps:**
 1. Run TC-01 twice in the same week; note the `weekly-count-after` field in the audit artifact
-2. After the week rolls over (or manually change the cache key date), run again
+2. Manually trigger the `weekly-reset.yml` scheduled workflow (or wait for Monday 00:00 UTC), then run TC-01 again
 
 **Expected:**
-- Count increments 1 → 2 within the same week
-- After week rollover, count resets to 1
+- Count increments 1 → 2 within the same week (visible in `invoker/<handle>` env variable `HALL_USAGE_COUNT`)
+- After reset, `HALL_USAGE_COUNT` in the `invoker/<handle>` env reads 0 before the next dispatch
 
-**Verify:** audit artifacts show correct `weekly_count_after` values.
+**Verify:** audit artifacts show correct `weekly_count_after` values; `invoker/<handle>` env variable is 0 after reset.
 
 ---
 
@@ -420,15 +439,15 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ---
 
-## TC-15 — hall:queued label does not trigger dispatch (path B guard)
+## TC-15 — hall:queued / hall:invoker-queued labels do not trigger dispatch
 
-**Precondition:** Issue has `hall:awaiting-input` + `hall:queued` labels but NO `hall:{agent}` label.
+**Precondition:** Issue has `hall:awaiting-input` + `hall:queued` (or `hall:invoker-queued`) labels but NO `hall:{agent}` label.
 
 **Trigger:** Post a human comment on the issue.
 
-**Expected:** path B finds no bound agent label (after excluding system labels); no dispatch.
+**Expected:** path B finds no bound agent label (after excluding all system labels including `hall:queued` and `hall:invoker-queued`); no dispatch.
 
-**Verify:** no dispatch job run.
+**Verify:** no dispatch job run for either system label.
 
 ---
 

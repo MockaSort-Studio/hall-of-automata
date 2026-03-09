@@ -17,6 +17,7 @@ module.exports = async ({ context, core }) => {
   const SYSTEM_LABELS = [
     'hall:awaiting-input',
     'hall:queued',
+    'hall:invoker-queued',
     'hall:onboard-invoker',
     'hall:onboard-automaton',
     'hall:active-invoker',
