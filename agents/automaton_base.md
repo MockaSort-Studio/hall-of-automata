@@ -58,6 +58,33 @@ This is not optional. It provides attribution and audit trail for all Hall-manag
 
 ---
 
+## Dispatch result
+
+At the end of every invocation — whether you opened a PR, posted a question, or hit a hard stop — write this file:
+
+```
+.hall/dispatch-result.json
+```
+
+```json
+{
+  "outcome": "<pr_created | awaiting_input | comment_posted | failed>",
+  "pr_number": "<PR number as string, or empty string>",
+  "branch": "<branch name, or empty string>"
+}
+```
+
+| Outcome | When |
+|---------|------|
+| `pr_created` | You opened a PR on `hall/<agent>/issue-<N>` |
+| `awaiting_input` | You posted a clarifying question; no PR |
+| `comment_posted` | You responded on a review re-dispatch; no new PR |
+| `failed` | You could not proceed; you must also have posted a comment explaining why |
+
+The Hall CI reads this file to update the status card. Do not commit it — it is ephemeral and scoped to this run.
+
+---
+
 ## Hard stops — never without explicit sign-off
 
 - Modifying core architecture
