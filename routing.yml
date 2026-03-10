@@ -1,5 +1,5 @@
 routing:
-  # Per-agent caps are stored as HALL_WEEKLY_CAP in each agent's hall/<slug> environment.
+  # Per-invoker caps are stored as HALL_WEEKLY_CAP in each invoker/<handle> environment.
   # This file no longer holds cap values — environment variables are the source of truth.
   reset_day: monday       # Day HALL_USAGE_COUNT is zeroed by the weekly-reset workflow
 

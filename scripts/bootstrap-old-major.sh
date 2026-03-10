@@ -1,33 +1,20 @@
 #!/usr/bin/env bash
-# Bootstrap the hall/roster environment.
+# Hall of Automata — bootstrap prerequisites check.
 #
-# hall/roster is the only environment the Hall needs before any workflow runs.
-# It holds the singleton deployment payload that Old Major writes the automaton
-# catalog into at automaton-onboarding time.
+# The Hall requires no environment setup before workflows run.
+# The agent catalog lives in agents.yml (repo file) and persona files
+# live in roster/<slug>.md — no GitHub Environments or deployments needed.
 #
-# Old Major has no dedicated GitHub Environment:
-#   - His persona is read from roster/old-major.md (repo file, not a gist)
-#   - His OAuth token comes from the invoker pool (invoker/* environments),
-#     selected at dispatch time by the pool-selection logic in detect/select-invoker
+# The only things that must exist before automaton onboarding can run:
+#   1. A registered invoker (at least one invoker/<handle> environment with
+#      CLAUDE_CODE_OAUTH_TOKEN, HALL_USAGE_COUNT, HALL_WEEKLY_CAP)
+#   2. APP_ID and APP_PRIVATE_KEY as repo-level secrets (GitHub App credentials)
 #
-# hall/<agent> environments are created by Old Major at automaton onboarding;
-# they hold PERSONA_GIST_ID as a plain variable only.
-#
-# invoker/<handle> environments are created by onboard-invoker.yml and hold
-# CLAUDE_CODE_OAUTH_TOKEN (the dispatch pool token), HALL_USAGE_COUNT, HALL_WEEKLY_CAP.
-#
-# Run once (idempotent — safe to re-run):
+# Run this to verify your setup:
 #   bash scripts/bootstrap-old-major.sh
 #
 # Prerequisites:
-#   - gh CLI authenticated (your normal GitHub session is enough)
-#
-# APP_ID and APP_PRIVATE_KEY are repo-level secrets needed by the workflows,
-# not by this script. Set them once in repo Settings → Secrets after registering
-# the GitHub App — this script does not touch them.
-#
-# What this creates:
-#   hall/roster  — singleton environment for the automaton catalog deployment
+#   - gh CLI authenticated
 
 set -euo pipefail
 
@@ -40,50 +27,37 @@ if [ -z "$REPO" ]; then
   exit 1
 fi
 
-# URL-encode an environment name (replaces / with %2F for path segments).
-encode_env() { printf '%s' "${1//\//%2F}"; }
-
-create_env() {
-  local name="$1"
-  local encoded
-  encoded=$(encode_env "$name")
-  echo "  creating environment: $name"
-  gh api -X PUT "/repos/$REPO/environments/$encoded" \
-    --input /dev/null \
-    -H "Accept: application/vnd.github+json" \
-    > /dev/null
-}
-
-seed_deployment() {
-  local env_name="$1"
-  local description="$2"
-  echo "  seeding deployment for: $env_name"
-  # GitHub requires at least one deployment for the environment page to be useful.
-  # We use auto_merge=false and empty required_contexts so it creates immediately.
-  gh api "/repos/$REPO/deployments" \
-    --input - <<JSON > /dev/null
-{"ref":"main","environment":"$env_name","description":"$description","auto_merge":false,"required_contexts":[]}
-JSON
-}
-
 echo
-echo "=== Hall of Automata — bootstrap ==="
+echo "=== Hall of Automata — bootstrap check ==="
 echo "Repository: $REPO"
 echo
 
-# ── 1. hall/roster ───────────────────────────────────────────────────────────────
-echo "[1/1] hall/roster environment + seed deployment"
-create_env "hall/roster"
-seed_deployment "hall/roster" "Roster catalog seed — empty, written by Old Major on automaton onboarding"
-echo "  done."
-echo
+# ── Check invoker pool ────────────────────────────────────────────────────────
+echo "[1/2] Checking invoker pool..."
+INVOKER_COUNT=$(gh api "/repos/$REPO/environments" --jq \
+  '[.environments[] | select(.name | startswith("invoker/"))] | length' 2>/dev/null || echo "0")
 
-# ── Done ─────────────────────────────────────────────────────────────────────
-echo "=== Bootstrap complete ==="
+if [ "$INVOKER_COUNT" -eq 0 ]; then
+  echo "  WARNING: No invoker/* environments found."
+  echo "  Register an invoker via the onboarding issue template before running automaton onboarding."
+else
+  echo "  OK: $INVOKER_COUNT invoker environment(s) registered."
+fi
+
+# ── Check repo-level secrets ─────────────────────────────────────────────────
+echo "[2/2] Checking repo secrets..."
+SECRETS=$(gh api "/repos/$REPO/actions/secrets" --jq '[.secrets[].name]' 2>/dev/null || echo "[]")
+for SECRET in APP_ID APP_PRIVATE_KEY; do
+  if echo "$SECRETS" | grep -q "\"$SECRET\""; then
+    echo "  OK: $SECRET is set."
+  else
+    echo "  WARNING: $SECRET not found in repo secrets — workflows will fail without it."
+  fi
+done
+
 echo
-echo "hall/roster is ready. Old Major can now onboard automata."
+echo "=== Check complete ==="
 echo
-echo "Next: register yourself as an invoker via the onboarding issue template."
-echo "The onboarding workflow uses the invoker pool for the token — at least one"
-echo "invoker must be registered before automaton onboarding can run."
-echo "APP_ID and APP_PRIVATE_KEY must be set as repo-level secrets separately."
+echo "If all checks pass, the Hall is ready. Open an onboarding issue to register"
+echo "automata or invokers."
+echo

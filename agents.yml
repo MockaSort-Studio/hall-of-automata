@@ -1,21 +1,16 @@
 # Hall of Automata — Agent Registry
 #
-# STATIC SEED — this file is not modified at runtime.
-# The live catalog is a gist referenced by the singleton deployment
-# payload of the `hall/roster` GitHub Environment. Old Major reads
-# from and writes to that gist; this file is the human-readable
-# reference for bootstrapping and auditing only.
+# This is the live catalog. Old Major reads from and writes to this file directly.
+# On automaton onboarding, Old Major adds the new agent entry here and commits
+# roster/<slug>.md in the same push — no external store, no deployment payload.
 #
 # To add a new automaton: open the onboarding issue template.
-# Old Major handles persona file creation (roster/<slug>.md) and roster deployment
-# update — persona committed directly to the repo. No per-agent environment is created.
 #
 # Token model: CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>
 # environments. Automata do not hold their own tokens — they run
 # under a pool-selected invoker's credential.
 
 meta:
-  roster_environment: hall/roster    # Singleton deployment; payload = full catalog JSON
   onboarding_template: .github/ISSUE_TEMPLATE/new-automaton.yml
 
 agents:
