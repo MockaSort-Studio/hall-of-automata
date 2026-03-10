@@ -32,13 +32,74 @@ jobs:
             const fn = require('./.hall/scripts/detect-ci-context.js')
             await fn({ github, context, core })
 
-  # ── Job 2: retry or escalate ─────────────────────────────────────────────
-  redispatch:
-    name: Re-dispatch ${{ needs.detect.outputs.agent }}
+  # ── Job 2: pool-select invoker ────────────────────────────────────────────
+  select-invoker:
+    name: Select invoker from pool
     needs: [detect]
     if: needs.detect.outputs.agent != ''
     runs-on: ubuntu-latest
-    environment: hall/${{ needs.detect.outputs.agent }}
+    outputs:
+      invoker: ${{ steps.pool.outputs.invoker }}
+    steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Select least-used invoker
+        id: pool
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            let envs = [], page = 1;
+            while (true) {
+              const res = await github.request('GET /repos/{owner}/{repo}/environments',
+                { owner, repo, per_page: 100, page });
+              const batch = (res.data.environments || []).filter(e => e.name.startsWith('invoker/') || e.name.startsWith('keeper/'));
+              envs = envs.concat(batch);
+              if ((res.data.environments || []).length < 100) break;
+              page++;
+            }
+            const candidates = [];
+            for (const env of envs) {
+              const enc = encodeURIComponent(env.name);
+              let count = 0, cap = 25;
+              try { count = parseInt((await github.request(
+                'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
+                { owner, repo, environment_name: enc, variable_name: 'HALL_USAGE_COUNT' }
+              )).data.value || '0', 10); } catch (_) {}
+              try { cap = parseInt((await github.request(
+                'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
+                { owner, repo, environment_name: enc, variable_name: 'HALL_WEEKLY_CAP' }
+              )).data.value || '25', 10); } catch (_) {}
+              if (count < cap) candidates.push({ handle: env.name.replace(/^(?:invoker|keeper)\//, ''), count });
+            }
+            if (candidates.length === 0) {
+              core.setFailed('No invoker available — all at cap.');
+              return;
+            }
+            candidates.sort((a, b) => a.count - b.count);
+            core.setOutput('invoker', candidates[0].handle);
+
+  # ── Job 3: retry or escalate ─────────────────────────────────────────────
+  redispatch:
+    name: Re-dispatch ${{ needs.detect.outputs.agent }}
+    needs: [detect, select-invoker]
+    if: needs.detect.outputs.agent != '' && needs.select-invoker.outputs.invoker != ''
+    runs-on: ubuntu-latest
+    environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     concurrency:
       group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
       cancel-in-progress: false

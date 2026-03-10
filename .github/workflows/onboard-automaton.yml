@@ -135,7 +135,6 @@ jobs:
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
             If the sheet passes: commit the persona character sheet to roster/<slug>.md and push,
-            create the hall/<slug> environment,
             update the hall/roster deployment payload with the new catalog entry,
             post a provisioning summary comment confirming registration,
             then close the issue.
@@ -182,7 +181,7 @@ jobs:
             Re-read the issue body (character sheet) and all comments.
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
-            (persona committed to roster/<slug>.md and pushed, hall/<slug> environment,
+            (persona committed to roster/<slug>.md and pushed,
             hall/roster deployment payload updated with new catalog entry,
             max_turns from the issue — default 30 if blank,
             summary comment, close issue).

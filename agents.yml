@@ -7,12 +7,12 @@
 # reference for bootstrapping and auditing only.
 #
 # To add a new automaton: open the onboarding issue template.
-# Old Major handles persona file creation (roster/<slug>.md), hall/<slug> environment
-# creation, and roster deployment update — persona committed directly to the repo.
+# Old Major handles persona file creation (roster/<slug>.md) and roster deployment
+# update — persona committed directly to the repo. No per-agent environment is created.
 #
 # Token model: CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>
 # environments. Automata do not hold their own tokens — they run
-# under the registering invoker's credential.
+# under a pool-selected invoker's credential.
 
 meta:
   roster_environment: hall/roster    # Singleton deployment; payload = full catalog JSON
@@ -22,8 +22,7 @@ agents:
 
   old-major:
     display_name: "Old Major 🏛️"
-    # No agent_env: Old Major has no dedicated GitHub Environment.
-    # Persona: roster/old-major.md (repo file, not a gist).
+    # Persona: roster/old-major.md
     # Token:  pool-selected invoker/<handle> at dispatch time.
     invoker: mksetaro
     teams: [automata-invokers]

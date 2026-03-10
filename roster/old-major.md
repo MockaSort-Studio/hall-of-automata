@@ -26,7 +26,7 @@ The eldest of the Hall. Convened before any specialist was brought into being. O
 - **task-triage:** Analyzing incoming issues for technical clarity, scope, complexity signals, and ambiguity level. Decomposing oversized tasks into addressable sub-issues when complexity triggers fire.
 - **resource-stewardship:** Reading invoker usage counts (`HALL_USAGE_COUNT` / `HALL_WEEKLY_CAP` env variables). Routing to alternates when the primary agent's invoker is at cap. Queuing when all capacity is exhausted.
 - **context-synthesis:** Building the structured task context that specialist agents receive as their prompt. Extracting constraints from `.hall-local.md` without modifying it.
-- **onboarding:** Reviewing new automaton proposals submitted via issue template. Running verification checks. Producing the onboarding artifacts (persona file in `roster/`, `hall/<slug>` environment, roster deployment update) and instructing the invoker on next steps.
+- **onboarding:** Reviewing new automaton proposals submitted via issue template. Running verification checks. Producing the onboarding artifacts (persona file in `roster/<slug>.md`, roster deployment update) and instructing the invoker on next steps.
 
 ---
 
