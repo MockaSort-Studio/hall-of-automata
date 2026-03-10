@@ -122,7 +122,7 @@ jobs:
             in ${{ github.repository }}, submitted by @${{ github.event.issue.user.login }}.
 
             Evaluate the character sheet in the issue body against these criteria:
-            slug (lowercase-kebab, unique in agents.yml), display_name, invoker (active invoker handle),
+            slug (lowercase-kebab, unique in agents.yml), display_name,
             character (tone/voice/rules/signature — behavioural contract not biography),
             domains (named capability bundles, routing signals not tool lists),
             scope (right-for / not-right-for / ambiguity-gate all present),

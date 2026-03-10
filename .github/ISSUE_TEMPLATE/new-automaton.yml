@@ -27,15 +27,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: invoker
-    attributes:
-      label: "Invoker (GitHub handle)"
-      description: "The registered invoker donating quota and responsible for this automaton."
-      placeholder: "@username"
-    validations:
-      required: true
-
   - type: textarea
     id: character
     attributes:
