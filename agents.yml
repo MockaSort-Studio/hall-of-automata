@@ -7,8 +7,8 @@
 # reference for bootstrapping and auditing only.
 #
 # To add a new automaton: open the onboarding issue template.
-# Old Major handles persona gist creation, hall/<slug> environment
-# creation, and roster gist registration — no repo commit is made.
+# Old Major handles persona file creation (roster/<slug>.md), hall/<slug> environment
+# creation, and roster deployment update — persona committed directly to the repo.
 #
 # Token model: CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>
 # environments. Automata do not hold their own tokens — they run

@@ -134,9 +134,10 @@ jobs:
             If any required field is missing or unusable: post a comment listing exactly what
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
-            If the sheet passes: create the persona gist, create the hall/<slug> environment,
-            update the roster gist via the hall/roster deployment payload with the new catalog entry,
-            post a provisioning summary comment confirming registration and including the gist URL,
+            If the sheet passes: commit the persona character sheet to roster/<slug>.md and push,
+            create the hall/<slug> environment,
+            update the hall/roster deployment payload with the new catalog entry,
+            post a provisioning summary comment confirming registration,
             then close the issue.
 
   # ── Phase 2: re-evaluate after invoker addresses feedback ─────────────────────
@@ -181,7 +182,8 @@ jobs:
             Re-read the issue body (character sheet) and all comments.
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
-            (gist, hall/<slug> environment, roster gist update via hall/roster with
+            (persona committed to roster/<slug>.md and pushed, hall/<slug> environment,
+            hall/roster deployment payload updated with new catalog entry,
             max_turns from the issue — default 30 if blank,
             summary comment, close issue).
             If gaps remain, post updated feedback. Do not provision until the sheet is complete.
