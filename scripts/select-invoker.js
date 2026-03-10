@@ -5,6 +5,7 @@
 //   FAIL_FAST    — if 'true', calls core.setFailed() when no invoker is available
 //   FAIL_MESSAGE — custom setFailed message (defaults to generic message)
 // Outputs: invoker (bare handle, e.g. 'mksetaro'; empty string if none available)
+//          invoker-count (current HALL_USAGE_COUNT for the selected invoker)
 
 module.exports = async ({ github, context, core }) => {
   const failFast = process.env.FAIL_FAST    === 'true';
@@ -56,7 +57,8 @@ module.exports = async ({ github, context, core }) => {
   }
 
   candidates.sort((a, b) => a.count - b.count);
-  const selected = candidates[0].handle;
-  core.info(`[select-invoker] selected invoker=${selected} (count=${candidates[0].count})`);
-  core.setOutput('invoker', selected);
+  const selected = candidates[0];
+  core.info(`[select-invoker] selected invoker=${selected.handle} (count=${selected.count})`);
+  core.setOutput('invoker',       selected.handle);
+  core.setOutput('invoker-count', String(selected.count));
 };

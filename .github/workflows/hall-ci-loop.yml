@@ -39,7 +39,8 @@ jobs:
     if: needs.detect.outputs.agent != ''
     runs-on: ubuntu-latest
     outputs:
-      invoker: ${{ steps.pool.outputs.invoker }}
+      invoker:       ${{ steps.pool.outputs.invoker }}
+      invoker-count: ${{ steps.pool.outputs.invoker-count }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -96,6 +97,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: .hall
+
+      - name: Increment invoker weekly counter
+        uses: ./.hall/actions/counter
+        with:
+          current-count:    ${{ needs.select-invoker.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.select-invoker.outputs.invoker }}
+          repo-owner:       ${{ needs.detect.outputs.repo-owner }}
+          repo-name:        ${{ needs.detect.outputs.repo-name }}
+          app-token:        ${{ steps.app-token.outputs.token }}
 
       - name: Read agent config
         id: agent-cfg

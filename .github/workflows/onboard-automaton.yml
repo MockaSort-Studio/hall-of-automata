@@ -31,7 +31,8 @@ jobs:
        contains(github.event.issue.labels.*.name, 'hall:awaiting-input'))
     runs-on: ubuntu-latest
     outputs:
-      invoker: ${{ steps.pool.outputs.invoker }}
+      invoker:       ${{ steps.pool.outputs.invoker }}
+      invoker-count: ${{ steps.pool.outputs.invoker-count }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -81,6 +82,15 @@ jobs:
 
       - name: Inject Old Major persona
         run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
+
+      - name: Increment invoker weekly counter
+        uses: ./actions/counter
+        with:
+          current-count:    ${{ needs.select-invoker.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.select-invoker.outputs.invoker }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        ${{ github.event.repository.name }}
+          app-token:        ${{ steps.app-token.outputs.token }}
 
       - name: Dispatch Old Major — onboarding analysis
         uses: ./actions/dispatch
@@ -136,6 +146,15 @@ jobs:
 
       - name: Inject Old Major persona
         run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
+
+      - name: Increment invoker weekly counter
+        uses: ./actions/counter
+        with:
+          current-count:    ${{ needs.select-invoker.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.select-invoker.outputs.invoker }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        ${{ github.event.repository.name }}
+          app-token:        ${{ steps.app-token.outputs.token }}
 
       - name: Dispatch Old Major — re-evaluate
         uses: ./actions/dispatch
