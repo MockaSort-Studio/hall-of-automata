@@ -97,7 +97,7 @@ jobs:
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   20
+          max-turns:   30
           prompt: >-
             You are handling automaton onboarding for issue #${{ github.event.issue.number }}
             in ${{ github.repository }}, submitted by @${{ github.event.issue.user.login }}.
@@ -117,9 +117,11 @@ jobs:
             If any required field is missing or unusable: post a comment listing exactly what
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
-            If the sheet passes: add the new agent entry to agents.yml and commit
-            the persona character sheet to roster/<slug>.md in the same commit and push,
-            post a provisioning summary comment confirming registration,
+            If the sheet passes: create a new branch (hall/old-major/issue-<N>),
+            add the new agent entry to agents.yml and commit the persona character
+            sheet to roster/<slug>.md in the same commit, push the branch, open a
+            pull request targeting main with a concise title and body, post a
+            provisioning summary comment on the issue linking to the PR,
             then close the issue.
 
   # ── Phase 2: re-evaluate after invoker addresses feedback ─────────────────────
@@ -161,7 +163,7 @@ jobs:
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   20
+          max-turns:   30
           prompt: >-
             The invoker has updated the automaton onboarding request on
             issue #${{ github.event.issue.number }} in ${{ github.repository }}.
@@ -173,8 +175,7 @@ jobs:
             Re-read the issue body (character sheet) and all comments.
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
-            (new agent entry added to agents.yml and persona committed to
-            roster/<slug>.md in the same commit and pushed,
-            max_turns from the issue — default 30 if blank,
-            summary comment, close issue).
+            (create branch hall/old-major/issue-<N>, commit agents.yml + roster/<slug>.md
+            in one commit, push, open a PR targeting main, post a summary comment on
+            the issue linking to the PR, close the issue).
             If gaps remain, post updated feedback. Do not provision until the sheet is complete.
