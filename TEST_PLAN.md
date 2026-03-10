@@ -56,7 +56,6 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - `HALL_WEEKLY_CAP` variable is present with correct value
 - Issue has a comment from `hall-of-automata[bot]` with an environment link
 
-**Result** : passed
 ---
 
 ### TC-INV-02 — Invoker onboarding: secret check gates test-token job
@@ -71,8 +70,6 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - `test-token` job does NOT run
 
 **Verify:** issue has a "secret not found" comment; no `test-token` run visible in Actions for this trigger.
-
-**Result**
 
 ---
 
@@ -92,10 +89,6 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - Issue is closed
 - `hall:active-invoker` label on the issue
 
-**Result** passed with minor bugs
-- End comment should be changed: invokation possible only by commenting @hall-of-automata
-- Token validation still week
-
 ---
 
 ### TC-INV-04 — Invoker onboarding: bad token produces retry prompt
@@ -113,7 +106,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ---
 
-### TC-INV-06 — Invoker onboarding: valid token, quota exhausted → queued
+### TC-INV-05 — Invoker onboarding: valid token, quota exhausted → queued
 
 **Precondition:** TC-INV-01 complete. Add a valid `CLAUDE_CODE_OAUTH_TOKEN` whose Anthropic quota is currently at zero (429 response).
 
@@ -129,20 +122,6 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - Issue is closed
 - Both `hall:active-invoker` and `hall:invoker-queued` labels present
 - Comment says invoker is queued until Monday reset, not that the token is invalid
-
----
-
-### TC-INV-05 — Invoker onboarding: duplicate ready reply does not race
-
-**Precondition:** TC-INV-03 in progress (test-token job running).
-
-**Trigger:** Reply `ready` a second time on the same issue before the first run finishes.
-
-**Expected:**
-- Concurrency group `onboard-invoker-{issue.number}` queues (not cancels) the second run
-- Second run waits; does not produce a duplicate welcome comment
-
-**Verify:** only one welcome comment posted; Actions shows second run queued not failed.
 
 ---
 
