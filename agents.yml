@@ -35,20 +35,3 @@ agents:
       scope_summary: >
         Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
         specialist, synthesizes task context. Does not implement code or open PRs.
-
-  hamlet:
-    display_name: "Hamlet 🐗"
-    agent_env: hall/hamlet            # GitHub Environment: persona config only
-                                      #   (CLAUDE_CODE_OAUTH_TOKEN lives in invoker/<handle>;
-                                      #   HALL_USAGE_COUNT and HALL_WEEKLY_CAP live in invoker/<handle>)
-    invoker: mksetaro
-    teams: [automata-invokers]
-    max_turns: 40
-    max_retries: 3
-    catalog:
-      roles: [implement, fix, refactor]
-      domains: [cpp, build-systems, devops]
-      scope_summary: >
-        Deep implementation work in C++ and build systems. Strong on structural fixes,
-        refactors, and CI configuration. Not the right call for UI, documentation,
-        or infrastructure provisioning.
