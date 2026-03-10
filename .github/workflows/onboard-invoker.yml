@@ -145,10 +145,6 @@ jobs:
     steps:
       - name: Checkout Hall repo (dispatch action)
         uses: actions/checkout@v4
-        with:
-          path: .hall
-          sparse-checkout: actions/
-          sparse-checkout-cone-mode: true
 
       - name: Create App token
         id: app-token
@@ -157,10 +153,17 @@ jobs:
           app-id:      ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Write validation CLAUDE.md
+        run: |
+          cat > CLAUDE.md << 'EOF'
+          # Hall Token Validation
+          This is a single-turn token validation check. Reply to the prompt with exactly the word requested. Do not use any tools. Do not read any files. Do not explore the repository.
+          EOF
+
       - name: Validate token via dispatch
         id: dispatch
         continue-on-error: true
-        uses: ./.hall/actions/dispatch
+        uses: ./actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}

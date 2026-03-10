@@ -98,8 +98,6 @@ jobs:
     steps:
       - name: Checkout Hall repo
         uses: actions/checkout@v4
-        with:
-          path: .hall
 
       - name: Create App token
         id: app-token
@@ -109,17 +107,21 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Inject Old Major persona
-        run: cp .hall/roster/old-major.md CLAUDE.md
+        run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
 
       - name: Dispatch Old Major — onboarding analysis
-        uses: ./.hall/actions/dispatch
+        uses: ./actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   15
+          max-turns:   20
           prompt: >-
             You are handling automaton onboarding for issue #${{ github.event.issue.number }}
             in ${{ github.repository }}, submitted by @${{ github.event.issue.user.login }}.
+
+            Reference files (read before evaluating):
+            - agents/automaton_template.md — expected character sheet format
+            - agents.yml — existing slugs (check uniqueness)
 
             Evaluate the character sheet in the issue body against these criteria:
             slug (lowercase-kebab, unique in agents.yml), display_name,
@@ -150,8 +152,6 @@ jobs:
     steps:
       - name: Checkout Hall repo
         uses: actions/checkout@v4
-        with:
-          path: .hall
 
       - name: Create App token
         id: app-token
@@ -161,17 +161,21 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Inject Old Major persona
-        run: cp .hall/roster/old-major.md CLAUDE.md
+        run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
 
       - name: Dispatch Old Major — re-evaluate
-        uses: ./.hall/actions/dispatch
+        uses: ./actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   15
+          max-turns:   20
           prompt: >-
             The invoker has updated the automaton onboarding request on
             issue #${{ github.event.issue.number }} in ${{ github.repository }}.
+
+            Reference files (read before evaluating):
+            - agents/automaton_template.md — expected character sheet format
+            - agents.yml — existing slugs (check uniqueness)
 
             Re-read the issue body (character sheet) and all comments.
             If all outstanding issues from your previous review are resolved:

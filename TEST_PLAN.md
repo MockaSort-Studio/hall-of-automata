@@ -56,6 +56,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - `HALL_WEEKLY_CAP` variable is present with correct value
 - Issue has a comment from `hall-of-automata[bot]` with an environment link
 
+**Result** : passed
 ---
 
 ### TC-INV-02 — Invoker onboarding: secret check gates test-token job
@@ -70,6 +71,8 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - `test-token` job does NOT run
 
 **Verify:** issue has a "secret not found" comment; no `test-token` run visible in Actions for this trigger.
+
+**Result**
 
 ---
 
@@ -88,6 +91,10 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 - Issue has welcome comment ("multiclassed — invoker")
 - Issue is closed
 - `hall:active-invoker` label on the issue
+
+**Result** passed with minor bugs
+- End comment should be changed: invokation possible only by commenting @hall-of-automata
+- Token validation still week
 
 ---
 
