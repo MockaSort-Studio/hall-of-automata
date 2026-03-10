@@ -29,3 +29,19 @@ agents:
       scope_summary: >
         Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
         specialist, synthesizes task context. Does not implement code or open PRs.
+
+  hamlet:
+    display_name: "Hamlet 🐗"
+    # Persona: roster/hamlet.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    invoker: mksetaro
+    teams: [automata-invokers]
+    max_turns: 15
+    max_retries: 2
+    catalog:
+      roles: [implement, debug, triage]
+      domains: [cpp, build-systems, debugging]
+      scope_summary: >
+        C++17 high-performance specialist — implements features, fixes bugs, and investigates
+        runtime misbehaviours in Bazel-managed codebases, working from CI output rather than
+        running builds inline.
