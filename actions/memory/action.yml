@@ -50,23 +50,10 @@ runs:
     - name: Read or write memory
       id: run
       shell: bash
-      run: |
-        MODE="${{ inputs.mode }}"
-
-        if [ "$MODE" = "save" ]; then
-          echo '${{ inputs.memory-json }}' > .hall-memory.json
-
-        elif [ "$MODE" = "restore" ]; then
-          if [ -f .hall-memory.json ]; then
-            CONTENT=$(cat .hall-memory.json)
-          else
-            CONTENT=""
-          fi
-          # Use a delimiter to safely handle multi-line JSON in GITHUB_OUTPUT
-          echo "memory-json<<EOF_MEMORY" >> "$GITHUB_OUTPUT"
-          echo "$CONTENT" >> "$GITHUB_OUTPUT"
-          echo "EOF_MEMORY" >> "$GITHUB_OUTPUT"
-        fi
+      env:
+        MODE:        ${{ inputs.mode }}
+        MEMORY_JSON: ${{ inputs.memory-json }}
+      run: bash .hall/scripts/save-restore-memory.sh
 
     - name: Save memory cache
       if: inputs.mode == 'save'

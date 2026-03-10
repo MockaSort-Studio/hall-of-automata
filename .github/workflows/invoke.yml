@@ -93,20 +93,16 @@ jobs:
       - name: Post queued comment and label
         if: needs.detect.outputs.issue-number != ''
         uses: actions/github-script@v7
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+          AGENT:        ${{ needs.detect.outputs.agent }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const owner  = '${{ needs.detect.outputs.repo-owner }}';
-            const repo   = '${{ needs.detect.outputs.repo-name }}';
-            const number = Number('${{ needs.detect.outputs.issue-number }}');
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: number,
-              body: `**${{ needs.detect.outputs.agent }}** request received, but all invokers are currently at their weekly capacity. The request has been queued — it will be retried when capacity is available.`
-            });
-            await github.rest.issues.addLabels({
-              owner, repo, issue_number: number,
-              labels: ['hall:invoker-queued']
-            });
+            const fn = require('./.hall/scripts/post-queued-comment.js')
+            await fn({ github, core })
 
   # ── Job 3: dispatch the resolved agent ───────────────────────────────────
   # Runs in invoker/<invoker> so secrets.CLAUDE_CODE_OAUTH_TOKEN injects from

@@ -1,8 +1,8 @@
 name: Invocation Counter
 description: >
-  Increments HALL_USAGE_COUNT in the agent's GitHub Environment via the REST API.
+  Increments HALL_USAGE_COUNT in the invoker's GitHub Environment via the REST API.
   The current count is read from vars.HALL_USAGE_COUNT in the calling job (injected
-  automatically because the job runs in environment: hall/<agent>) and passed as an
+  automatically because the job runs in environment: invoker/<handle>) and passed as an
   input. No cache, no JSON blobs — one PATCH call on increment.
 
 inputs:
@@ -10,7 +10,7 @@ inputs:
     description: Current value read from vars.HALL_USAGE_COUNT in the calling job
     required: true
   environment-name:
-    description: Full GitHub Environment name (e.g. hall/hamlet)
+    description: Full GitHub Environment name (e.g. invoker/mksetaro)
     required: true
   repo-owner:
     description: Repository owner
@@ -34,14 +34,9 @@ runs:
       id: increment
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.app-token }}
-      run: |
-        NEXT=$(( ${{ inputs.current-count }} + 1 ))
-        # URL-encode the environment name (hall/hamlet → hall%2Fhamlet)
-        ENV_ENCODED="${{ inputs.environment-name }}"
-        ENV_ENCODED="${ENV_ENCODED//\//%2F}"
-        gh api --method PATCH \
-          /repos/${{ inputs.repo-owner }}/${{ inputs.repo-name }}/environments/${ENV_ENCODED}/variables/HALL_USAGE_COUNT \
-          -f name=HALL_USAGE_COUNT \
-          -f value="${NEXT}"
-        echo "count=${NEXT}" >> "$GITHUB_OUTPUT"
+        GH_TOKEN:      ${{ inputs.app-token }}
+        CURRENT_COUNT: ${{ inputs.current-count }}
+        ENV_NAME:      ${{ inputs.environment-name }}
+        REPO_OWNER:    ${{ inputs.repo-owner }}
+        REPO_NAME:     ${{ inputs.repo-name }}
+      run: bash .hall/scripts/increment-counter.sh

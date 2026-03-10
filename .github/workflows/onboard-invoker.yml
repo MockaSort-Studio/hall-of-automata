@@ -176,36 +176,15 @@ jobs:
         shell: bash
         env:
           TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          echo "::add-mask::$TOKEN"
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-            --max-time 15 \
-            -X POST "https://api.anthropic.com/v1/messages" \
-            -H "Authorization: Bearer ${TOKEN}" \
-            -H "anthropic-version: 2023-06-01" \
-            -H "Content-Type: application/json" \
-            -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}') || HTTP=000
-          echo "fallback HTTP: $HTTP"
-          # 429 = valid token, quota exhausted — treat as pass
-          # 401/403 = bad token — fail
-          # 000 = network unreachable — inconclusive, treat as fail (cannot confirm token)
-          if [[ "$HTTP" == "429" ]]; then
-            echo "passed=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "passed=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: bash .hall/scripts/probe-token.sh
 
       - name: Resolve result
         id: result
         shell: bash
-        run: |
-          if [[ "${{ steps.dispatch.outcome }}" == "success" ]]; then
-            echo "test-passed=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ steps.fallback.outputs.passed }}" == "true" ]]; then
-            echo "test-passed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "test-passed=false" >> "$GITHUB_OUTPUT"
-          fi
+        env:
+          DISPATCH_OUTCOME: ${{ steps.dispatch.outcome }}
+          FALLBACK_PASSED:  ${{ steps.fallback.outputs.passed }}
+        run: bash .hall/scripts/resolve-token-result.sh
 
   # ── Phase 2c: post result ─────────────────────────────────────────────────────
   finalize:

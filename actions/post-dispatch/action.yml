@@ -63,54 +63,36 @@ runs:
     - name: Apply hall label to PR
       if: inputs.pr-number != ''
       uses: actions/github-script@v7
+      env:
+        REPO_OWNER: ${{ inputs.repo-owner }}
+        REPO_NAME:  ${{ inputs.repo-name }}
+        PR_NUMBER:  ${{ inputs.pr-number }}
+        AGENT:      ${{ inputs.agent-dispatched }}
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const label = 'hall:${{ inputs.agent-dispatched }}';
-          // Ensure label exists in the repo (create if missing)
-          try {
-            await github.rest.issues.getLabel({
-              owner: '${{ inputs.repo-owner }}',
-              repo: '${{ inputs.repo-name }}',
-              name: label
-            });
-          } catch {
-            await github.rest.issues.createLabel({
-              owner: '${{ inputs.repo-owner }}',
-              repo: '${{ inputs.repo-name }}',
-              name: label,
-              color: 'f97316'
-            });
-          }
-          await github.rest.issues.addLabels({
-            owner: '${{ inputs.repo-owner }}',
-            repo: '${{ inputs.repo-name }}',
-            issue_number: Number('${{ inputs.pr-number }}'),
-            labels: [label]
-          });
+          const fn = require('./.hall/scripts/apply-hall-label.js')
+          await fn({ github, core })
 
     - name: Write invocation audit log
       shell: bash
-      run: |
-        cat > hall-invocation-log.json << EOF
-        {
-          "agent_requested": "${{ inputs.agent }}",
-          "agent_dispatched": "${{ inputs.agent-dispatched }}",
-          "rerouted": ${{ inputs.rerouted }},
-          "repo": "${{ inputs.repo-owner }}/${{ inputs.repo-name }}",
-          "issue": ${{ inputs.issue-number }},
-          "pr": ${{ inputs.pr-number != '' && inputs.pr-number || 'null' }},
-          "invoker": "${{ inputs.invoker }}",
-          "team_validated": "${{ inputs.team-validated }}",
-          "timestamp_start": "${{ github.event.created_at }}",
-          "timestamp_end": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-          "turns_used": ${{ inputs.turns-used }},
-          "turns_max": ${{ inputs.turns-max }},
-          "retry_count": ${{ inputs.retry-count }},
-          "outcome": "${{ inputs.outcome }}",
-          "weekly_count_after": ${{ inputs.weekly-count-after }}
-        }
-        EOF
+      env:
+        AGENT:               ${{ inputs.agent }}
+        AGENT_DISPATCHED:    ${{ inputs.agent-dispatched }}
+        REROUTED:            ${{ inputs.rerouted }}
+        REPO_OWNER:          ${{ inputs.repo-owner }}
+        REPO_NAME:           ${{ inputs.repo-name }}
+        ISSUE_NUMBER:        ${{ inputs.issue-number }}
+        PR_NUMBER:           ${{ inputs.pr-number }}
+        INVOKER:             ${{ inputs.invoker }}
+        TEAM_VALIDATED:      ${{ inputs.team-validated }}
+        TIMESTAMP_START:     ${{ github.event.created_at }}
+        TURNS_USED:          ${{ inputs.turns-used }}
+        TURNS_MAX:           ${{ inputs.turns-max }}
+        RETRY_COUNT:         ${{ inputs.retry-count }}
+        OUTCOME:             ${{ inputs.outcome }}
+        WEEKLY_COUNT_AFTER:  ${{ inputs.weekly-count-after }}
+      run: bash .hall/scripts/write-audit-log.sh
 
     - name: Upload audit log artifact
       uses: actions/upload-artifact@v4

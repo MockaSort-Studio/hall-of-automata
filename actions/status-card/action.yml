@@ -54,72 +54,18 @@ runs:
     - name: Create or update status card
       id: upsert
       uses: actions/github-script@v7
+      env:
+        REPO_OWNER:    ${{ inputs.repo-owner }}
+        REPO_NAME:     ${{ inputs.repo-name }}
+        ISSUE_NUMBER:  ${{ inputs.issue-number }}
+        AGENT:         ${{ inputs.agent }}
+        STAGE:         ${{ inputs.stage }}
+        BRANCH:        ${{ inputs.branch }}
+        PR_NUMBER:     ${{ inputs.pr-number }}
+        EXTRA:         ${{ inputs.extra }}
+        DISPATCHED_AT: ${{ inputs.dispatched-at }}
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const owner   = '${{ inputs.repo-owner }}';
-          const repo    = '${{ inputs.repo-name }}';
-          const issueNo = Number('${{ inputs.issue-number }}');
-          const agent   = '${{ inputs.agent }}';
-          const stage   = '${{ inputs.stage }}';
-          const branch  = '${{ inputs.branch }}' || '—';
-          const pr      = '${{ inputs.pr-number }}' ? `#${{ inputs.pr-number }}` : '—';
-          const extra   = '${{ inputs.extra }}';
-
-          const stageLabel = {
-            'dispatching':    'Dispatching agent...',
-            'analyzing':      'Analyzing...',
-            'awaiting-input': 'Awaiting context — question posted',
-            'comment-posted': 'Response posted',
-            'queued':         'Queued — weekly quota reached',
-            'working':        `Working — \`${branch}\``,
-
-            'pr-opened':      `PR opened — ${pr}`,
-            'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
-            'escalated':      `Escalated — keeper notified`,
-            'failed':         'Failed — see comments',
-            'done':           `Done — ${pr} merged`
-          }[stage] ?? stage;
-
-          const dispatched = '${{ inputs.dispatched-at }}' || new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-          const runUrl  = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const runLink = `[Run #${context.runId}](${runUrl})`;
-
-          const body = [
-            '<!-- hall-status -->',
-            `### Hall \u2014 ${agent}`,
-            '',
-            '| | |',
-            '|---|---|',
-            `| **Stage** | ${stageLabel} |`,
-            `| **Dispatched** | ${dispatched} |`,
-            `| **Branch** | \`${branch}\` |`,
-            `| **PR** | ${pr} |`,
-            `| **Run** | ${runLink} |`
-          ].join('\n');
-
-          // Search for an existing status card in the thread
-          let existingId = null;
-          for await (const page of github.paginate.iterator(
-            github.rest.issues.listComments,
-            { owner, repo, issue_number: issueNo, per_page: 100 }
-          )) {
-            for (const c of page.data) {
-              if (c.body && c.body.startsWith('<!-- hall-status -->')) {
-                existingId = c.id;
-                break;
-              }
-            }
-            if (existingId) break;
-          }
-
-          let commentId;
-          if (existingId) {
-            await github.rest.issues.updateComment({ owner, repo, comment_id: existingId, body });
-            commentId = existingId;
-          } else {
-            const res = await github.rest.issues.createComment({ owner, repo, issue_number: issueNo, body });
-            commentId = res.data.id;
-          }
-
-          core.setOutput('comment-id', String(commentId));
+          const fn = require('./.hall/scripts/update-status-card.js')
+          await fn({ github, context, core })

@@ -46,57 +46,23 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.app-token }}
       run: |
-        # Delete the cache entry via GitHub API
-        # Ignore errors — cache may have already expired
         gh api \
           --method DELETE \
           -H "Accept: application/vnd.github+json" \
-          /repos/${{ inputs.repo-owner }}/${{ inputs.repo-name }}/actions/caches?key=${{ steps.key.outputs.cache-key }} \
+          "/repos/${{ inputs.repo-owner }}/${{ inputs.repo-name }}/actions/caches?key=${{ steps.key.outputs.cache-key }}" \
           || true
 
-    - name: Remove hall label from PR
+    - name: Cleanup PR labels and post summary
       uses: actions/github-script@v7
+      env:
+        REPO_OWNER:   ${{ inputs.repo-owner }}
+        REPO_NAME:    ${{ inputs.repo-name }}
+        PR_NUMBER:    ${{ inputs.pr-number }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        AGENT:        ${{ inputs.agent }}
+        MERGED:       ${{ inputs.merged }}
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const label = 'hall:${{ inputs.agent }}';
-          try {
-            await github.rest.issues.removeLabel({
-              owner: '${{ inputs.repo-owner }}',
-              repo: '${{ inputs.repo-name }}',
-              issue_number: Number('${{ inputs.pr-number }}'),
-              name: label
-            });
-          } catch {
-            // Label may already be gone — not an error
-          }
-
-    - name: Remove awaiting-input label from linked issue
-      if: inputs.issue-number != ''
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ inputs.app-token }}
-        script: |
-          try {
-            await github.rest.issues.removeLabel({
-              owner: '${{ inputs.repo-owner }}',
-              repo: '${{ inputs.repo-name }}',
-              issue_number: Number('${{ inputs.issue-number }}'),
-              name: 'hall:awaiting-input'
-            });
-          } catch {
-            // Label may not exist — not an error
-          }
-
-    - name: Post summary on linked issue
-      if: inputs.issue-number != '' && inputs.merged == 'true'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ inputs.app-token }}
-        script: |
-          await github.rest.issues.createComment({
-            owner: '${{ inputs.repo-owner }}',
-            repo: '${{ inputs.repo-name }}',
-            issue_number: Number('${{ inputs.issue-number }}'),
-            body: `${{ inputs.agent }} — PR #${{ inputs.pr-number }} merged. Task complete.`
-          });
+          const fn = require('./.hall/scripts/cleanup-pr.js')
+          await fn({ github, core })
