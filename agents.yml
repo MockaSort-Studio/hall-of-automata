@@ -19,7 +19,7 @@ agents:
     display_name: "Old Major 🏛️"
     # Persona: roster/old-major.md
     # Token:  pool-selected invoker/<handle> at dispatch time.
-    invoker: mksetaro
+    author: mksetaro
     teams: [automata-invokers]
     max_turns: 20
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.

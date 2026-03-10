@@ -187,12 +187,12 @@ jobs:
             -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}') || HTTP=000
           echo "fallback HTTP: $HTTP"
           # 429 = valid token, quota exhausted — treat as pass
-          # 000 = network unreachable — inconclusive, treat as pass
           # 401/403 = bad token — fail
-          if [[ "$HTTP" == "401" || "$HTTP" == "403" ]]; then
-            echo "passed=false" >> "$GITHUB_OUTPUT"
+          # 000 = network unreachable — inconclusive, treat as fail (cannot confirm token)
+          if [[ "$HTTP" == "429" ]]; then
+            echo "passed=true"  >> "$GITHUB_OUTPUT"
           else
-            echo "passed=true" >> "$GITHUB_OUTPUT"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Resolve result

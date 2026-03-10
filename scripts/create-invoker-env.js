@@ -16,24 +16,24 @@ module.exports = async ({ github, core }) => {
     owner, repo, environment_name: envName,
   });
 
-  // Set HALL_WEEKLY_CAP variable — try create, fall back to update
-  const varPayload = {
-    owner, repo,
-    environment_name: envName,
-    name:  'HALL_WEEKLY_CAP',
-    value: capTurns,
-  };
-  try {
-    await github.request(
-      'POST /repos/{owner}/{repo}/environments/{environment_name}/variables',
-      varPayload
-    );
-  } catch {
-    await github.request(
-      'PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}',
-      varPayload
-    );
+  // Set HALL_WEEKLY_CAP and initialise HALL_USAGE_COUNT=0 — try create, fall back to update
+  async function upsertVar(name, value) {
+    const payload = { owner, repo, environment_name: envName, name, value };
+    try {
+      await github.request(
+        'POST /repos/{owner}/{repo}/environments/{environment_name}/variables',
+        payload
+      );
+    } catch {
+      await github.request(
+        'PATCH /repos/{owner}/{repo}/environments/{environment_name}/variables/{name}',
+        payload
+      );
+    }
   }
+
+  await upsertVar('HALL_WEEKLY_CAP',   capTurns);
+  await upsertVar('HALL_USAGE_COUNT',  '0');
 
   const envUrl = `https://github.com/${owner}/${repo}/settings/environments`;
   const body   = [
