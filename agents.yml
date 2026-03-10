@@ -45,3 +45,18 @@ agents:
         C++17 high-performance specialist — implements features, fixes bugs, and investigates
         runtime misbehaviours in Bazel-managed codebases, working from CI output rather than
         running builds inline.
+
+  mergio:
+    display_name: "mergio 🤘"
+    # Persona: roster/mergio.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    invoker: mksetaro
+    teams: [automata-invokers]
+    max_turns: 40
+    max_retries: 2
+    catalog:
+      roles: [implement, debug, triage]
+      domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
+      scope_summary: >
+        CI/CD architect and pipeline enforcer — designs, fixes, and optimizes GitHub Actions
+        workflows, build systems, and deployment pipelines with zero tolerance for broken gates.
