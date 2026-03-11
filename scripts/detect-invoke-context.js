@@ -146,7 +146,7 @@ module.exports = async ({ github, context, core }) => {
     }
 
     if (candidates.length > 0) {
-      candidates.sort((a, b) => a.count - b.count);
+      candidates.sort((a, b) => a.count - b.count || Math.random() - 0.5);
       invoker      = candidates[0].handle;
       invokerCount = candidates[0].count;
       core.info(`[detect] selected invoker=${invoker} (count=${invokerCount})`);
