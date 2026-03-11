@@ -40,6 +40,8 @@ nav = [
     ]},
     {"How To" = [
         {"Invoking Automata" = "how-to-invoke.md"},
+        {"Org-Wide Setup" = "org-setup.md"},
+        {"Webhook Relay (Fly.io)" = "relay-setup.md"},
     ]},
 ]
 

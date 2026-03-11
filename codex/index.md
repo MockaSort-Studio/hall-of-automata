@@ -61,6 +61,8 @@ Practical guides for day-to-day use.
 | Document | What it covers |
 |----------|---------------|
 | [Invoking Automata](how-to-invoke.md) | All trigger paths, dos and don'ts, status card reference |
+| [Org-Wide Setup](org-setup.md) | Issue templates, label provisioning script, new-repo checklist |
+| [Webhook Relay (Fly.io)](relay-setup.md) | Cross-repo event forwarding via Fly.io |
 
 ### Agent Definitions
 Behavioral spec and persona format.
