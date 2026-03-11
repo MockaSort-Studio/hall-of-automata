@@ -36,6 +36,7 @@ How the pieces fit together at the infrastructure level.
 | [Runner Model](architecture/runner-model.md) | Execution layers, persona injection, state persistence |
 | [Permissions Model](architecture/permissions-model.md) | GitHub teams as the authorization layer |
 | [Secrets & Storage](architecture/secrets-model.md) | Keeper environments, OAuth tokens, deployment payloads, env variables |
+| [CI Loop and PR Checks](architecture/ci-loop-and-checks.md) | CI re-dispatch loop, why Hall workflows appear as PR checks, design rationale |
 
 ### Operations
 Day-to-day and emergency procedures.
