@@ -2,14 +2,16 @@
 // Queries all invoker/* (and legacy keeper/*) environments, reads HALL_USAGE_COUNT
 // and HALL_WEEKLY_CAP for each, filters out at-cap members, and picks the least-used.
 // Env vars:
-//   FAIL_FAST    — if 'true', calls core.setFailed() when no invoker is available
-//   FAIL_MESSAGE — custom setFailed message (defaults to generic message)
+//   FAIL_FAST       — if 'true', calls core.setFailed() when no invoker is available
+//   FAIL_MESSAGE    — custom setFailed message (defaults to generic message)
+//   EXCLUDE_INVOKER — handle to exclude from selection (used for single-retry fallback)
 // Outputs: invoker (bare handle, e.g. 'mksetaro'; empty string if none available)
 //          invoker-count (current HALL_USAGE_COUNT for the selected invoker)
 
 module.exports = async ({ github, context, core }) => {
-  const failFast = process.env.FAIL_FAST    === 'true';
-  const failMsg  = process.env.FAIL_MESSAGE || 'No invoker available — all at cap.';
+  const failFast       = process.env.FAIL_FAST       === 'true';
+  const failMsg        = process.env.FAIL_MESSAGE    || 'No invoker available — all at cap.';
+  const excludeInvoker = process.env.EXCLUDE_INVOKER || '';
 
   const owner = context.repo.owner;
   const repo  = context.repo.repo;
@@ -45,8 +47,9 @@ module.exports = async ({ github, context, core }) => {
       )).data.value || '25', 10);
     } catch (_) { /* not set — default 25 */ }
     core.info(`[select-invoker] ${env.name}: count=${count} cap=${cap}`);
-    if (count < cap) {
-      candidates.push({ handle: env.name.replace(/^(?:invoker|keeper)\//, ''), count });
+    const handle = env.name.replace(/^(?:invoker|keeper)\//, '');
+    if (count < cap && handle !== excludeInvoker) {
+      candidates.push({ handle, count });
     }
   }
 

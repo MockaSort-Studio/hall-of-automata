@@ -68,6 +68,9 @@ jobs:
       github.event_name == 'issues' &&
       github.event.label.name == 'hall:onboard-automaton'
     runs-on: ubuntu-latest
+    # Exit condition: this job gets exactly one retry (see select-retry-invoker + analyze-retry).
+    # There is no retry loop. Max 2 total dispatch attempts per invocation.
+    continue-on-error: true
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
       - name: Checkout Hall repo
@@ -135,6 +138,9 @@ jobs:
       contains(github.event.issue.labels.*.name, 'hall:onboard-automaton') &&
       contains(github.event.issue.labels.*.name, 'hall:awaiting-input')
     runs-on: ubuntu-latest
+    # Exit condition: this job gets exactly one retry (see select-retry-invoker + re-analyze-retry).
+    # There is no retry loop. Max 2 total dispatch attempts per invocation.
+    continue-on-error: true
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
       - name: Checkout Hall repo
@@ -161,6 +167,167 @@ jobs:
           scripts-dir:      scripts
 
       - name: Dispatch Old Major — re-evaluate
+        uses: ./actions/dispatch
+        with:
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   30
+          prompt: >-
+            The invoker has updated the automaton onboarding request on
+            issue #${{ github.event.issue.number }} in ${{ github.repository }}.
+
+            Reference files (read before evaluating):
+            - agents/automaton_template.md — expected character sheet format
+            - agents.yml — existing slugs (check uniqueness)
+
+            Re-read the issue body (character sheet) and all comments.
+            If all outstanding issues from your previous review are resolved:
+            remove the hall:awaiting-input label, then proceed with full provisioning
+            (create branch hall/old-major/issue-<N>, commit agents.yml + roster/<slug>.md
+            in one commit, push, open a PR targeting main, post a summary comment on
+            the issue linking to the PR, close the issue).
+            If gaps remain, post updated feedback. Do not provision until the sheet is complete.
+
+  # ── Retry jobs: re-select invoker and re-dispatch if analyze/re-analyze failed ──
+  # Both analyze and re-analyze have continue-on-error: true, so the workflow
+  # proceeds here when either fails (e.g. Claude OAuth quota exhausted).
+  # Exit condition: one retry only. If the retry jobs also fail, the workflow fails.
+  # Max 2 total dispatch attempts per invocation.
+
+  select-retry-invoker:
+    name: Select retry invoker (on dispatch failure)
+    needs: [select-invoker, analyze, re-analyze]
+    if: >
+      always() &&
+      needs.select-invoker.result == 'success' &&
+      (needs.analyze.result == 'failure' || needs.re-analyze.result == 'failure')
+    runs-on: ubuntu-latest
+    outputs:
+      invoker:       ${{ steps.pool.outputs.invoker }}
+      invoker-count: ${{ steps.pool.outputs.invoker-count }}
+    steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Select alternate invoker (excluding failed)
+        id: pool
+        uses: actions/github-script@v7
+        env:
+          EXCLUDE_INVOKER: ${{ needs.select-invoker.outputs.invoker }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/select-invoker.js')
+            await fn({ github, context, core })
+
+  analyze-retry:
+    name: "Old Major — analyze submission (retry)"
+    needs: [select-retry-invoker]
+    if: >
+      github.event_name == 'issues' &&
+      needs.select-retry-invoker.outputs.invoker != ''
+    runs-on: ubuntu-latest
+    environment: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
+    steps:
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Inject Old Major persona
+        run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
+
+      - name: Increment invoker weekly counter
+        uses: ./actions/counter
+        with:
+          current-count:    ${{ needs.select-retry-invoker.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        ${{ github.event.repository.name }}
+          app-token:        ${{ steps.app-token.outputs.token }}
+          scripts-dir:      scripts
+
+      - name: Dispatch Old Major — onboarding analysis (retry)
+        uses: ./actions/dispatch
+        with:
+          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:   ${{ steps.app-token.outputs.token }}
+          max-turns:   30
+          prompt: >-
+            You are handling automaton onboarding for issue #${{ github.event.issue.number }}
+            in ${{ github.repository }}, submitted by @${{ github.event.issue.user.login }}.
+
+            Reference files (read before evaluating):
+            - agents/automaton_template.md — expected character sheet format
+            - agents.yml — existing slugs (check uniqueness)
+
+            Evaluate the character sheet in the issue body against these criteria:
+            slug (lowercase-kebab, unique in agents.yml), display_name,
+            character (tone/voice/rules/signature — behavioural contract not biography),
+            domains (named capability bundles, routing signals not tool lists),
+            scope (right-for / not-right-for / ambiguity-gate all present),
+            scope_summary (one sentence, optimised for routing decisions),
+            max_turns (optional integer — use 30 if blank or absent; record in catalog entry).
+
+            If any required field is missing or unusable: post a comment listing exactly what
+            needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
+
+            If the sheet passes: create a new branch (hall/old-major/issue-<N>),
+            add the new agent entry to agents.yml and commit the persona character
+            sheet to roster/<slug>.md in the same commit, push the branch, open a
+            pull request targeting main with a concise title and body, post a
+            provisioning summary comment on the issue linking to the PR,
+            then close the issue.
+
+  re-analyze-retry:
+    name: "Old Major — re-evaluate after feedback (retry)"
+    needs: [select-retry-invoker]
+    if: >
+      github.event_name == 'issue_comment' &&
+      needs.select-retry-invoker.outputs.invoker != ''
+    runs-on: ubuntu-latest
+    environment: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
+    steps:
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Inject Old Major persona
+        run: cat agents/automaton_base.md roster/old-major.md > CLAUDE.md
+
+      - name: Increment invoker weekly counter
+        uses: ./actions/counter
+        with:
+          current-count:    ${{ needs.select-retry-invoker.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        ${{ github.event.repository.name }}
+          app-token:        ${{ steps.app-token.outputs.token }}
+          scripts-dir:      scripts
+
+      - name: Dispatch Old Major — re-evaluate (retry)
         uses: ./actions/dispatch
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
