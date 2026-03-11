@@ -2,8 +2,7 @@ name: Dispatch Agent
 description: >
   Runs the Claude Code Action with the agent's OAuth token.
   Callers write the agent persona to CLAUDE.md before calling this action;
-  it is read into system_prompt and removed before the SDK runs to avoid the
-  "Cannot use both a settings file" conflict introduced in claude-code-action@v1.
+  Claude Code picks it up automatically as project-level instructions.
 
 inputs:
   oauth-token:
@@ -28,21 +27,6 @@ runs:
       shell: bash
       run: echo "::add-mask::${{ inputs.oauth-token }}"
 
-    - name: Read and remove persona file
-      id: persona
-      shell: bash
-      run: |
-        if [ -f CLAUDE.md ]; then
-          {
-            echo "content<<HALL_PERSONA_EOF"
-            cat CLAUDE.md
-            echo "HALL_PERSONA_EOF"
-          } >> "$GITHUB_OUTPUT"
-          rm CLAUDE.md
-        else
-          echo "content=" >> "$GITHUB_OUTPUT"
-        fi
-
     - name: Run Claude Code Action
       uses: anthropics/claude-code-action@v1
       with:
@@ -53,5 +37,4 @@ runs:
         # not Claude Code's permission prompts.
         claude_args: "--max-turns ${{ inputs.max-turns }} --dangerously-skip-permissions"
         prompt: ${{ inputs.prompt }}
-        system_prompt: ${{ steps.persona.outputs.content }}
         show_full_output: "true"
