@@ -7,6 +7,14 @@ module.exports = async ({ github, core }) => {
   const teamSlug = process.env.TEAM_SLUG;
   const username = process.env.USERNAME;
 
+  // GitHub bot accounts always end with [bot] and cannot be team members.
+  // The Hall bot acting on its own orchestration (creating issues, applying
+  // routing labels) is inherently authorized — skip the membership check.
+  if (username.endsWith('[bot]')) {
+    core.info(`[check-team-membership] ${username} is a bot — bypassing team check`);
+    return 'true';
+  }
+
   try {
     const res = await github.rest.teams.getMembershipForUserInOrg({
       org, team_slug: teamSlug, username,
