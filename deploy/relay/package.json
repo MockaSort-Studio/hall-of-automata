@@ -1,0 +1,13 @@
+{
+  "name": "hall-relay",
+  "version": "1.0.0",
+  "description": "Webhook relay — forwards GitHub org events to Hall invoke.yml",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node index.js"
+  }
+}

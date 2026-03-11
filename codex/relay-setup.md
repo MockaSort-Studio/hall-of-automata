@@ -40,12 +40,14 @@ Events forwarded:
 
 ## 1. Create the relay app
 
+The relay code lives in [`deploy/relay/`](../deploy/relay/) in the Hall repo.
+
 ```bash
-mkdir hall-relay && cd hall-relay
-fly launch --name hall-relay --region lhr --no-deploy
+cd deploy/relay
+fly launch --name hall-relay --region lhr --no-deploy --copy-config
 ```
 
-Create two files:
+The folder contains:
 
 === "index.js"
 
@@ -161,6 +163,13 @@ The PAT needs only `actions: write` on `hall-of-automata` — nothing else. A fi
 ---
 
 ## 3. Deploy
+
+```bash
+# From repo root — the script checks for missing secrets and guides you
+bash deploy/relay/deploy.sh
+```
+
+Or manually from `deploy/relay/`:
 
 ```bash
 fly deploy

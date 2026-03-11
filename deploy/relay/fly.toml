@@ -1,0 +1,20 @@
+app = "hall-relay"
+primary_region = "lhr"
+
+[build]
+  # No Dockerfile needed — Fly detects Node.js from package.json
+
+[http_service]
+  internal_port = 8080
+  force_https   = true
+  auto_stop_machines  = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[vm]]
+  size = "shared-cpu-1x"
