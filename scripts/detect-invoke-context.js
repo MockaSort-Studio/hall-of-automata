@@ -168,22 +168,19 @@ module.exports = async ({ github, context, core }) => {
 
     const candidates = [];
     for (const env of envs) {
-      // Environment names with slashes must be percent-encoded in the API path.
-      // encodeURIComponent('invoker/alice') → 'invoker%2Falice'
-      const encodedName = encodeURIComponent(env.name);
       let count = 0;
       let cap   = 25;
       try {
         const r = await github.request(
           'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
-          { owner: hallOwner, repo: hallRepo, environment_name: encodedName, variable_name: 'HALL_USAGE_COUNT' }
+          { owner: hallOwner, repo: hallRepo, environment_name: env.name, variable_name: 'HALL_USAGE_COUNT' }
         );
         count = parseInt(r.data.value || '0', 10);
       } catch (_) { /* not set yet — default 0 */ }
       try {
         const r = await github.request(
           'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
-          { owner: hallOwner, repo: hallRepo, environment_name: encodedName, variable_name: 'HALL_WEEKLY_CAP' }
+          { owner: hallOwner, repo: hallRepo, environment_name: env.name, variable_name: 'HALL_WEEKLY_CAP' }
         );
         cap = parseInt(r.data.value || '25', 10);
       } catch (_) { /* not set yet — default 25 */ }
