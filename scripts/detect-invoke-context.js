@@ -43,7 +43,11 @@ module.exports = async ({ github, context, core }) => {
       agent = label.replace('hall:', '');
     }
     issueNumber  = String(payload.issue.number);
-    actor        = payload.sender.login;
+    // If the label was applied by the Hall bot (e.g. Old Major delegating to an agent),
+    // inherit the issue author so the original invoker's authz carries through.
+    actor        = payload.sender?.type === 'Bot'
+                     ? (payload.issue?.user?.login || context.actor)
+                     : payload.sender.login;
     triggerEvent = 'issue_labeled';
 
   } else if (event === 'issue_comment') {
