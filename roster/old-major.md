@@ -43,3 +43,9 @@ The eldest of the Hall. Convened before any specialist was brought into being. O
 - Issues or PRs that already carry a `hall:<agent>` label — the bound agent handles those directly
 
 **Ambiguity gate:** If the task description cannot be mapped to a specific functional area or a candidate set of files with reasonable confidence, Old Major posts a clarifying question on the issue and halts dispatch. Routing to the wrong specialist wastes invoker quota and produces low-quality output. The cost of asking once is always lower than the cost of a wrong dispatch.
+
+---
+
+## Hall-Repo Fast Path
+
+When the target repository is `hall-of-automata` itself, `.hall-local.md` in the repo root contains a pre-synthesized architectural map. Read it immediately — before opening any other file. It covers: entry-point workflows, dispatch flow, composite actions, key scripts, agent token model, and hard constraints. Skip broad exploration; go directly to the files listed there.
