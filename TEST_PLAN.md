@@ -28,10 +28,11 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 | Requirement | Detail |
 |-------------|--------|
 | Registered invoker | At least one account completed Phase A TC-INV-03 successfully (`hall:active-invoker` applied) |
-| `invoker/<handle>` environment | Created by onboarding; holds `CLAUDE_CODE_OAUTH_TOKEN` for the test invoker |
-| `hall/hamlet` environment | Either registered via onboarding or manually provisioned for the Hamlet smoke test |
-| Target repo | Any repo in the org where the App is installed |
-| Unauthorized user | A second account NOT in `automata-invokers` |
+| `invoker/<handle>` environment | Created by onboarding; holds `CLAUDE_CODE_OAUTH_TOKEN`, `HALL_USAGE_COUNT`, `HALL_WEEKLY_CAP` |
+| Agent in `agents.yml` | `hamlet` or `mergio` entry present on `main` (both are — no separate env required) |
+| Roster persona file | `roster/hamlet.md` or `roster/mergio.md` present on `main` (both are) |
+| Target repo | Any repo in the org where the App is installed (hall repo itself is fine) |
+| Unauthorized user | A second GitHub account NOT in `automata-invokers` |
 
 ---
 
@@ -198,7 +199,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ### TC-01 ★ — Label trigger, authorized invoker
 
-**Precondition:** Phase A complete; `hall/hamlet` environment exists; test invoker is `hall:active-invoker`.
+**Precondition:** Phase A complete; `hamlet` entry present in `agents.yml` on main; test invoker is `hall:active-invoker`.
 
 **Trigger:** Apply label `hall:hamlet` to an issue on the hall repo (or a target repo once relay is live).
 
@@ -251,15 +252,16 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ## TC-04 — Cap exceeded
 
-**Precondition:** Set `hamlet.weekly_cap` in `routing.yml` to 1 and dispatch once successfully first.
+**Precondition:** Lower `HALL_WEEKLY_CAP` on `invoker/<handle>` to 1 via repo Settings → Environments. Dispatch once successfully first so `HALL_USAGE_COUNT` reaches 1.
 
 **Trigger:** Attempt a second dispatch (any method).
 
 **Expected:**
-- Cap-exceeded comment posted: "hamlet has reached its weekly invocation cap (1). The request has been queued."
-- No agent run; counter NOT incremented beyond cap
+- Pool selection finds no under-cap invoker; `notify-queued` job fires
+- Cap-exceeded comment posted on the issue; `hall:invoker-queued` label applied
+- No agent run; counter NOT incremented
 
-**Verify:** issue has cap-exceeded comment; no new PR; restore `routing.yml` after test.
+**Verify:** issue has cap-exceeded comment; `hall:invoker-queued` label present; no new PR. Restore `HALL_WEEKLY_CAP` and zero `HALL_USAGE_COUNT` after test.
 
 ---
 
@@ -338,7 +340,7 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ## TC-09 — CI escalation
 
-**Precondition:** Task memory for the PR has `retry_count` ≥ `max_retries` (3 by default). Force this by manually editing the memory cache or running TC-08 enough times.
+**Precondition:** Task memory for the PR has `retry_count` ≥ `max_retries` (2 for hamlet/mergio). Force this by running TC-08 enough times or manually patching the memory cache entry.
 
 **Trigger:** Another CI failure on the same branch.
 

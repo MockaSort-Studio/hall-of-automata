@@ -204,7 +204,7 @@ jobs:
         env:
           AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
-        run: cp ".hall/roster/${AGENT}.md" CLAUDE.md
+        run: cat ".hall/agents/automaton_base.md" ".hall/roster/${AGENT}.md" > CLAUDE.md
 
       #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
