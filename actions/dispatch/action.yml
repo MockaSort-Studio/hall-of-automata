@@ -28,6 +28,8 @@ runs:
       run: echo "::add-mask::${{ inputs.oauth-token }}"
 
     - name: Run Claude Code Action
+      id: run-claude
+      continue-on-error: true
       uses: anthropics/claude-code-action@v1
       with:
         claude_code_oauth_token: ${{ inputs.oauth-token }}
@@ -38,3 +40,24 @@ runs:
         claude_args: "--max-turns ${{ inputs.max-turns }} --dangerously-skip-permissions"
         prompt: ${{ inputs.prompt }}
         show_full_output: "true"
+
+    # When the SDK exits before the agent writes dispatch-result.json (e.g. rate-limit hit),
+    # write it here so the post-dispatch steps can correctly route to the queued stage.
+    # The authorize step already validated the actor, so SDK-level failures at this point
+    # are most commonly rate-limit hits. The nightly retry job will re-trigger dispatch.
+    - name: Write dispatch-result on SDK failure
+      if: steps.run-claude.outcome == 'failure'
+      shell: bash
+      run: |
+        if [ -f ".hall/dispatch-result.json" ]; then
+          echo "dispatch-result.json already written by agent; skipping"
+          exit 0
+        fi
+        mkdir -p .hall
+        printf '{"outcome":"quota_exceeded","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
+        echo "Wrote dispatch-result.json with outcome: quota_exceeded"
+
+    - name: Propagate agent failure
+      if: steps.run-claude.outcome == 'failure'
+      shell: bash
+      run: exit 1
