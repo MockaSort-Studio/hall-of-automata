@@ -36,7 +36,12 @@ module.exports = async ({ github, context, core }) => {
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
     // Ignore system labels — they are applied by the Hall itself, not invokers
     if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
-    agent        = label.replace('hall:', '');
+    // hall:dispatch-automaton — standard invocation path; routes to Old Major for triage
+    if (label === 'hall:dispatch-automaton') {
+      agent = 'old-major';
+    } else {
+      agent = label.replace('hall:', '');
+    }
     issueNumber  = String(payload.issue.number);
     actor        = payload.sender.login;
     triggerEvent = 'issue_labeled';
@@ -47,25 +52,17 @@ module.exports = async ({ github, context, core }) => {
     core.info(`[detect] event=issue_comment sender=${payload.sender?.login} senderType=${senderType}`);
     if (senderType === 'Bot') { core.setOutput('agent', ''); return; }
 
-    const body  = payload.comment?.body || '';
-    // Path A — explicit @mention: @hall-of-automata[bot] <agent>  (or @hall-of-automata <agent>)
-    const mentionMatch = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w+)/i);
-    if (mentionMatch) {
-      core.info(`[detect] path=A mentionMatch=${mentionMatch[1]}`);
-      agent = mentionMatch[1];
-    } else {
-      // Path B — human reply while awaiting input: non-bot comment on a
-      // hall:awaiting-input labeled issue that also has a hall:{agent} label.
-      const labels     = payload.issue?.labels || [];
-      core.info(`[detect] path=B labels=${JSON.stringify(labels.map(l => l.name))}`);
-      const awaitLabel = labels.find(l => l.name === 'hall:awaiting-input');
-      core.info(`[detect] awaitLabel=${!!awaitLabel}`);
-      if (!awaitLabel) { core.setOutput('agent', ''); return; }
-      const hallLabel  = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
-      core.info(`[detect] hallLabel=${hallLabel?.name}`);
-      if (!hallLabel)  { core.setOutput('agent', ''); return; }
-      agent = hallLabel.name.replace('hall:', '');
-    }
+    // Reply while awaiting input: non-bot comment on a hall:awaiting-input
+    // labeled issue that also has a hall:{agent} label re-dispatches that agent.
+    const labels     = payload.issue?.labels || [];
+    core.info(`[detect] labels=${JSON.stringify(labels.map(l => l.name))}`);
+    const awaitLabel = labels.find(l => l.name === 'hall:awaiting-input');
+    core.info(`[detect] awaitLabel=${!!awaitLabel}`);
+    if (!awaitLabel) { core.setOutput('agent', ''); return; }
+    const hallLabel  = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name) && l.name !== 'hall:dispatch-automaton');
+    core.info(`[detect] hallLabel=${hallLabel?.name}`);
+    if (!hallLabel)  { core.setOutput('agent', ''); return; }
+    agent = hallLabel.name.replace('hall:', '');
     issueNumber  = String(payload.issue.number);
     actor        = payload.sender.login;
     triggerEvent = 'issue_comment';

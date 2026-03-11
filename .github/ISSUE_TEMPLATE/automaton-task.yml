@@ -1,14 +1,14 @@
 name: "⚔️ Automaton Quest"
 description: "Send a task to a registered automaton. The agent operates on what you provide here — fill it out completely."
 title: "[Quest]: <short description>"
-labels: []
+labels: [hall:dispatch-automaton]
 body:
   - type: markdown
     attributes:
       value: |
         The agent runs with only the context you supply here — no implicit knowledge of your repo or prior work.
-        After submitting, assign to `@hall-of-automata` and Old Major will pick the right specialist.
-        To invoke a specific agent directly, apply `hall:<agent>` instead of assigning.
+        Submitting this form applies `hall:dispatch-automaton`, which triggers Old Major to triage and route.
+        To invoke a specific agent directly, apply `hall:<agent>` as a label instead.
 
   - type: dropdown
     id: mode
