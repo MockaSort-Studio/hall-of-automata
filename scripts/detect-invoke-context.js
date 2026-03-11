@@ -109,7 +109,7 @@ module.exports = async ({ github, context, core }) => {
     core.setOutput('pr-number',   issueNumber);
     core.setOutput('review-body', body);
 
-  } else if (event === 'workflow_call') {
+  } else if (event === 'workflow_call' || event === 'workflow_dispatch') {
     triggerEvent = 'workflow_call';
     // actor stays as context.actor
 
