@@ -10,7 +10,7 @@ inputs:
     description: Current value read from vars.HALL_USAGE_COUNT in the calling job
     required: true
   environment-name:
-    description: Full GitHub Environment name (e.g. invoker/mksetaro)
+    description: Full GitHub Environment name (e.g. invoker/<githandle>)
     required: true
   repo-owner:
     description: Repository owner

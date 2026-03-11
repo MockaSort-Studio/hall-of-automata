@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Increments HALL_USAGE_COUNT for an invoker environment via the GitHub REST API.
-# Required env: CURRENT_COUNT, ENV_NAME (e.g. invoker/mksetaro), REPO_OWNER, REPO_NAME
+# Required env: CURRENT_COUNT, ENV_NAME (e.g. invoker/<githandle>), REPO_OWNER, REPO_NAME
 # GH_TOKEN must be set (GitHub App token with environments:write).
 # Output (GITHUB_OUTPUT): count=<new value>
 set -euo pipefail
