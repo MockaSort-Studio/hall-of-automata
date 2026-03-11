@@ -17,8 +17,10 @@ GitHub serves community health files from the org's `.github` repository. Templa
 ```bash
 gh repo create MockaSort-Studio/.github --public --description "Org-wide community health files"
 git clone https://github.com/MockaSort-Studio/.github
-cd .github && mkdir -p .github/ISSUE_TEMPLATE
+cd .github && mkdir -p ISSUE_TEMPLATE
 ```
+
+> **Important:** The `.github` repo *is* the `.github` folder from GitHub's perspective. Templates go in `ISSUE_TEMPLATE/` at the **repo root** — not inside a `.github/` subfolder.
 
 ### Copy templates from the Hall repo
 
@@ -26,9 +28,9 @@ cd .github && mkdir -p .github/ISSUE_TEMPLATE
 # From the cloned .github repo
 HALL=../hall-of-automata  # adjust path if needed
 
-cp $HALL/.github/ISSUE_TEMPLATE/automaton-task.yml      .github/ISSUE_TEMPLATE/
-cp $HALL/.github/ISSUE_TEMPLATE/invoker-onboarding.yml  .github/ISSUE_TEMPLATE/
-cp $HALL/.github/ISSUE_TEMPLATE/new-automaton.yml       .github/ISSUE_TEMPLATE/
+cp $HALL/.github/ISSUE_TEMPLATE/automaton-task.yml      ISSUE_TEMPLATE/
+cp $HALL/.github/ISSUE_TEMPLATE/invoker-onboarding.yml  ISSUE_TEMPLATE/
+cp $HALL/.github/ISSUE_TEMPLATE/new-automaton.yml       ISSUE_TEMPLATE/
 
 git add . && git commit -m "add Hall issue templates org-wide" && git push
 ```
@@ -75,7 +77,7 @@ Requires `gh` CLI authenticated with a token that has `write:org` or at minimum 
 
 ## Checklist — new org or new repo
 
-- [ ] `MockaSort-Studio/.github` repo exists with Hall templates in `.github/ISSUE_TEMPLATE/`
+- [ ] `MockaSort-Studio/.github` repo exists with Hall templates in `ISSUE_TEMPLATE/` (repo root)
 - [ ] `scripts/setup-hall-labels.sh` run for the target repo
 - [ ] Hall GitHub App installed on the target repo (Settings → Apps → hall-of-automata → Configure)
 - [ ] Webhook relay deployed and App webhook URL set to relay (see [Relay Setup](relay-setup.md))
