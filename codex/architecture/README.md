@@ -4,7 +4,7 @@ icon: material/map
 
 # Architecture
 
-The Hall of Automata runs on GitHub Actions backed by GitHub Deployments and Gists. No self-hosted runners. No external databases. All state lives in GitHub infrastructure.
+The Hall of Automata runs on GitHub Actions. No self-hosted runners. No external databases. All state lives in GitHub infrastructure — repository files, Environments, Actions Cache, and Artifacts.
 
 ---
 
@@ -12,61 +12,54 @@ The Hall of Automata runs on GitHub Actions backed by GitHub Deployments and Gis
 
 ```mermaid
 flowchart TB
-    subgraph ORG["GitHub Organization"]
-        subgraph ANYREPO["Any Repository"]
-            EV["Issue / PR\nassigned or labeled"]
+    subgraph HALL["hall-of-automata repo"]
+        subgraph EVENTS["Triggering Events"]
+            EV["Issue / PR\nlabeled, commented, or reviewed"]
         end
 
-        subgraph HALL["hall-of-automata repo"]
-            WF["GitHub Actions\nWorkflows"]
-            OM["roster/old-major.md\n(Old Major persona — repo exception)"]
+        subgraph CODE["Repository Files"]
+            WF["GitHub Actions Workflows"]
+            CATALOG["agents.yml\n(live agent catalog)"]
+            PERSONAS["roster/*.md\n(agent personas)"]
+            BASE["agents/automaton_base.md\n(base contract)"]
         end
 
-        subgraph ENVS["Hall Environments"]
-            subgraph ROSTER["hall/roster"]
-                RD["Deployment (singleton)\npayload: catalog JSON\n(all agents + gist refs)"]
-            end
-            subgraph AGENTENV["hall/\u003cagent\u003e"]
-                AV["Variables:\nHALL_USAGE_COUNT\nHALL_WEEKLY_CAP"]
-                AD["Deployment (singleton)\npayload:\npersona_gist_id\ndashboard_gist_id"]
-                AS["Secret:\nCLAUDE_CODE_OAUTH_TOKEN"]
-            end
+        subgraph INVOKERS["Invoker Pool — GitHub Environments"]
+            INV1["invoker/handle\nCLAUDE_CODE_OAUTH_TOKEN\nHALL_USAGE_COUNT · HALL_WEEKLY_CAP"]
+            INV2["invoker/handle2\nCLAUDE_CODE_OAUTH_TOKEN\nHALL_USAGE_COUNT · HALL_WEEKLY_CAP"]
         end
 
-        subgraph GISTS["GitHub Gists (per agent)"]
-            PG["persona.md\n(character sheet — HMI + dispatch source)"]
-            DG["dashboard.md\n(metrics · audit log · task history — HMI)"]
-        end
-
-        CACHE[("Actions Cache\nhall-task-{repo}-{pr}\n(task working memory)")]
+        CACHE[("Actions Cache\nhall-task-{repo}-{pr}\ntask working memory")]
+        ARTS[("Actions Artifacts\nhall-log-{agent}-{issue}-{run}\naudit log per dispatch")]
     end
 
-    subgraph RELAY["Fly.io Webhook Relay"]
-        RE["Validates webhook signature\nForwards to hall workflow_dispatch"]
-    end
+    CLAUDE["Anthropic\nInference"]
 
-    APP["Hall of Automata\nGitHub App"]
-
-    EV -->|webhook| APP
-    APP --> RE
-    RE -->|workflow_dispatch| WF
-    WF --- OM
-    WF -->|read catalog| RD
-    WF -->|read/write lifecycle| AD
-    WF -->|read cap & usage| AV
-    WF -->|read OAuth token| AS
-    WF -->|fetch persona| PG
-    WF -->|update dashboard| DG
+    EV -->|trigger| WF
+    WF -->|pool-select least-used| INVOKERS
+    WF -->|read catalog| CATALOG
+    WF -->|inject persona| PERSONAS
+    WF -->|base contract| BASE
     WF -->|task memory| CACHE
+    WF -->|audit| ARTS
+    INVOKERS -->|OAuth token| CLAUDE
 ```
 
 ---
 
 ## Invocation paths
 
-**Labeled path** — a `hall:<agent>` label is applied to an issue or PR. The named agent is dispatched directly. No Old Major triage step.
+**Labeled path** — a `hall:<agent>` label is applied to an issue or PR. The named agent is dispatched directly.
 
-**Assignment path** — a issue or PR is assigned to `@hall-of-automata` without specifying an agent. Old Major runs first: reads the roster catalog from the `hall/roster` deployment, analyzes the task, selects the most capable available agent, synthesizes the task context, and dispatches the specialist. If confidence is insufficient, Old Major posts a clarifying question and enters the awaiting-input state.
+**Comment path** — `@hall-of-automata[bot] <agent>` is posted as a comment. The named agent is dispatched directly.
+
+**Awaiting-input path** — an issue has `hall:awaiting-input` and `hall:<agent>` labels, and a human posts a new comment. The same agent is re-dispatched with the reply as additional context.
+
+**PR review path** — a reviewer `@mention`s the bot in a pull request review. The agent is re-dispatched with the review feedback appended to its task memory.
+
+**CI failure path** — a failing check suite on a `hall/*` branch triggers `hall-ci-loop.yml`. The agent is re-dispatched up to `max_retries` times before keeper escalation.
+
+**Assignment path** *(planned)* — an issue is assigned to `@hall-of-automata` without specifying an agent. Old Major runs first to triage, select the right specialist, and synthesize context.
 
 ---
 
@@ -74,13 +67,16 @@ flowchart TB
 
 ```
 Event
-  ├─ labeled      → authorize → fetch persona (gist) → dispatch specialist
-  └─ assigned     → authorize → dispatch Old Major
-                                    └─ triage → synthesize context
-                                         └─ fetch persona (gist) → dispatch specialist
+  ├─ labeled / comment / review / CI
+  │     └─ detect → pool-select invoker → authorize
+  │                     └─ inject persona → dispatch agent → status card → counter → audit
+  │
+  └─ assigned (planned)
+        └─ detect → dispatch Old Major (triage)
+                        └─ select specialist → inject persona → dispatch specialist
 ```
 
-In both paths: persona is fetched from the agent's gist (via the `hall/<agent>` deployment payload), assembled with the base contract into CLAUDE.md, and the target repo's own CLAUDE.md (if any) is stashed as `.hall-local.md` for the agent to read.
+In all current paths: the workflow checks out the Hall repo, reads `roster/{agent}.md` and `agents/automaton_base.md`, assembles them into `CLAUDE.md` in the workspace, and runs the Claude Code Action in a pool-selected `invoker/<handle>` environment. The CLAUDE.md is never committed — the runner is ephemeral.
 
 ---
 
@@ -90,10 +86,10 @@ In both paths: persona is fetched from the agent's gist (via the `hall/<agent>` 
 |----------|---------------|
 | [`runner-model.md`](runner-model.md) | GitHub-hosted runners, persona injection, state persistence |
 | [`permissions-model.md`](permissions-model.md) | GitHub teams as the authorization layer |
-| [`secrets-model.md`](secrets-model.md) | Keeper environments, secrets, variables, and deployment payloads |
+| [`secrets-model.md`](secrets-model.md) | Invoker pool environments, secrets, and variables |
 
 ---
 
 ## Design rationale
 
-The full record of options considered and why this architecture was chosen is in [`codex/design-options.md`](../codex/design-options.md).
+The full record of options considered and why this architecture was chosen is in [`codex/design-options.md`](../design-options.md).

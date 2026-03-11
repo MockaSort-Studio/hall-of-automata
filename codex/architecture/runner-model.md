@@ -8,12 +8,11 @@ icon: material/robot
 
 | Layer | Where it runs | What it does |
 |-------|--------------|-------------|
-| **Detect job** | GitHub-hosted runner | Thin event parsing: trigger type, invoker, agent (if labeled), issue/PR number |
-| **Old Major triage job** | GitHub-hosted runner (pool-selected `invoker/<handle>` env) | Reads roster catalog, analyzes task, selects agent, synthesizes context. Only runs on the assignment path. |
-| **Dispatch job** | GitHub-hosted runner (pool-selected `invoker/<handle>` env) | Persona injection, Claude Code Action, status card, counter update, audit log |
+| **Detect job** | GitHub-hosted runner | Thin event parsing: trigger type, actor, agent (if labeled), issue/PR number; pool-selects invoker |
+| **Dispatch job** | GitHub-hosted runner (`invoker/<handle>` env) | Persona injection, Claude Code Action, status card, counter update, audit log |
 | **Claude inference** | Anthropic infrastructure | Language model processing; called by the Claude Code Action via OAuth token |
 
-The GitHub runner checks out the target repository, assembles the CLAUDE.md context file from the base contract and agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner.
+The GitHub runner checks out the Hall repo, assembles the CLAUDE.md context file from the base contract and agent persona, and runs `anthropics/claude-code-action@v1`. The action drives the agentic loop: calling Claude, executing bash/file tools, and committing results — all on the runner.
 
 ---
 
@@ -52,9 +51,19 @@ This ensures at most one active dispatch per agent per issue at any time. Re-dis
 
 ---
 
-## GitHub Environments and secret isolation
+## Invoker pool and environment selection
 
-Each agent's OAuth token lives in a GitHub Environment (`hall/{agent}`). The dispatch job declares `environment: hall/{agent}` (computed dynamically from the detected agent). This gives access to that environment's secrets and allows environment-level protection rules (e.g., required reviewers for certain agents).
+Each dispatch runs in the environment of the pool-selected invoker (`invoker/<handle>`). Pool selection happens in the `detect` job via `scripts/detect-invoke-context.js`, which:
+
+1. Lists all `invoker/*` environments via the GitHub Environments API
+2. Reads `HALL_USAGE_COUNT` and `HALL_WEEKLY_CAP` for each
+3. Filters out members at or over cap
+4. Sorts by `HALL_USAGE_COUNT` ascending
+5. Outputs the least-used member as `invoker`
+
+The dispatch job then declares `environment: invoker/<handle>` dynamically. This gives access to that environment's `CLAUDE_CODE_OAUTH_TOKEN` secret.
+
+If the pool is exhausted (all members at cap), the `invoker` output is empty, the `notify-queued` job fires, and the dispatch job is skipped.
 
 ---
 
@@ -63,12 +72,11 @@ Each agent's OAuth token lives in a GitHub Environment (`hall/{agent}`). The dis
 At dispatch time, the workflow assembles the agent's operating context:
 
 1. Read `agents/automaton_base.md` from the Hall repo (checked out in the workflow)
-2. Fetch the agent's persona character sheet from its Gist (ID read from the `hall/<agent>` deployment payload)
+2. Read `roster/{agent}.md` from the Hall repo — the agent's character sheet
 3. Concatenate base contract + persona → write to `CLAUDE.md` in the workspace root
-4. If the target repo has its own `CLAUDE.md`: move it to `.hall-local.md` before writing the Hall's CLAUDE.md
-5. Pass task context as the `prompt` input to the Claude Code Action, including an instruction to read `.hall-local.md` and extract hard constraints
+4. Pass task context as the `prompt` input to the Claude Code Action
 
-`CLAUDE.md` and `.hall-local.md` are never committed. The runner is ephemeral — they exist only for the duration of the dispatch job. The base contract (`automaton_base.md`) explicitly prohibits the agent from committing either file.
+`CLAUDE.md` is never committed. The runner is ephemeral — it exists only for the duration of the dispatch job. The base contract (`automaton_base.md`) explicitly prohibits the agent from committing the file.
 
 ---
 
@@ -76,14 +84,11 @@ At dispatch time, the workflow assembles the agent's operating context:
 
 The runner is ephemeral, but task state persists between runs via:
 
-- **Actions Cache:** per-task working memory (`hall-task-{repo}-{pr}`). Keyed by PR so multiple concurrent tasks on different PRs never collide.
-- **GitHub Deployments:** automaton lifecycle. `hall/<agent>` env holds a singleton deployment whose payload maps `persona_gist_id` and `dashboard_gist_id`. Updated (not recreated) on each invocation.
-- **GitHub Gists:** persona and dashboard content. Dashboard gist is appended after each dispatch with an audit log entry and updated metrics.
-- **Environment variables (`HALL_USAGE_COUNT`, `HALL_WEEKLY_CAP`):** keeper usage tracking. Written by the workflow via the GitHub API after each successful dispatch.
+- **Actions Cache:** per-task working memory (`hall-task-{repo}-{pr}`). Keyed by PR so multiple concurrent tasks on different PRs never collide. 7-day TTL; deleted on PR close by `hall-cleanup.yml`.
+- **Environment variables (`HALL_USAGE_COUNT`, `HALL_WEEKLY_CAP`):** invoker usage tracking. Written by the workflow via the GitHub API after each successful dispatch.
 - **Actions Artifacts:** immutable invocation audit logs (`hall-log-{agent}-{issue}-{run_id}`)
 - **GitHub issue/PR thread:** permanent human-readable task history; serves as fallback context if cache expires
-
-See `architecture/` overall and the design document for the full state model.
+- **`agents.yml` and `roster/*.md`:** live catalog and persona state, version-controlled in the Hall repo
 
 ---
 
@@ -91,7 +96,8 @@ See `architecture/` overall and the design document for the full state model.
 
 | Tradeoff | Consequence |
 |----------|-------------|
-| GitHub-hosted runners only | No persistent environment, no local tooling beyond what the runner image provides; target repo must be checked out |
+| GitHub-hosted runners only | No persistent environment; target repo must be checked out |
 | App private key in repo secrets | Visible to repo admins — see [`secrets-model.md`](secrets-model.md) |
 | Cache as working memory | 7-day expiry; agent reconstructs from issue thread on miss |
-| Dynamic `environment:` expression | GitHub evaluates this at job start; the environment must exist before the first dispatch |
+| Dynamic `environment:` expression | GitHub evaluates this at job start; the invoker environment must exist before the first dispatch |
+| Pool-based token model | No dedicated per-agent token; any invoker's token can run any agent |

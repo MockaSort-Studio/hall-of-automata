@@ -6,9 +6,9 @@
 
 ## Status
 
-**Phases 1–4 complete. Phase 5 (architecture redesign per Lore Keeper review) is in progress — documentation rewritten, implementation not yet started.**
+**Phases 1–4 complete. Phase A smoke test complete. Phase B (task dispatch baseline) is next.**
 
-The system works end-to-end for a single named-agent dispatch. Before implementing Phase 5 code changes, run the smoke test on the hall repo to establish a working baseline.
+The system works end-to-end for invoker onboarding, automaton onboarding, and named-agent dispatch. The invoker pool model is live with `mksetaro` as active invoker. Old Major provisioned `mergio` (PR #11). Phase B tests named-agent task dispatch on real issues.
 
 ---
 
@@ -17,18 +17,17 @@ The system works end-to-end for a single named-agent dispatch. Before implementi
 ### Prerequisites (👤)
 - GitHub App registered (`hall-of-automata[bot]`), App ID and private key stored as repo secrets
 - Bot avatar uploaded
-- `hamlet` keeper OAuth token generated via `claude setup-token`, stored in `hall/hamlet` Environment
 - `automata-invokers` team verified
-- Trigger labels created in target repos
+- Trigger labels created
 
 ### Phase 1 — Repo structure
-- `agents.yml` · `routing.yml` · `actions/` skeletons · `roster/hamlet.md` as persona file
+- `agents.yml` · `routing.yml` · `actions/` skeletons · `roster/old-major.md` as persona file
 - Generic `invoke.yml` replaces per-agent workflow files
 
 ### Phase 2 — Dispatch core
 - `actions/authorize` — team membership gate, rejection comment, label removal
 - `actions/status-card` — upsert `<!-- hall-status -->` comment across full lifecycle
-- `actions/counter` — weekly invocation counter via Actions Cache
+- `actions/counter` — weekly invocation counter via Environments API (`HALL_USAGE_COUNT`)
 - `actions/dispatch` — runs `claude-code-action@v1` with OAuth token and persona
 - `actions/post-dispatch` — applies `hall:{agent}` label to opened PR, uploads audit artifact
 - `invoke.yml` — two-job workflow: detect trigger context → dispatch agent
@@ -44,241 +43,86 @@ The system works end-to-end for a single named-agent dispatch. Before implementi
 - `scripts/` — all inline bash and JS extracted from workflows into standalone files
 - `awaiting-input` state — status card stage + `hall:awaiting-input` label + auto-re-dispatch on human reply
 - Issue template updated with `@mention` + label invocation instructions
-- Docs reconciled: `secrets-model.md`, `runner-model.md`, `federation/joining.md`, `roster/hamlet.md`
+- Invoker pool model: `detect-invoke-context.js` pool-selects least-used under-cap invoker
+- Weekly reset: `weekly-reset.yml` zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC
+- Token validation hardened: curl 000 fails; only HTTP 429 counts as a valid probe pass
+- `agents.yml` `author` field (replaces `invoker`) — credits creator, no runtime binding
+- `onboard-automaton.yml`: Old Major creates PR (not direct push); `max_turns` 30; counter increment
 
 ---
 
-## Phase 5 — Architecture redesign (Lore Keeper review)
+## Phase A smoke test — COMPLETE ✅
 
-> Design documents updated. Implementation not started. Smoke test first.
+All test cases passed.
 
-### 📐 Design changes (complete)
-- `codex/design_document.md` — UC-1/4/5/6 revised; FR-12 through FR-18 added; NFR-1 updated; storage table updated; Appendix C updated
-- `codex/architecture/README.md` — new architecture diagram with all components
-- `codex/architecture/runner-model.md` — persona injection model, new execution layers
-- `codex/architecture/secrets-model.md` — env variables, deployment payloads, keeper topology
-- `agents/automaton_base.md` — canonical base contract (merged from base-behavior_old.md)
-- `agents/automaton_template.md` — character sheet format (replaces Jinja2 template)
-- `agents/personality-guide.md` — updated to gist-hosted personas, catalog entry concept
-- `roster/old-major.md` — full character sheet
-- `agents.yml` — new schema with `display_name`, `catalog` block, `old-major` entry
-
-### � Keeper prerequisites — provision before first test
-
-These must exist before any workflow run that routes to Old Major.
-
-- [ ] Create GitHub Environment `hall/roster` in repo Settings → Environments (or run `bash scripts/bootstrap-old-major.sh`)
-  - No secrets needed at this stage — Old Major writes the deployment payload
-  - Seed deployment created automatically by bootstrap script
-- [ ] Register at least one invoker via the onboarding issue template before running automaton onboarding
-  - Old Major (onboard-automaton.yml) uses the invoker pool for its token — no dedicated `hall/old-major` env
-- [ ] Verify the GitHub App has permissions: `environments: write`, `deployments: write`, `contents: write`, `issues: write`
-
-**First test — onboarding smoke:**
-1. File a `new-automaton` issue using the template (fill in a real or dummy character sheet)
-2. Template auto-applies `hall:onboard-automaton` → `onboard-automaton.yml` fires; `select-invoker` picks least-used invoker from pool; `analyze` job runs in `invoker/<handle>` env
-3. Old Major reads the issue, creates the persona gist, creates the keeper environment, seeds the roster deployment, updates `agents.yml`, posts keeper instructions on the issue
-4. Verify each artifact exists before proceeding to Phase 5 code tasks
+- ✅ TC-INV-01 — invoker onboarding happy path
+- ✅ TC-INV-02 — duplicate registration rejected
+- ✅ TC-INV-03 — invalid token rejected (curl 000 → fail)
+- ✅ TC-INV-04 — cap enforcement
+- ✅ TC-INV-05 — weekly reset
+- ✅ TC-AUT-01 — automaton onboarding (Old Major dispatched)
+- ✅ TC-AUT-02 — Old Major creates PR with agents.yml + roster file
+- ✅ TC-AUT-03 — PR merged, agents.yml updated on main
+- ✅ TC-AUT-04 — counter incremented after Old Major dispatch
 
 ---
 
-### �🔧 Code tasks — new invocation path (Old Major triage)
+## Phase B — Task dispatch baseline
 
-- [ ] `invoke.yml`: add `assignment` trigger (`issues.assigned` to `@hall-of-automata`)
-- [ ] `invoke.yml`: add `triage` job — pool-selects invoker (same pattern as detect job), runs in pool-selected `invoker/<handle>` env, reads roster catalog from `hall/roster` deployment, outputs `selected_agent` + `task_context`
-- [ ] `invoke.yml`: dispatch job reads from both detect (labeled path) and triage (assignment path) outputs
-- [ ] `scripts/detect-invoke-context.js`: add assignment path detection
-- [ ] `roster/old-major.md`: persona already written; Old Major env + deployment must be provisioned (👤)
-
-### ✅ Code tasks — keeper env variables (replace Actions Cache counter)
-
-- [x] `actions/counter/action.yml`: replace cache-based counter with Environments API read/write on `HALL_USAGE_COUNT`
-- [x] Cap check in `detect` job via REST API (pool-based: all `invoker/*` envs queried, least-used under-cap member selected); `check-invoker-cap` job removed — superseded
-- [x] `notify-queued` job added: fires when pool is exhausted (invoker == ''), posts comment + applies `hall:invoker-queued`
-- [x] Pool-based invoker selection: `detect-invoke-context.js` queries all `invoker/*` envs, filters at-cap members, sorts by usage, picks first; outputs `actor` (for authz) and `invoker` (selected pool member)
-- [x] Weekly reset: `weekly-reset.yml` scheduled workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC
-
-### 🔧 Code tasks — deployment lifecycle
-
-- [ ] Create `hall/roster` environment + seed deployment with hamlet catalog entry (👤 + 🔧)
-- [ ] `actions/post-dispatch`: update `hall/<agent>` deployment after dispatch (status + audit append)
-- [ ] `actions/cleanup`: append completed-task entry to dashboard gist on PR close
-- [ ] Onboarding workflow (new): issue template → Old Major → creates env + deployment + gists → instructs keeper
-
-### 🔧 Code tasks — persona injection model
-
-- [ ] `invoke.yml` dispatch job: fetch persona from gist (via deployment payload) instead of copying roster file
-- [ ] `invoke.yml` dispatch job: stash target repo CLAUDE.md as `.hall-local.md` before writing Hall's CLAUDE.md
-- [ ] `actions/dispatch`: pass task context as `prompt` input (currently unused path)
-- [ ] Remove `scripts/inject-ci-context.sh` and `scripts/append-review-context.sh` — context synthesis moves to Old Major or prompt construction
-
-### ✅ Code tasks — unauthorized invocation hardening (FR-17)
-
-- [x] `actions/authorize`: hard `core.setFailed()` + label removal + comment in one combined step
-- [x] All `if: steps.auth.outputs.authorized == 'true'` guards removed from `invoke.yml`
-
-### ✅ Code tasks — dispatch outcome contract
-
-- [x] `automaton_base.md`: agent must write `.hall/dispatch-result.json` with full outcome enum (`pr_created`, `awaiting_input`, `comment_posted`, `quota_exceeded`, `failed`)
-- [x] `scripts/find-agent-pr.js`: reads dispatch-result.json first, falls back to API branch query
-- [x] `scripts/resolve-final-stage.sh`: maps all outcome values to status-card stages incl. `queued`
-- [x] `actions/status-card/action.yml`: `comment-posted`, `queued`, `failed` stage labels added
-- [x] `post-dispatch`: `outcome` input uses `steps.final.outputs.stage` (semantic) not step conclusion
-
-### ✅ Code tasks — co-authorship (FR-16)
-
-- [x] Co-authored-by instruction in `automaton_base.md`; verify claude-code-action honours commit trailers in live test
-
-### ✅ Code tasks — cleanup finalization
-
-- [x] `post-dispatch`: semantic `outcome` fixed (uses `steps.final.outputs.stage`)
-- [ ] `actions/cleanup`: make summary comment mandatory (remove `if: inputs.issue-number != ''` guard for comment step)
-- [ ] `hall-cleanup.yml` detect step: extract inline JS to `scripts/detect-cleanup-context.js`
-
----
-
-## Open items (known gaps, unchanged from Phase 4)
-
-| Item | Impact | Priority |
-|------|--------|----------|
-| No webhook relay | Hall only reacts to its own repo events | Before full org use |
-| FR-9 routing implementation | Cap exceeded → queue instead of route | Phase 5 |
-| PR size cap enforcement | No diff size limit | Investigate |
-| Agent display names with emoji in status card | Raw slug used | Low |
-
----
-
-## Order of remaining work
-
-### Phase A — Onboarding smoke (TEST_PLAN.md Phase A)
-
-> Blocking. Nothing else is testable without registered invokers and automata.
-
-- [ ] 👤 Provision `hall/roster` environment + seed deployment (run `bash scripts/bootstrap-old-major.sh`)
-- [ ] 👤 Create all labels (`hall:onboard-invoker`, `hall:onboard-automaton`, `hall:active-invoker`, `hall:awaiting-input`, `hall:queued`, `hall:invoker-queued`)
-- [ ] 👤 Verify GitHub App permissions (environments, deployments, contents, issues: write)
-- [ ] Run TC-INV-01 through TC-INV-05 (invoker onboarding)
-- [ ] Run TC-AUT-01 through TC-AUT-04 (automaton onboarding)
-
-### Phase B — Task dispatch baseline (TEST_PLAN.md Phase B)
-
-> Requires at least one registered invoker and `hall/hamlet` provisioned via onboarding.
+> Requires at least one registered invoker. `mergio` is provisioned on main (PR #11 merged).
 
 - [ ] Run TC-01 (label trigger, authorized)
 - [ ] Run TC-02 (@mention trigger)
 - [ ] Run TC-03 (unauthorized hard-fail)
-- [ ] Run TC-04 (cap exceeded)
+- [ ] Run TC-04 (cap exceeded → queued)
 - [ ] Run TC-05 + TC-06 (awaiting-input state + re-dispatch)
 - [ ] Run TC-07 (PR review → re-dispatch)
 - [ ] Run TC-08 + TC-09 (CI loop + escalation)
 - [ ] Run TC-10 + TC-11 (cleanup on merge and close)
-- [ ] Run TC-12 (weekly counter)
+- [ ] Run TC-12 (weekly counter reset)
 
-### Phase C — Code tasks (post Phase B green)
+---
+
+## Phase C — Code tasks (post Phase B green)
 
 In priority order:
 
-1. **Unauthorized hardening + cleanup fixes** — smallest scope, highest safety impact
-   - `actions/authorize`: hard `core.setFailed()` + tag `@automata-invokers` in rejection
-   - Remove `if: steps.auth.outputs.authorized == 'true'` guards (hard fail makes them redundant)
-   - `actions/cleanup`: make summary comment mandatory; extract detect JS; fix `outcome` semantics
+### 1. 🔧 Cleanup fixes (small scope, high safety)
+- [ ] `actions/cleanup`: make summary comment mandatory (remove `if: inputs.issue-number != ''` guard)
 
-2. **Keeper env variables** — replace Actions Cache counter
-   - `actions/counter`: read/write `HALL_USAGE_COUNT` via Environments API
-   - Remove `check-weekly-cap.sh` gate from dispatch job; cap check moves to pre-dispatch guard
-   - Add weekly reset scheduled workflow
+### 2. 🔧 Old Major triage + assignment trigger
+- [ ] `invoke.yml`: add `issues.assigned` trigger
+- [ ] `invoke.yml`: add `triage` job — pool-selects invoker, dispatches Old Major to read catalog, select agent, synthesize context
+- [ ] `invoke.yml`: dispatch job reads from both detect (labeled path) and triage (assignment path) outputs
+- [ ] `scripts/detect-invoke-context.js`: add assignment path detection
 
-3. **Persona injection model**
-   - Fetch persona from gist URL in deployment payload instead of repo file copy
-   - Stash target repo `CLAUDE.md` as `.hall-local.md` before overwriting
-   - Remove `inject-ci-context.sh` and `append-review-context.sh` (context synthesis moves to Old Major)
+### 3. ⚠️ Known gaps (investigate, no commit yet)
+- [ ] PR size cap: enforce 800 LOC limit — persona instruction vs. post-dispatch CI gate; configurable per agent in `agents.yml`
+- [ ] Agent display names with emoji in status card (raw slug used, not `display_name`)
 
-4. **Old Major triage + assignment trigger**
-   - `invoke.yml`: add `issues.assigned` trigger; add `triage` job (Old Major selects agent + context)
-   - `detect-invoke-context.js`: assignment path detection
+---
 
-5. **Deployment lifecycle**
-   - `actions/post-dispatch`: update `hall/<agent>` deployment after each dispatch
-   - `actions/cleanup`: append completed-task entry to dashboard gist on PR close
+## Phase D — Webhook relay + full org test
 
-### Phase D — Webhook relay + full org test
-
-- Fly.io relay for cross-repo event routing
+- Fly.io / Cloudflare Worker relay for cross-repo event routing
 - Full org smoke test across multiple target repos
 
-### Prerequisites (👤)
-- GitHub App registered (`hall-of-automata[bot]`), App ID and private key stored as repo secrets
-- Bot avatar uploaded
-- `hamlet` keeper OAuth token generated via `claude setup-token`, stored in `hall/hamlet` Environment
-- `automata-invokers` team verified
-- Trigger labels created in target repos
+**Why it's needed:** GitHub delivers workflow events only to the repo where the event occurs. The Hall's `invoke.yml` currently only fires on events within the hall-of-automata repo itself.
 
-### Phase 1 — Repo structure
-- `agents.yml` · `routing.yml` · `actions/` skeletons · `roster/hamlet.md` as persona file
-- Generic `invoke.yml` replaces per-agent workflow files
+**What it does:**
+1. Receives GitHub App webhook (any org repo event)
+2. Validates signature with the App's webhook secret
+3. Calls `POST /repos/MockaSort-Studio/hall-of-automata/actions/workflows/invoke.yml/dispatches`
 
-### Phase 2 — Dispatch core
-- `actions/authorize` — team membership gate, rejection comment, label removal
-- `actions/status-card` — upsert `<!-- hall-status -->` comment across full lifecycle
-- `actions/counter` — weekly invocation counter via Actions Cache
-- `actions/dispatch` — runs `claude-code-action@v1` with OAuth token and persona
-- `actions/post-dispatch` — applies `hall:{agent}` label to opened PR, uploads audit artifact
-- `invoke.yml` — two-job workflow: detect trigger context → dispatch agent
-
-### Phase 3 — Task lifecycle
-- `actions/memory` — save/restore task JSON blob via Actions Cache (keyed by PR)
-- `hall-ci-loop.yml` — detects failing CI on `hall/*` branches, re-dispatches or escalates
-- `invoke.yml` pr_review path — restores memory, appends review feedback, re-dispatches
-- Keeper escalation — @mention on PR after `max_retries` exhausted
-- `hall-cleanup.yml` + `actions/cleanup` — deletes memory, removes labels, posts issue summary
-
-### Phase 4 — Polish
-- `scripts/` — all inline bash and JS extracted from workflows into standalone files
-- `awaiting-input` state — status card stage + `hall:awaiting-input` label + auto-re-dispatch on human reply
-- Issue template updated with `@mention` + label invocation instructions
-- Docs reconciled: `secrets-model.md`, `runner-model.md`, `federation/joining.md`, `roster/hamlet.md`
+**Build after** Phase B passes.
 
 ---
 
 ## Open items
 
-### 🔧 Semantic `outcome` in audit log
-
-`post-dispatch` receives `outcome: ${{ steps.agent.outcome || 'skipped' }}` which is a GitHub step conclusion (`success`/`failure`/`skipped`), not the semantic outcome defined in Appendix E (`pr_created`, `comment_posted`, `awaiting_input`, `failed`).
-
-Fix: pass `${{ steps.final.outputs.stage }}` as an additional input or derive the semantic outcome from the final stage in `post-dispatch` itself.
-
----
-
-## Known limitations
-
-| Limitation | Impact | When to fix |
-|------------|--------|-------------|
-| No webhook relay | Hall only reacts to events on the hall repo itself; target repos don't trigger the Hall automatically | Before real multi-repo use — see relay notes below |
-| `post-dispatch` pre-built inputs unused (`turns-used`, `turns-max`, `retry-count`, `rerouted`) | Audit log always shows `0`/`false` for these fields | When FR-9 routing is implemented |
-| `hall-cleanup.yml` detect step stays inline JS | Minor style inconsistency; step runs before checkout so extraction would require an extra sparse checkout step | Low priority |
-| PR size cap (800 LOC) | No limit on how large an agent's PR diff can be | Investigate: persona instruction vs. post-dispatch CI gate; configurable per agent in `agents.yml` |
-| Agent display names with emoji | Status card and comments use the raw slug (`hamlet`) not the display name (`hamlet 🐗`) | Add `display_name` field to `agents.yml`; update status-card and comment templates |
-
----
-
-## Webhook relay — 👤 next infrastructure task
-
-**Why it's needed.** GitHub delivers workflow events only to the repo where the event occurs. The Hall's `invoke.yml` currently only fires on events within the hall-of-automata repo itself. For true org-wide operation, a relay is required.
-
-**What it does:**
-1. Receives GitHub App webhook (any org repo event)
-2. Validates signature with the App's webhook secret
-3. Calls `POST /repos/MockaSort-Studio/hall-of-automata/actions/workflows/invoke.yml/dispatches` with the event payload forwarded as `workflow_dispatch` inputs
-
-**Hosting options:** Cloudflare Worker, Fly.io, GitHub App proxy. Fewer than 100 lines. The relay only validates a signature and calls one API endpoint.
-
-**Build it after** a successful end-to-end smoke test on the hall repo (see `TEST_PLAN.md`).
-
----
-
-## Order of remaining work
-
-```
-Smoke test (TEST_PLAN.md) → FR-9 routing → webhook relay → full org test
-```
+| Item | Impact | Priority |
+|------|--------|----------|
+| No webhook relay | Hall only reacts to its own repo events | Before full org use |
+| PR size cap not enforced | No diff size limit | Investigate |
+| Agent display names with emoji | Raw slug used in status card | Low |
+| `post-dispatch` pre-built inputs unused (`turns-used`, `retry-count` always 0) | Audit log incomplete | When FR-9 routing is implemented |
