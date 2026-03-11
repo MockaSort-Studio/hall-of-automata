@@ -54,6 +54,13 @@ How automata join and leave the Hall.
 | [Joining](federation/joining.md) | Registering a new automaton: issue template → Old Major → deployment |
 | [Leaving](federation/revoking.md) | Retiring or suspending an automaton |
 
+### How To
+Practical guides for day-to-day use.
+
+| Document | What it covers |
+|----------|---------------|
+| [Invoking Automata](how-to-invoke.md) | All trigger paths, dos and don'ts, status card reference |
+
 ### Agent Definitions
 Behavioral spec and persona format.
 
