@@ -140,9 +140,11 @@ Two distinct queued scenarios exist:
 
 **Onboarding-time:** The invoker's token probe returns HTTP 429 (quota exhausted but token valid). Both `hall:active-invoker` and `hall:invoker-queued` labels are applied. The issue is closed with a "queued" message. The invoker is registered and will dispatch as soon as quota resets.
 
-**Dispatch-time:** The entire invoker pool is at cap when a dispatch is attempted. The `detect` job finds no eligible invoker; the `notify-queued` job posts a pool-exhausted comment and applies `hall:invoker-queued`. The dispatch job does not run. Alternatively, the agent itself hits a quota limit mid-dispatch and writes `quota_exceeded` to the dispatch result; the status card updates to "Queued — weekly quota reached".
+**Dispatch-time (pool exhausted):** The entire invoker pool is at cap when a dispatch is attempted. The `detect` job finds no eligible invoker; the `notify-queued` job posts a pool-exhausted comment and applies `hall:invoker-queued`. The dispatch job does not run.
 
-In all cases the weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC. Automatic retry of queued tasks is deferred to Phase C-4.
+**Dispatch-time (Claude API quota):** The agent hits Claude API quota mid-dispatch and writes `quota_exceeded` to `.hall/dispatch-result.json`. The post-dispatch step posts a "quota hit — queuing task" comment, applies `hall:queued`, and updates the status card. A nightly job (`retry-queued.yml`, 03:00 UTC) finds all open issues labeled `hall:queued`, removes the label, and cycles the bound agent label to re-trigger `invoke.yml`. If the retry also hits quota, the agent writes `quota_exceeded` again, `hall:queued` is re-applied, and the next nightly run picks it up. No loop — one attempt per nightly run.
+
+In all cases the weekly-reset workflow zeroes `HALL_USAGE_COUNT` every Monday 00:00 UTC.
 
 
 ### End-to-End Lifecycle
@@ -157,8 +159,9 @@ flowchart LR
         MN --> AU{"Authorized?"}
         AU -->|No| RJ["Rejected"]
         AU -->|Yes| POOL{"Invoker<br/>available?"}
-        POOL -->|"Pool exhausted"| RT["Request queued"]
+        POOL -->|"Pool exhausted"| RT["Request queued\nhall:invoker-queued"]
         POOL -->|Selected| AG["Agent dispatched"]
+        AG -->|"Quota hit"| QT["Quota queued\nhall:queued\nnightly retry"]
     end
 
     subgraph WORK["Agent Work"]

@@ -44,8 +44,9 @@ module.exports = async ({ github, context, core }) => {
       )).data.value || '25', 10);
     } catch (_) { /* not set — default 25 */ }
     core.info(`[select-invoker] ${env.name}: count=${count} cap=${cap}`);
+    const handle = env.name.replace(/^(?:invoker|keeper)\//, '');
     if (count < cap) {
-      candidates.push({ handle: env.name.replace(/^(?:invoker|keeper)\//, ''), count });
+      candidates.push({ handle, count });
     }
   }
 

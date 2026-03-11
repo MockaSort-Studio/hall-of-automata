@@ -19,7 +19,7 @@ elif [ -n "$FIND_PR" ]; then
   echo "branch=$BRANCH"          >> "$GITHUB_OUTPUT"
 elif [ "${AGENT_OUTCOME:-}" = "quota_exceeded" ]; then
   # Claude API quota exhausted mid-dispatch. Request is queued; no PR, no question.
-  # Routing (least_used) will be implemented in C-4 to auto-retry with another key.
+  # A nightly job (retry-queued.yml) will re-trigger dispatch when quota resets.
   echo "stage=queued"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
