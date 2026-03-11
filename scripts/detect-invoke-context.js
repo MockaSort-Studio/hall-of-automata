@@ -74,13 +74,37 @@ module.exports = async ({ github, context, core }) => {
   } else if (event === 'pull_request_review') {
     const body  = payload.review?.body || '';
     const match = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w+)/i);
-    if (!match) { core.setOutput('agent', ''); return; }
-    agent        = match[1];
+    if (match) {
+      agent = match[1];
+    } else {
+      // Fall back to PR labels when review body doesn't mention @hall-of-automata
+      const prLabels = payload.pull_request?.labels || [];
+      core.info(`[detect] event=pull_request_review pr_labels=${JSON.stringify(prLabels.map(l => l.name))}`);
+      const hallLabel = prLabels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
+      if (!hallLabel) { core.setOutput('agent', ''); return; }
+      agent = hallLabel.name === 'hall:dispatch-automaton' ? 'old-major' : hallLabel.name.replace('hall:', '');
+    }
     issueNumber  = String(payload.pull_request.number);
     actor        = payload.sender.login;
     triggerEvent = 'pr_review';
     core.setOutput('pr-number',   issueNumber);
     core.setOutput('review-body', body);
+
+  } else if (event === 'pull_request' && payload.action === 'labeled') {
+    const label = payload.label?.name || '';
+    if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
+    if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
+    if (label === 'hall:dispatch-automaton') {
+      agent = 'old-major';
+    } else {
+      agent = label.replace('hall:', '');
+    }
+    issueNumber  = String(payload.pull_request.number);
+    actor        = payload.sender?.type === 'Bot'
+                     ? (payload.pull_request?.user?.login || context.actor)
+                     : payload.sender.login;
+    triggerEvent = 'pr_labeled';
+    core.setOutput('pr-number', issueNumber);
 
   } else if (event === 'workflow_call') {
     triggerEvent = 'workflow_call';
@@ -158,7 +182,7 @@ module.exports = async ({ github, context, core }) => {
 
   // ── Parse dispatch mode from issue body ──────────────────────────────────
   let mode = 'doing';
-  const issueBody = payload.issue?.body || '';
+  const issueBody = payload.issue?.body || payload.pull_request?.body || '';
   const modeMatch = issueBody.match(/###\s*Mode\s+(\S+)/i);
   if (modeMatch) {
     const raw = modeMatch[1].toLowerCase();
