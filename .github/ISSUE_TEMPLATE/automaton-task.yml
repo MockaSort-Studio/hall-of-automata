@@ -1,24 +1,14 @@
-name: "Automaton Task"
-description: Invoke an automaton on a task. Fill this out completely — the agent has no context beyond what is here.
+name: "⚔️ Automaton Quest"
+description: "Send a task to a registered automaton. The agent operates on what you provide here — fill it out completely."
+title: "[Quest]: <short description>"
 labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        Submitting this form creates a task issue. Assign it to `@hall-of-automata` or apply `hall:<agent>` to invoke directly.
-        The Hall will post a status card as its first response.
-
-  - type: dropdown
-    id: agent
-    attributes:
-      label: Agent
-      description: Which automaton should handle this task. Leave blank to let Old Major decide.
-      options:
-        - "(let Old Major decide)"
-        - "hamlet"
-      default: 0
-    validations:
-      required: false
+        The agent runs with only the context you supply here — no implicit knowledge of your repo or prior work.
+        After submitting, assign to `@hall-of-automata` and Old Major will pick the right specialist.
+        To invoke a specific agent directly, apply `hall:<agent>` instead of assigning.
 
   - type: dropdown
     id: mode
@@ -36,18 +26,18 @@ body:
     id: repository
     attributes:
       label: Target repository
-      description: "Which repo this task concerns (if different from this one)"
-      placeholder: "MockaSort-Studio/ADP8"
+      description: "Which repo this task concerns. Leave blank if it's this repo."
+      placeholder: "MockaSort-Studio/some-repo"
 
   - type: textarea
     id: context
     attributes:
       label: Context
-      description: What the agent needs to know. Relevant files, current behavior, constraints, prior decisions.
+      description: "What the agent needs to know: relevant files, current behavior, prior decisions, constraints."
       placeholder: |
         - File: core/lifecycle/task.hpp — base class for all tasks
-        - Current behavior: X
-        - Constraint: no heap allocation in hot path
+        - Current behavior: X happens when Y is called
+        - Prior decision: Z approach was rejected because ...
     validations:
       required: true
 
@@ -55,22 +45,50 @@ body:
     id: requirements
     attributes:
       label: Requirements
-      description: What done looks like. Be specific.
+      description: "What done looks like. Use a checklist — the agent will tick these off."
       placeholder: |
         - [ ] Implement X following Y pattern
-        - [ ] Unit test covering Z edge case
+        - [ ] Unit tests covering Z edge case
         - [ ] BUILD file updated
     validations:
       required: true
 
   - type: textarea
+    id: ci-checks
+    attributes:
+      label: CI checks
+      description: |
+        How to verify the PR is green. Provide the local command to run and list any required workflow checks that must pass before merge.
+        The agent will reference this when validating its own work before opening a PR.
+      placeholder: |
+        Local: `bazel test //... --test_output=errors`
+        Required checks: lint, build, unit-tests
+        Workflow: .github/workflows/ci.yml
+    validations:
+      required: false
+
+  - type: textarea
+    id: guardrails
+    attributes:
+      label: Guardrails
+      description: |
+        Hard limits for this task — safety, process, or operational constraints the agent must not cross.
+        Stricter than out-of-scope: if a guardrail would be violated, the agent must stop and escalate rather than proceed.
+      placeholder: |
+        - Do not modify anything under infra/prod/
+        - PR diff must not exceed 300 LOC
+        - Request review from @mksetaro before any merge
+    validations:
+      required: false
+
+  - type: textarea
     id: out-of-scope
     attributes:
       label: Out of scope
-      description: What the agent should NOT do or touch. Optional but useful.
+      description: "What the agent should not do or touch on this task."
       placeholder: |
-        - Do not modify the public API
-        - Do not add dependencies
+        - Do not refactor unrelated code
+        - Do not add new dependencies
 
   - type: checkboxes
     id: sign-off-required
@@ -78,4 +96,3 @@ body:
       label: Sign-off required before action
       options:
         - label: "This task requires human review before any code is pushed"
-
