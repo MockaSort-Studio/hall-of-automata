@@ -30,18 +30,17 @@ module.exports = async ({ github, context, core }) => {
 
   const candidates = [];
   for (const env of envs) {
-    const enc = encodeURIComponent(env.name);
     let count = 0, cap = 25;
     try {
       count = parseInt((await github.request(
         'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
-        { owner, repo, environment_name: enc, variable_name: 'HALL_USAGE_COUNT' }
+        { owner, repo, environment_name: env.name, variable_name: 'HALL_USAGE_COUNT' }
       )).data.value || '0', 10);
     } catch (_) { /* not set — default 0 */ }
     try {
       cap = parseInt((await github.request(
         'GET /repos/{owner}/{repo}/environments/{environment_name}/variables/{variable_name}',
-        { owner, repo, environment_name: enc, variable_name: 'HALL_WEEKLY_CAP' }
+        { owner, repo, environment_name: env.name, variable_name: 'HALL_WEEKLY_CAP' }
       )).data.value || '25', 10);
     } catch (_) { /* not set — default 25 */ }
     core.info(`[select-invoker] ${env.name}: count=${count} cap=${cap}`);
