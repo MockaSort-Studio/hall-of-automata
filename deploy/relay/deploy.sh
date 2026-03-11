@@ -19,8 +19,9 @@ echo ""
 echo "→ Checking secrets..."
 
 MISSING=()
+SECRETS_LIST=$(fly secrets list --app hall-relay 2>/dev/null || true)
 for VAR in WEBHOOK_SECRET APP_ID APP_PRIVATE_KEY; do
-  if ! fly secrets list --app hall-relay 2>/dev/null | grep -q "^${VAR}"; then
+  if ! echo "$SECRETS_LIST" | grep -qw "$VAR"; then
     MISSING+=("$VAR")
   fi
 done
