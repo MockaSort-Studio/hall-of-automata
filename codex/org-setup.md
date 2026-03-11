@@ -41,16 +41,16 @@ Templates are now available in every org repo. When a repo has its own `ISSUE_TE
 
 GitHub has no native org-wide label sync. Use the script below to create (or update) all Hall labels in one or more repos.
 
-The script lives in the Hall repo at [`scripts/setup-hall-labels.sh`](../scripts/setup-hall-labels.sh).
+The script lives in the Hall repo at [`deploy/scripts/setup-hall-labels.sh`](../deploy/scripts/setup-hall-labels.sh).
 
 ### Usage
 
 ```bash
 # All repos in the org (excluding hall-of-automata itself)
-./scripts/setup-hall-labels.sh
+./deploy/scripts/setup-hall-labels.sh
 
 # Specific repos only
-./scripts/setup-hall-labels.sh MockaSort-Studio/my-project MockaSort-Studio/another-repo
+./deploy/scripts/setup-hall-labels.sh MockaSort-Studio/my-project MockaSort-Studio/another-repo
 ```
 
 Requires `gh` CLI authenticated with a token that has `write:org` or at minimum `repo` scope on the target repos.
