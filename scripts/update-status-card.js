@@ -16,6 +16,7 @@ module.exports = async ({ github, context, core }) => {
 
   const stageLabel = {
     'dispatching':    'Dispatching agent...',
+    'assigning':      'Old Major is Assigning the Quest',
     'analyzing':      'Analyzing...',
     'awaiting-input': 'Awaiting context — question posted',
     'queued':         'Queued — weekly quota reached',
