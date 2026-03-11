@@ -99,16 +99,10 @@ module.exports = async ({ github, context, core }) => {
   } else if (event === 'pull_request_review') {
     const body  = payload.review?.body || '';
     const match = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w+)/i);
-    if (match) {
-      agent = match[1];
-    } else {
-      // Fall back to PR labels when review body doesn't mention @hall-of-automata
-      const prLabels = payload.pull_request?.labels || [];
-      core.info(`[detect] event=pull_request_review pr_labels=${JSON.stringify(prLabels.map(l => l.name))}`);
-      const hallLabel = prLabels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
-      if (!hallLabel) { core.setOutput('agent', ''); return; }
-      agent = hallLabel.name === 'hall:dispatch-automaton' ? 'old-major' : hallLabel.name.replace('hall:', '');
-    }
+    // @mention is required — label-only fallback was removed because any reviewer
+    // on an agent-owned PR (which carries hall:<agent>) would accidentally trigger dispatch.
+    if (!match) { core.setOutput('agent', ''); return; }
+    agent = match[1];
     issueNumber  = String(payload.pull_request.number);
     actor        = payload.sender.login;
     triggerEvent = 'pr_review';

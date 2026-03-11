@@ -70,17 +70,15 @@ Use this when a PR opened by an agent needs correction after a code review.
 **Steps:**
 
 1. Open a **Pull Request Review** (not a plain comment) on the agent's PR.
-2. Include `@hall-of-automata` anywhere in the review body to explicitly route to the bound agent.
+2. Include `@hall-of-automata <agent>` in the review body — this is required.
 3. Submit as **Comment** or **Request changes** — both trigger dispatch.
 
 ```
-@hall-of-automata the test in src/foo_test.cpp is missing the edge case
+@hall-of-automata hamlet the test in src/foo_test.cpp is missing the edge case
 for empty input. Please add coverage.
 ```
 
 The agent is re-dispatched with your review feedback injected into its context alongside restored task memory.
-
-> If the PR already has a `hall:<agent>` label, the @mention is optional — the label fallback will route correctly. But including the mention is clearer and always safe.
 
 ---
 
