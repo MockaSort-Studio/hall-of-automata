@@ -348,24 +348,6 @@ jobs:
             const fn = require('./.hall/scripts/post-quota-queued.js')
             await fn({ github, core })
 
-      - name: Close issue — advising/researching complete
-        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'done' && steps.final.outputs.pr-number == '' && needs.detect.outputs.issue-number != ''
-        env:
-          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
-          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            await github.rest.issues.update({
-              owner: process.env.REPO_OWNER,
-              repo:  process.env.REPO_NAME,
-              issue_number: Number(process.env.ISSUE_NUMBER),
-              state: 'closed',
-              state_reason: 'completed',
-            })
-
       - name: Post-dispatch audit
         if: always() && steps.auth.outcome == 'success'
         uses: ./.hall/actions/post-dispatch

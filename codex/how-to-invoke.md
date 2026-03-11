@@ -43,8 +43,8 @@ flowchart TD
 | Mode | What the agent does | Thread outcome |
 |------|---------------------|----------------|
 | `doing` | Implements and opens a PR | Issue stays open until PR merged |
-| `advising` | Analyses and posts a reply | Issue auto-closed when response posted |
-| `researching` | Deep research, no code changes | Issue auto-closed when response posted |
+| `advising` | Analyses and posts a reply | Issue stays open — close it yourself when done |
+| `researching` | Deep research, no code changes | Issue stays open — close it yourself when done |
 
 ---
 
@@ -111,7 +111,7 @@ Every dispatch creates or updates a `<!-- hall-status -->` comment on the issue 
 | Awaiting context | Agent posted a question, waiting for reply |
 | Queued | All invoker quota exhausted, will retry |
 | Failed | Something went wrong — check comments |
-| Done | Response posted or PR merged |
+| Done | Response posted (advising/researching) or PR merged (doing) |
 
 ---
 
