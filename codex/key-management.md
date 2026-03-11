@@ -34,7 +34,7 @@ Unlike API keys, there is no fixed rotation schedule. Tokens are rotated on pers
 ## Rotation procedure
 
 1. On the keeper's machine: `claude setup-token` (browser auth flow — token shown once, copy it)
-2. Hall repo → Settings → Environments → `hall/<agent>` → `CLAUDE_CODE_OAUTH_TOKEN` → Update secret
+2. Hall repo → Settings → Environments → `invoker/<handle>` → `CLAUDE_CODE_OAUTH_TOKEN` → Update secret
 3. Verify: trigger a test invocation and confirm it succeeds
 
 The old token is invalidated automatically when the new one is issued.
