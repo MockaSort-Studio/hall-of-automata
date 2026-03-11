@@ -1,4 +1,4 @@
-name: CI Re-dispatch Loop
+name: "[Hall] CI Re-dispatch Loop"
 
 on:
   check_suite:

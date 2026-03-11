@@ -87,6 +87,7 @@ In all current paths: the workflow checks out the Hall repo, reads `roster/{agen
 | [`runner-model.md`](runner-model.md) | GitHub-hosted runners, persona injection, state persistence |
 | [`permissions-model.md`](permissions-model.md) | GitHub teams as the authorization layer |
 | [`secrets-model.md`](secrets-model.md) | Invoker pool environments, secrets, and variables |
+| [`ci-loop-and-checks.md`](ci-loop-and-checks.md) | CI re-dispatch loop, PR checks side effects, and design rationale |
 
 ---
 
