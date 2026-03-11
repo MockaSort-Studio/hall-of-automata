@@ -22,6 +22,27 @@ on:
         required: false
         type: string
         default: ""
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: Agent identifier (e.g. hamlet)
+        required: true
+        type: string
+      repo-owner:
+        description: Target repository owner (defaults to this org)
+        required: false
+        type: string
+        default: ""
+      repo-name:
+        description: Target repository name (defaults to this repo)
+        required: false
+        type: string
+        default: ""
+      issue-number:
+        description: Issue or PR number in the target repository
+        required: false
+        type: string
+        default: ""
   issues:
     types: [labeled]
   issue_comment:
