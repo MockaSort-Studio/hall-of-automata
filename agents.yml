@@ -21,7 +21,7 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     author: mksetaro
     teams: [automata-invokers]
-    max_turns: 20
+    max_turns: 60
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
     catalog:
       roles: [triage, route, onboard, synthesize]
