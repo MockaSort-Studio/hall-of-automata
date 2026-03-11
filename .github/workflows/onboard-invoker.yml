@@ -153,13 +153,6 @@ jobs:
           app-id:      ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Write validation CLAUDE.md
-        run: |
-          cat > CLAUDE.md << 'EOF'
-          # Hall Token Validation
-          This is a single-turn token validation check. Reply to the prompt with exactly the word requested. Do not use any tools. Do not read any files. Do not explore the repository.
-          EOF
-
       - name: Validate token via dispatch
         id: dispatch
         continue-on-error: true
@@ -168,7 +161,7 @@ jobs:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
           max-turns:   1
-          prompt:      "Reply with exactly one word: ready"
+          prompt:      "Token validation check — do not use any tools, do not read any files. Reply with exactly one word: ready"
 
       - name: Fallback probe (dispatch failed — check if quota-exceeded vs bad token)
         id: fallback
@@ -176,7 +169,7 @@ jobs:
         shell: bash
         env:
           TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: bash .hall/scripts/probe-token.sh
+        run: bash scripts/probe-token.sh
 
       - name: Resolve result
         id: result
@@ -184,7 +177,7 @@ jobs:
         env:
           DISPATCH_OUTCOME: ${{ steps.dispatch.outcome }}
           FALLBACK_PASSED:  ${{ steps.fallback.outputs.passed }}
-        run: bash .hall/scripts/resolve-token-result.sh
+        run: bash scripts/resolve-token-result.sh
 
   # ── Phase 2c: post result ─────────────────────────────────────────────────────
   finalize:
