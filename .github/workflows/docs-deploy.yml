@@ -1,0 +1,14 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - codex/**
+
+jobs:
+  docs:
+    uses: MockaSort-Studio/actions/.github/workflows/docs-deploy.yml@main
+    with:
+      config-file: pyproject.toml
