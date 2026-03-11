@@ -9,7 +9,7 @@
 # Outputs: stage, pr-number, branch
 set -euo pipefail
 
-if [ "$TRIGGER" = "pr_review" ]; then
+if [ "$TRIGGER" = "pr_review" ] || [ "$TRIGGER" = "pr_labeled" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$DETECT_PR"    >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
