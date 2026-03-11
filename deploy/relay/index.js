@@ -119,6 +119,13 @@ createServer(async (req, res) => {
   const repoOwner = payload.repository?.owner?.login
   const repoName  = payload.repository?.name
 
+  // Skip events from the Hall repo itself — invoke.yml handles them natively
+  // via issues.labeled / issue_comment triggers. Forwarding would double-fire.
+  if (repoOwner === HALL_OWNER && repoName === HALL_REPO) {
+    res.writeHead(200).end('ok')
+    return
+  }
+
   // issues.labeled — standard invocation trigger
   if (event === 'issues' && payload.action === 'labeled') {
     const label = payload.label?.name || ''
