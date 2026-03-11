@@ -16,6 +16,7 @@ Once deployed, any repo in the org can use Hall agents by labeling issues — no
 GitHub org webhook (any repo)
   └─▶ hall-relay.fly.dev/webhook
         ├─ validate HMAC-SHA256 signature
+        ├─ generate GitHub App installation token (hall-of-automata[bot])
         ├─ filter hall: label events
         └─▶ POST /repos/MockaSort-Studio/hall-of-automata/actions/workflows/invoke.yml/dispatches
               └─▶ [Hall] Invoke Agent (agent, repo-owner, repo-name, issue-number)
@@ -32,121 +33,26 @@ Events forwarded:
 
 ## Prerequisites
 
-- [flyctl](https://fly.io/docs/hands-on/install-flyctl/) installed and authenticated
+- [flyctl](https://fly.io/docs/hands-on/install-flyctl/) installed and authenticated (`fly auth login`)
 - A Fly.io account (free tier is sufficient)
-- A GitHub fine-grained PAT or GitHub App token with `actions: write` on `hall-of-automata`
+- The Hall GitHub App `APP_ID` and `APP_PRIVATE_KEY` (same values already stored in Hall repo secrets)
 
 ---
 
 ## 1. Create the relay app
 
-The relay code lives in [`deploy/relay/`](../deploy/relay/) in the Hall repo.
+The relay code lives in [`deploy/relay/`](../deploy/relay/) in the Hall repo — no extra files to create.
 
 ```bash
 cd deploy/relay
 fly launch --name hall-relay --region lhr --no-deploy --copy-config
 ```
 
-The folder contains:
-
-=== "index.js"
-
-    ```js
-    import { createServer } from 'http'
-    import { createHmac, timingSafeEqual } from 'crypto'
-
-    const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
-    const GITHUB_TOKEN   = process.env.GITHUB_TOKEN
-    const HALL_OWNER     = process.env.HALL_OWNER || 'MockaSort-Studio'
-    const HALL_REPO      = process.env.HALL_REPO  || 'hall-of-automata'
-    const HALL_REF       = process.env.HALL_REF   || 'main'
-
-    const SYSTEM_LABELS = [
-      'hall:awaiting-input', 'hall:queued', 'hall:invoker-queued',
-      'hall:onboard-invoker', 'hall:onboard-automaton', 'hall:active-invoker',
-    ]
-
-    function verify(body, sig) {
-      if (!sig) return false
-      const expected = 'sha256=' + createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')
-      try { return timingSafeEqual(Buffer.from(sig), Buffer.from(expected)) } catch { return false }
-    }
-
-    async function dispatch(inputs) {
-      const res = await fetch(
-        `https://api.github.com/repos/${HALL_OWNER}/${HALL_REPO}/actions/workflows/invoke.yml/dispatches`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ref: HALL_REF, inputs }),
-        }
-      )
-      if (!res.ok) console.error('dispatch failed', res.status, await res.text())
-      else console.log('dispatched', inputs.agent, 'for', inputs['repo-owner'] + '/' + inputs['repo-name'], '#' + inputs['issue-number'])
-    }
-
-    createServer(async (req, res) => {
-      if (req.method !== 'POST' || req.url !== '/webhook') {
-        res.writeHead(404).end(); return
-      }
-
-      const chunks = []
-      for await (const chunk of req) chunks.push(chunk)
-      const rawBody = Buffer.concat(chunks)
-
-      if (!verify(rawBody, req.headers['x-hub-signature-256'])) {
-        console.warn('invalid signature')
-        res.writeHead(401).end('Unauthorized'); return
-      }
-
-      const event   = req.headers['x-github-event']
-      const payload = JSON.parse(rawBody)
-      const repoOwner = payload.repository?.owner?.login
-      const repoName  = payload.repository?.name
-
-      if (event === 'issues' && payload.action === 'labeled') {
-        const label = payload.label?.name || ''
-        if (label.startsWith('hall:') && !SYSTEM_LABELS.includes(label)) {
-          const agent = label === 'hall:dispatch-automaton' ? 'old-major' : label.replace('hall:', '')
-          await dispatch({ agent, 'repo-owner': repoOwner, 'repo-name': repoName,
-                           'issue-number': String(payload.issue.number) })
-        }
-      }
-
-      if (event === 'issue_comment' && payload.action === 'created') {
-        if (payload.sender?.type === 'Bot') { res.writeHead(200).end('ok'); return }
-        const labels    = payload.issue?.labels || []
-        const hallLabel = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name))
-        if (hallLabel) {
-          const agent = hallLabel.name === 'hall:dispatch-automaton' ? 'old-major' : hallLabel.name.replace('hall:', '')
-          await dispatch({ agent, 'repo-owner': repoOwner, 'repo-name': repoName,
-                           'issue-number': String(payload.issue.number) })
-        }
-      }
-
-      res.writeHead(200).end('ok')
-    }).listen(8080)
-    ```
-
-=== "package.json"
-
-    ```json
-    { "type": "module", "engines": { "node": ">=22" } }
-    ```
-
-Update the generated `fly.toml` to ensure:
-
-```toml
-[http_service]
-  internal_port = 8080
-  force_https   = true
-```
+The folder already contains `index.js`, `package.json`, and `fly.toml`. The app listens on port 3000 and authenticates as `hall-of-automata[bot]` by generating short-lived installation tokens from the App credentials — no personal token required.
 
 ---
 
 ## 2. Set secrets
-
-The relay authenticates as `hall-of-automata[bot]` using the same GitHub App credentials already stored in the Hall repo secrets — no personal token needed.
 
 ```bash
 # Generate a random webhook secret — save this for step 4
@@ -161,14 +67,14 @@ fly secrets set \
   HALL_REPO="hall-of-automata"
 ```
 
-`APP_ID` and `APP_PRIVATE_KEY` are the same values stored as `APP_ID` / `APP_PRIVATE_KEY` in the Hall repo secrets. The relay generates short-lived installation tokens (1 hour TTL) from these credentials and refreshes them automatically.
+`APP_ID` and `APP_PRIVATE_KEY` are the same values stored as secrets in the Hall repo. The relay generates 1-hour installation tokens and refreshes them automatically (5 min before expiry).
 
 ---
 
 ## 3. Deploy
 
 ```bash
-# From repo root — the script checks for missing secrets and guides you
+# From repo root — checks for missing secrets before deploying
 bash deploy/relay/deploy.sh
 ```
 
@@ -216,7 +122,7 @@ Add each repo, or select **All repositories** for org-wide access.
 User opens issue in other-repo
   → applies hall:dispatch-automaton (or uses the issue template)
   → org webhook fires
-  → relay validates signature, extracts repo + issue
+  → relay validates signature, generates App token, extracts repo + issue
   → workflow_dispatch → [Hall] Invoke Agent
   → Old Major reads issue, picks specialist, applies hall:<agent>
   → specialist dispatched with repo-owner=other-repo, repo-name=other-repo
@@ -235,4 +141,4 @@ fly logs --app hall-relay
 fly status --app hall-relay
 ```
 
-Failed dispatches are logged with status code and response body. The relay itself is stateless — a redeploy restores full operation.
+Failed dispatches are logged with status code and response body. The relay is stateless — a redeploy restores full operation.
