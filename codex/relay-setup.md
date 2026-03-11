@@ -146,19 +146,22 @@ Update the generated `fly.toml` to ensure:
 
 ## 2. Set secrets
 
+The relay authenticates as `hall-of-automata[bot]` using the same GitHub App credentials already stored in the Hall repo secrets — no personal token needed.
+
 ```bash
-# Generate a random webhook secret — save this for the next step
+# Generate a random webhook secret — save this for step 4
 WEBHOOK_SECRET=$(openssl rand -hex 32)
 echo "Webhook secret: $WEBHOOK_SECRET"
 
 fly secrets set \
   WEBHOOK_SECRET="$WEBHOOK_SECRET" \
-  GITHUB_TOKEN="<fine-grained PAT: actions:write on hall-of-automata>" \
+  APP_ID="<Hall GitHub App ID>" \
+  APP_PRIVATE_KEY="$(cat path/to/hall-of-automata.private-key.pem)" \
   HALL_OWNER="MockaSort-Studio" \
   HALL_REPO="hall-of-automata"
 ```
 
-The PAT needs only `actions: write` on `hall-of-automata` — nothing else. A fine-grained token scoped to that single repo is sufficient.
+`APP_ID` and `APP_PRIVATE_KEY` are the same values stored as `APP_ID` / `APP_PRIVATE_KEY` in the Hall repo secrets. The relay generates short-lived installation tokens (1 hour TTL) from these credentials and refreshes them automatically.
 
 ---
 

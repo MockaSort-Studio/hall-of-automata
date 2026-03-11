@@ -3,21 +3,23 @@
 //
 // Env vars (set via `fly secrets set`):
 //   WEBHOOK_SECRET  — shared secret configured in the GitHub org webhook
-//   GITHUB_TOKEN    — fine-grained PAT with actions:write on hall-of-automata
+//   APP_ID          — Hall GitHub App ID (same as in Hall repo secrets)
+//   APP_PRIVATE_KEY — Hall GitHub App private key PEM (same as in Hall repo secrets)
 //   HALL_OWNER      — org name (default: MockaSort-Studio)
 //   HALL_REPO       — Hall repo name (default: hall-of-automata)
 //   HALL_REF        — branch to dispatch on (default: main)
 
 import { createServer } from 'http'
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac, timingSafeEqual, createSign } from 'crypto'
 
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
-const GITHUB_TOKEN   = process.env.GITHUB_TOKEN
+const APP_ID         = process.env.APP_ID
+const APP_PRIVATE_KEY = (process.env.APP_PRIVATE_KEY || '').replace(/\\n/g, '\n')
 const HALL_OWNER     = process.env.HALL_OWNER || 'MockaSort-Studio'
 const HALL_REPO      = process.env.HALL_REPO  || 'hall-of-automata'
 const HALL_REF       = process.env.HALL_REF   || 'main'
 
-// Labels managed by the Hall itself — not invocation triggers
+// System labels managed by the Hall — not invocation triggers
 const SYSTEM_LABELS = [
   'hall:awaiting-input',
   'hall:queued',
@@ -27,18 +29,61 @@ const SYSTEM_LABELS = [
   'hall:active-invoker',
 ]
 
+// ── GitHub App token generation ───────────────────────────────────────────────
+// Tokens expire after 1 hour. Cache and refresh when within 5 minutes of expiry.
+let cachedToken = null
+let tokenExpiresAt = 0
+
+function makeJwt() {
+  const now = Math.floor(Date.now() / 1000)
+  const header  = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 600, iss: APP_ID })).toString('base64url')
+  const sign = createSign('RSA-SHA256')
+  sign.update(`${header}.${payload}`)
+  const sig = sign.sign(APP_PRIVATE_KEY, 'base64url')
+  return `${header}.${payload}.${sig}`
+}
+
+async function getInstallationToken() {
+  if (cachedToken && Date.now() < tokenExpiresAt - 300_000) return cachedToken
+
+  // 1. Get the installation ID for HALL_OWNER
+  const jwt = makeJwt()
+  const instRes = await fetch(`https://api.github.com/orgs/${HALL_OWNER}/installation`, {
+    headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json', 'User-Agent': 'hall-relay/1.0' },
+  })
+  if (!instRes.ok) throw new Error(`Failed to get installation: ${instRes.status} ${await instRes.text()}`)
+  const { id: installationId } = await instRes.json()
+
+  // 2. Exchange for an installation access token
+  const tokRes = await fetch(`https://api.github.com/app/installations/${installationId}/access_tokens`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/vnd.github+json', 'User-Agent': 'hall-relay/1.0' },
+  })
+  if (!tokRes.ok) throw new Error(`Failed to get access token: ${tokRes.status} ${await tokRes.text()}`)
+  const { token, expires_at } = await tokRes.json()
+
+  cachedToken = token
+  tokenExpiresAt = new Date(expires_at).getTime()
+  console.log('[relay] refreshed installation token, expires', expires_at)
+  return token
+}
+
+// ── Webhook verification ───────────────────────────────────────────────────────
 function verify(rawBody, sig) {
   if (!sig) return false
   const expected = 'sha256=' + createHmac('sha256', WEBHOOK_SECRET).update(rawBody).digest('hex')
   try { return timingSafeEqual(Buffer.from(sig), Buffer.from(expected)) } catch { return false }
 }
 
+// ── Dispatch ──────────────────────────────────────────────────────────────────
 async function dispatch(inputs) {
+  const token = await getInstallationToken()
   const url = `https://api.github.com/repos/${HALL_OWNER}/${HALL_REPO}/actions/workflows/invoke.yml/dispatches`
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization:  `Bearer ${GITHUB_TOKEN}`,
+      Authorization:  `Bearer ${token}`,
       'Content-Type': 'application/json',
       'User-Agent':   'hall-relay/1.0',
     },
@@ -52,6 +97,7 @@ async function dispatch(inputs) {
   }
 }
 
+// ── HTTP server ───────────────────────────────────────────────────────────────
 createServer(async (req, res) => {
   if (req.method !== 'POST' || req.url !== '/webhook') {
     res.writeHead(404).end()
@@ -89,7 +135,6 @@ createServer(async (req, res) => {
 
   // issue_comment.created — awaiting-input reply re-dispatch
   if (event === 'issue_comment' && payload.action === 'created') {
-    // Never process bot comments
     if (payload.sender?.type === 'Bot') { res.writeHead(200).end('ok'); return }
     const labels    = payload.issue?.labels || []
     const hallLabel = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name))
@@ -105,4 +150,4 @@ createServer(async (req, res) => {
   }
 
   res.writeHead(200).end('ok')
-}).listen(8080, () => console.log('[relay] listening on :8080'))
+}).listen(3000, () => console.log('[relay] listening on :3000'))

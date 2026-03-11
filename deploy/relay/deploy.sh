@@ -19,7 +19,7 @@ echo ""
 echo "→ Checking secrets..."
 
 MISSING=()
-for VAR in WEBHOOK_SECRET GITHUB_TOKEN; do
+for VAR in WEBHOOK_SECRET APP_ID APP_PRIVATE_KEY; do
   if ! fly secrets list --app hall-relay 2>/dev/null | grep -q "^${VAR}"; then
     MISSING+=("$VAR")
   fi
@@ -35,10 +35,12 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   echo "Set them with:"
   echo "  fly secrets set \\"
   echo "    WEBHOOK_SECRET=\"\$(openssl rand -hex 32)\" \\"
-  echo "    GITHUB_TOKEN=\"<fine-grained PAT: actions:write on hall-of-automata>\" \\"
+  echo "    APP_ID=\"<Hall GitHub App ID>\" \\"
+  echo "    APP_PRIVATE_KEY=\"\$(cat path/to/private-key.pem)\" \\"
   echo "    HALL_OWNER=\"MockaSort-Studio\" \\"
   echo "    HALL_REPO=\"hall-of-automata\""
   echo ""
+  echo "APP_ID and APP_PRIVATE_KEY are the same values stored in the Hall repo secrets."
   echo "Then re-run this script."
   exit 1
 fi
