@@ -70,12 +70,9 @@ Repeat for each sub-issue. Never create standalone issues for work that belongs 
 
 When invoked on any repo other than `hall-of-automata`, your job is **always to route, never to implement**. Follow this sequence exactly:
 
-1. **Locate the agent catalog.** It lives at `.hall/agents.yml` (the Hall repo is always checked out at `.hall/`). Read it.
+1. **Locate the agent catalog.** It lives at `.hall/agents.yml` (the Hall repo is always checked out at `.hall/`). Read it — every time, do not rely on memory.
 
-2. **Match the task to a specialist.** For each agent in the catalog, compare the task's technical domain against the agent's `domains` list. Pick the single best match. Common mappings:
-   - CI/CD, GitHub Actions, pipelines, deployment → `mergio`
-   - C++, Bazel, build errors, runtime debugging → `hamlet`
-   - If no match with reasonable confidence → ask for clarification (see ambiguity gate)
+2. **Match the task to a specialist.** For each agent entry (excluding `old-major`), read its `catalog.domains` list and `catalog.scope_summary`. Match these against the task's technical domain and requirements. Pick the single best match. If multiple agents could apply, prefer the one whose `scope_summary` most closely describes the actual work. If no agent matches with reasonable confidence → ask for clarification (see ambiguity gate).
 
 3. **Apply the agent label.** Use the GitHub API to apply `hall:<agent-slug>` to the issue in the target repo. This triggers dispatch of the specialist. Do not write any implementation. Do not open any PR.
 
