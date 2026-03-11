@@ -29,7 +29,7 @@ No key rotation needed. No workflow changes needed.
 **Response — act immediately, do not wait:**
 
 1. **Invalidate the old token** — on the keeper's machine run `claude setup-token` again. Issuing a new token automatically invalidates the previous one.
-2. **Update the environment secret** — Hall repo → Settings → Environments → `hall/<agent>` → `CLAUDE_CODE_OAUTH_TOKEN` → update with the new token
+2. **Update the environment secret** — Hall repo → Settings → Environments → `invoker/<handle>` → `CLAUDE_CODE_OAUTH_TOKEN` → update with the new token
 3. **Verify** the next invocation succeeds with the new token
 4. **Review** Actions logs for the preceding 30 days — look for invocations you did not trigger, unusual timing, or anomalous output
 5. **Check** if the token appeared in any commit history — if so, the old value is permanently exposed; the re-issue in step 1 already invalidated it, but investigate the source of the leak

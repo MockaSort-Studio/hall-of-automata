@@ -75,11 +75,9 @@ Behavioral spec and persona format.
 
 ## Key concepts
 
-**Keeper** — the org member whose Claude Pro/Max subscription backs an automaton. One keeper can back multiple automata. Usage and cap are tracked per keeper environment (`hall/<agent>`).
+**Keeper** — the org member whose Claude Pro/Max subscription backs an automaton. One keeper can back multiple automata. Usage and cap are tracked per invoker environment (`invoker/<handle>`).
 
 **Old Major** — the Hall Master. Entry point for all unlabeled invocations. Reads the roster catalog, picks the right specialist, synthesizes context. Never implements code directly.
-
-**Deployment (singleton)** — each automaton has one GitHub Deployment per environment, created at onboarding and updated (never recreated) on each invocation. The deployment payload maps gist IDs for persona and dashboard.
 
 **CLAUDE.md** — the assembled context file written to the runner workspace at dispatch time: base contract + persona character sheet. Never committed. Target repo's own CLAUDE.md (if any) is stashed as `.hall-local.md` for the agent to read.
 
@@ -95,7 +93,6 @@ The immediate path before new features:
 Smoke test (TEST_PLAN.md)
   → Phase 5: unauthorized hardening + cleanup fixes
   → Phase 5: keeper env variables (replace cache counter)
-  → Phase 5: persona injection via gist + .hall-local.md stash
   → Phase 5: Old Major triage job + assignment trigger
   → Phase 5: deployment lifecycle actions
   → Webhook relay (Fly.io)
