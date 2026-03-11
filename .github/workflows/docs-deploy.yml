@@ -6,9 +6,11 @@ on:
       - main
     paths:
       - codex/**
+      - pyproject.toml
+      - .github/workflows/docs-deploy.yml
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 

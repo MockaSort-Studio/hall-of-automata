@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []
 site_name = "Hall of Automata"
-site_url = "http://localhost:8000"
+site_url = "https://mockasort-studio.github.io/hall-of-automata/"
 site_description = "Federated AI agent orchestration for GitHub organisations — built on Claude Code and GitHub Actions."
 site_author = "MockaSort Studio"
 docs_dir = "codex"
