@@ -41,6 +41,14 @@ inputs:
   agent-name:
     description: Display name of the agent, used in the rejection comment
     required: true
+  bot-login:
+    description: >
+      Login of the Hall GitHub App bot (e.g. hall-of-automata[bot]).
+      When the actor matches this login the team-membership check is bypassed —
+      the Hall bot is always authorized for its own orchestration actions.
+      Derived from the app-slug output of create-github-app-token.
+    required: false
+    default: "hall-of-automata[bot]"
   scripts-dir:
     description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
     required: false
@@ -53,9 +61,10 @@ runs:
       id: check
       uses: actions/github-script@v7
       env:
-        ORG:       ${{ inputs.org }}
-        TEAM_SLUG: ${{ inputs.team-slug }}
-        USERNAME:  ${{ inputs.username }}
+        ORG:            ${{ inputs.org }}
+        TEAM_SLUG:      ${{ inputs.team-slug }}
+        USERNAME:       ${{ inputs.username }}
+        HALL_BOT_LOGIN: ${{ inputs.bot-login }}
       with:
         github-token: ${{ inputs.org-read-token }}
         result-encoding: string

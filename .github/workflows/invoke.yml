@@ -162,6 +162,7 @@ jobs:
           trigger-event:  ${{ needs.detect.outputs.trigger-event }}
           label-name:     hall:${{ needs.detect.outputs.agent }}
           agent-name:     ${{ needs.detect.outputs.agent }}
+          bot-login:      ${{ steps.app-token.outputs.app-slug }}[bot]
 
       - name: Update status card — dispatching
         if: needs.detect.outputs.issue-number != ''
