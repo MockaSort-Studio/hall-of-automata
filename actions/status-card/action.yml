@@ -69,6 +69,7 @@ runs:
         PR_NUMBER:     ${{ inputs.pr-number }}
         EXTRA:         ${{ inputs.extra }}
         DISPATCHED_AT: ${{ inputs.dispatched-at }}
+        AGENTS_YML:    ${{ inputs.scripts-dir }}/../agents.yml
       with:
         github-token: ${{ inputs.app-token }}
         script: |
