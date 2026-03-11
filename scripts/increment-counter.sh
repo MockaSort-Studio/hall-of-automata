@@ -5,7 +5,7 @@
 # Output (GITHUB_OUTPUT): count=<new value>
 set -euo pipefail
 
-NEXT=$(( CURRENT_COUNT + 1 ))
+NEXT=$(( CURRENT_COUNT + ${INCREMENT:-3} ))
 
 # URL-encode the environment name (invoker/foo → invoker%2Ffoo)
 ENV_ENCODED="${ENV_NAME//\//%2F}"

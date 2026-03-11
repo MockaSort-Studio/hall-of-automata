@@ -56,7 +56,7 @@ module.exports = async ({ github, context, core }) => {
     return;
   }
 
-  candidates.sort((a, b) => a.count - b.count);
+  candidates.sort((a, b) => a.count - b.count || Math.random() - 0.5);
   const selected = candidates[0];
   core.info(`[select-invoker] selected invoker=${selected.handle} (count=${selected.count})`);
   core.setOutput('invoker',       selected.handle);

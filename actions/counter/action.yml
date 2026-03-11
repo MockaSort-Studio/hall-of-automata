@@ -21,6 +21,10 @@ inputs:
   app-token:
     description: GitHub App installation token (environments:write required)
     required: true
+  increment:
+    description: Amount to add to the counter per dispatch (default 3 = 1 dispatch-hour)
+    required: false
+    default: "3"
   scripts-dir:
     description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
     required: false
@@ -40,6 +44,7 @@ runs:
       env:
         GH_TOKEN:      ${{ inputs.app-token }}
         CURRENT_COUNT: ${{ inputs.current-count }}
+        INCREMENT:     ${{ inputs.increment }}
         ENV_NAME:      ${{ inputs.environment-name }}
         REPO_OWNER:    ${{ inputs.repo-owner }}
         REPO_NAME:     ${{ inputs.repo-name }}
