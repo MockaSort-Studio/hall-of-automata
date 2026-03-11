@@ -48,8 +48,8 @@ module.exports = async ({ github, context, core }) => {
     if (senderType === 'Bot') { core.setOutput('agent', ''); return; }
 
     const body  = payload.comment?.body || '';
-    // Path A — explicit @mention: @hall-of-automata[bot] <agent>
-    const mentionMatch = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
+    // Path A — explicit @mention: @hall-of-automata[bot] <agent>  (or @hall-of-automata <agent>)
+    const mentionMatch = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w+)/i);
     if (mentionMatch) {
       core.info(`[detect] path=A mentionMatch=${mentionMatch[1]}`);
       agent = mentionMatch[1];
@@ -72,7 +72,7 @@ module.exports = async ({ github, context, core }) => {
 
   } else if (event === 'pull_request_review') {
     const body  = payload.review?.body || '';
-    const match = body.match(/@hall-of-automata\[bot\]\s+(?:agent:\s*)?(\w+)/i);
+    const match = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w+)/i);
     if (!match) { core.setOutput('agent', ''); return; }
     agent        = match[1];
     issueNumber  = String(payload.pull_request.number);
