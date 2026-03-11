@@ -39,4 +39,4 @@ runs:
         ENV_NAME:      ${{ inputs.environment-name }}
         REPO_OWNER:    ${{ inputs.repo-owner }}
         REPO_NAME:     ${{ inputs.repo-name }}
-      run: bash .hall/scripts/increment-counter.sh
+      run: bash "${{ github.action_path }}/../../scripts/increment-counter.sh"

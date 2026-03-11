@@ -67,5 +67,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('./.hall/scripts/update-status-card.js')
+          const fn = require('${{ github.action_path }}/../../scripts/update-status-card.js')
           await fn({ github, context, core })

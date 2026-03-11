@@ -64,5 +64,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('./.hall/scripts/cleanup-pr.js')
+          const fn = require('${{ github.action_path }}/../../scripts/cleanup-pr.js')
           await fn({ github, core })

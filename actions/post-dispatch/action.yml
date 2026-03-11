@@ -71,7 +71,7 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('./.hall/scripts/apply-hall-label.js')
+          const fn = require('${{ github.action_path }}/../../scripts/apply-hall-label.js')
           await fn({ github, core })
 
     - name: Write invocation audit log
@@ -92,7 +92,7 @@ runs:
         RETRY_COUNT:         ${{ inputs.retry-count }}
         OUTCOME:             ${{ inputs.outcome }}
         WEEKLY_COUNT_AFTER:  ${{ inputs.weekly-count-after }}
-      run: bash .hall/scripts/write-audit-log.sh
+      run: bash "${{ github.action_path }}/../../scripts/write-audit-log.sh"
 
     - name: Upload audit log artifact
       uses: actions/upload-artifact@v4

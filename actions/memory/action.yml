@@ -53,7 +53,7 @@ runs:
       env:
         MODE:        ${{ inputs.mode }}
         MEMORY_JSON: ${{ inputs.memory-json }}
-      run: bash .hall/scripts/save-restore-memory.sh
+      run: bash "${{ github.action_path }}/../../scripts/save-restore-memory.sh"
 
     - name: Save memory cache
       if: inputs.mode == 'save'

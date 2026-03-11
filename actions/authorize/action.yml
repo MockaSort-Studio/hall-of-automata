@@ -56,7 +56,7 @@ runs:
         github-token: ${{ inputs.org-read-token }}
         result-encoding: string
         script: |
-          const fn = require('./.hall/scripts/check-team-membership.js')
+          const fn = require('${{ github.action_path }}/../../scripts/check-team-membership.js')
           return await fn({ github, core })
 
     - name: Reject — remove label, post comment, hard fail
@@ -74,5 +74,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('./.hall/scripts/reject-unauthorized.js')
+          const fn = require('${{ github.action_path }}/../../scripts/reject-unauthorized.js')
           await fn({ github, core })
