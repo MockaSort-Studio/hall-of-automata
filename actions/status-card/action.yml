@@ -24,7 +24,8 @@ inputs:
   stage:
     description: >
       Current lifecycle stage. One of:
-      dispatching | analyzing | awaiting-input | working | pr-opened | ci-fix | escalated | done
+      dispatching | analyzing | awaiting-input | working | pr-opened | ci-fix | escalated | failed | queued | done
+      done is the terminal state for both code tasks (PR merged) and non-code tasks (advising/researching response posted).
     required: true
   dispatched-at:
     description: ISO timestamp of the initial dispatch (used only on card creation)

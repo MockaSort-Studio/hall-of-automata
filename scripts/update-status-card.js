@@ -18,14 +18,13 @@ module.exports = async ({ github, context, core }) => {
     'dispatching':    'Dispatching agent...',
     'analyzing':      'Analyzing...',
     'awaiting-input': 'Awaiting context — question posted',
-    'comment-posted': 'Response posted',
     'queued':         'Queued — weekly quota reached',
     'working':        `Working — \`${branch}\``,
     'pr-opened':      `PR opened — ${pr}`,
     'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
     'escalated':      'Escalated — keeper notified',
     'failed':         'Failed — see comments',
-    'done':           `Done — ${pr} merged`,
+    'done':           process.env.PR_NUMBER ? `Done — ${pr} merged` : 'Done — response posted',
   }[stage] ?? stage;
 
   const dispatched = process.env.DISPATCHED_AT
