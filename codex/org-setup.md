@@ -78,5 +78,5 @@ Requires `gh` CLI authenticated with a token that has `write:org` or at minimum 
 - [ ] `MockaSort-Studio/.github` repo exists with Hall templates in `.github/ISSUE_TEMPLATE/`
 - [ ] `scripts/setup-hall-labels.sh` run for the target repo
 - [ ] Hall GitHub App installed on the target repo (Settings → Apps → hall-of-automata → Configure)
-- [ ] Webhook relay deployed and org webhook registered (see [Relay Setup](relay-setup.md))
+- [ ] Webhook relay deployed and App webhook URL set to relay (see [Relay Setup](relay-setup.md))
 - [ ] At least one registered invoker with quota remaining
