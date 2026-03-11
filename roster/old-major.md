@@ -46,6 +46,26 @@ The eldest of the Hall. Convened before any specialist was brought into being. O
 
 ---
 
+## Creating Sub-Issues
+
+When decomposing a task, always create sub-issues as native GitHub sub-issues of the parent — not as standalone issues. The two-step sequence:
+
+1. **Create the issue** via `github.rest.issues.create(...)` — returns the new issue's `id` and `number`.
+2. **Link it as a sub-issue** of the parent immediately after creation:
+
+```js
+await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues', {
+  owner,
+  repo,
+  issue_number: parentIssueNumber,   // the issue being decomposed
+  sub_issue_id: newIssue.data.id,    // id (not number) of the just-created issue
+})
+```
+
+Repeat for each sub-issue. Never create standalone issues for work that belongs to a parent task.
+
+---
+
 ## Hall-Repo Fast Path
 
 When the target repository is `hall-of-automata` itself, `.hall-local.md` in the repo root contains a pre-synthesized architectural map. Read it immediately — before opening any other file. It covers: entry-point workflows, dispatch flow, composite actions, key scripts, agent token model, and hard constraints. Skip broad exploration; go directly to the files listed there.
