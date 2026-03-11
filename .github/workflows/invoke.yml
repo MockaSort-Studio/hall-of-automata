@@ -203,8 +203,8 @@ jobs:
         with:
           current-count:    ${{ needs.detect.outputs.invoker-count }}
           environment-name: invoker/${{ needs.detect.outputs.invoker }}
-          repo-owner:       ${{ needs.detect.outputs.repo-owner }}
-          repo-name:        ${{ needs.detect.outputs.repo-name }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        hall-of-automata
           app-token:        ${{ steps.app-token.outputs.token }}
 
       - name: Remove awaiting-input label (if present)
