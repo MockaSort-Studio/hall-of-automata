@@ -3,7 +3,9 @@
 # Required env: TRIGGER, FIND_PR, DETECT_PR, BRANCH
 # Optional env: AGENT_OUTCOME — value from dispatch-result.json (see automaton_base.md).
 #   When present, the agent's declared outcome takes precedence over inference.
-#   Valid values: pr_created | awaiting_input | comment_posted | quota_exceeded | failed
+#   Valid values: pr_created | awaiting_input | quota_exceeded | failed
+# Optional env: MODE — dispatch mode parsed from issue body (doing | advising | researching).
+#   When advising or researching and no PR was opened, output stage=done.
 # Outputs: stage, pr-number, branch
 set -euo pipefail
 
@@ -15,12 +17,6 @@ elif [ -n "$FIND_PR" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$FIND_PR"      >> "$GITHUB_OUTPUT"
   echo "branch=$BRANCH"          >> "$GITHUB_OUTPUT"
-elif [ "${AGENT_OUTCOME:-}" = "comment_posted" ]; then
-  # Advice or research mode — agent replied on the issue, conversation complete.
-  # Do not apply hall:awaiting-input; the thread is done.
-  echo "stage=comment-posted"    >> "$GITHUB_OUTPUT"
-  echo "pr-number="              >> "$GITHUB_OUTPUT"
-  echo "branch="                 >> "$GITHUB_OUTPUT"
 elif [ "${AGENT_OUTCOME:-}" = "quota_exceeded" ]; then
   # Claude API quota exhausted mid-dispatch. Request is queued; no PR, no question.
   # Routing (least_used) will be implemented in C-4 to auto-retry with another key.
@@ -29,6 +25,12 @@ elif [ "${AGENT_OUTCOME:-}" = "quota_exceeded" ]; then
   echo "branch="                 >> "$GITHUB_OUTPUT"
 elif [ "${AGENT_OUTCOME:-}" = "failed" ]; then
   echo "stage=failed"            >> "$GITHUB_OUTPUT"
+  echo "pr-number="              >> "$GITHUB_OUTPUT"
+  echo "branch="                 >> "$GITHUB_OUTPUT"
+elif [ "${MODE:-doing}" = "advising" ] || [ "${MODE:-doing}" = "researching" ]; then
+  # Advising/researching mode — agent replied on the issue, conversation complete.
+  # Do not apply hall:awaiting-input; the thread is done.
+  echo "stage=done"              >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 else

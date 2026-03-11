@@ -156,6 +156,17 @@ module.exports = async ({ github, context, core }) => {
     }
   }
 
+  // ── Parse dispatch mode from issue body ──────────────────────────────────
+  let mode = 'doing';
+  const issueBody = payload.issue?.body || '';
+  const modeMatch = issueBody.match(/###\s*Mode\s+(\S+)/i);
+  if (modeMatch) {
+    const raw = modeMatch[1].toLowerCase();
+    if (raw === 'advising') mode = 'advising';
+    else if (raw === 'researching') mode = 'researching';
+    else mode = 'doing';
+  }
+
   core.setOutput('actor',         actor);
   core.setOutput('agent',         agent);
   core.setOutput('issue-number',  issueNumber);
@@ -164,4 +175,5 @@ module.exports = async ({ github, context, core }) => {
   core.setOutput('trigger-event', triggerEvent);
   core.setOutput('repo-owner',    repoOwner);
   core.setOutput('repo-name',     repoName);
+  core.setOutput('mode',          mode);
 };

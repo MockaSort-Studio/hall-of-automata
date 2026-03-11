@@ -281,6 +281,56 @@ Run after Phase A completes. These are produced by Phase A — do not create the
 
 ---
 
+## TC-05b — Advising mode: response posted, issue closed
+
+**Precondition:** Registered invoker; any issue.
+
+**Trigger:** Apply `hall:hamlet` (or `hall:old-major`) to an issue whose `### Mode` field reads `Advising — evaluate options and recommend`.
+
+**Steps:**
+1. Create an issue with `### Mode` set to `Advising — evaluate options and recommend`
+2. Apply a `hall:{agent}` label
+
+**Expected:**
+- `detect` job parses `mode=advising` and surfaces it as a job output
+- Agent runs; posts a comment with options, tradeoffs, and a recommendation; does NOT open a PR
+- `resolve-final-stage.sh` sees `MODE=advising` + no PR → `stage=done`
+- Status card updates to `Done — response posted`
+- Issue is closed by the post-dispatch close step
+- `hall:awaiting-input` label is NOT applied
+
+**Verify:**
+- Issue is closed
+- Status card shows `Done — response posted`
+- No PR opened; no `hall:awaiting-input` label
+
+---
+
+## TC-05c — Researching mode: response posted, issue closed
+
+**Precondition:** Registered invoker; any issue.
+
+**Trigger:** Apply `hall:{agent}` label to an issue whose `### Mode` field reads `Researching — investigate and report`.
+
+**Steps:**
+1. Create an issue with `### Mode` set to `Researching — investigate and report`
+2. Apply a `hall:{agent}` label
+
+**Expected:**
+- `detect` job parses `mode=researching`
+- Agent runs; posts findings comment; does NOT open a PR
+- `resolve-final-stage.sh` sees `MODE=researching` + no PR → `stage=done`
+- Status card updates to `Done — response posted`
+- Issue is closed
+- `hall:awaiting-input` label is NOT applied
+
+**Verify:**
+- Issue is closed
+- Status card shows `Done — response posted`
+- No PR opened; no `hall:awaiting-input` label
+
+---
+
 ## TC-06 — Human reply → awaiting-input re-dispatch
 
 **Precondition:** TC-05 completed successfully; issue has `hall:awaiting-input` + `hall:hamlet` labels.
@@ -447,6 +497,8 @@ Run before any release tag. All items must pass.
 - [ ] TC-02 — comment trigger, authorized
 - [ ] TC-03 — unauthorized invoker (both label and comment)
 - [ ] TC-05 — awaiting-input state set correctly
+- [ ] TC-05b — advising mode: Done — response posted, issue closed
+- [ ] TC-05c — researching mode: Done — response posted, issue closed
 - [ ] TC-06 — human reply re-dispatches
 - [ ] TC-07 — PR review re-dispatch
 - [ ] TC-08 — CI failure re-dispatch (at least 1 cycle)
@@ -465,12 +517,12 @@ Run before any release tag. All items must pass.
 
 | Change area | Re-run these TCs |
 |-------------|-----------------|
-| `detect-invoke-context.js` | 01, 02, 03, 06, 14, 15 |
-| `invoke.yml` dispatch job | 01, 02, 05, 06, 07 |
+| `detect-invoke-context.js` | 01, 02, 03, 05b, 05c, 06, 14, 15 |
+| `invoke.yml` dispatch job | 01, 02, 05, 05b, 05c, 06, 07 |
 | `hall-ci-loop.yml` | 08, 09 |
 | `hall-cleanup.yml` / `actions/cleanup` | 10, 11 |
 | `actions/authorize` | 03 |
 | `actions/counter` | 04, 12 |
 | `actions/memory` | 08, 13 |
-| `actions/status-card` | 01, 05, 08, 09, 10 |
+| `actions/status-card` | 01, 05, 05b, 05c, 08, 09, 10 |
 | `scripts/*.sh` or `scripts/*.js` | All ★ cases |
