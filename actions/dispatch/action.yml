@@ -34,6 +34,8 @@ runs:
       with:
         claude_code_oauth_token: ${{ inputs.oauth-token }}
         github_token: ${{ inputs.app-token }}
+        # Allow the Hall App bot to trigger dispatches (relay-initiated workflow_dispatch)
+        allowed_bots: "hall-of-automata[bot]"
         # --dangerously-skip-permissions: required in non-interactive CI runners — no human to
         # approve tool-use prompts. The actual security boundary is the GitHub App token scope,
         # not Claude Code's permission prompts.
