@@ -22,6 +22,21 @@ module.exports = async ({ github, context, core }) => {
   let repoOwner    = process.env.INPUT_REPO_OWNER || context.repo.owner;
   let repoName     = process.env.INPUT_REPO_NAME  || context.repo.repo;
 
+  // Parse target repository from issue body when not overridden by workflow inputs.
+  // Matches the "### Target repository" field in the automaton-task issue template.
+  // Expected format: "owner/repo". Blank or "_No response_" falls back to Hall repo.
+  const parseTargetRepo = (body) => {
+    if (!body) return;
+    const m = body.match(/###\s*Target repository\s*\n+([^\n]+)/i);
+    if (!m) return;
+    const field = m[1].trim();
+    if (!field || field === '_No response_') return;
+    const parts = field.split('/');
+    if (parts.length === 2 && parts[0].trim() && parts[1].trim()) {
+      return { owner: parts[0].trim(), name: parts[1].trim() };
+    }
+  };
+
   const SYSTEM_LABELS = [
     'hall:awaiting-input',
     'hall:queued',
@@ -49,6 +64,11 @@ module.exports = async ({ github, context, core }) => {
                      ? (payload.issue?.user?.login || context.actor)
                      : payload.sender.login;
     triggerEvent = 'issue_labeled';
+    // Extract target repo from issue body when not provided via workflow inputs.
+    if (!process.env.INPUT_REPO_OWNER && !process.env.INPUT_REPO_NAME) {
+      const parsed = parseTargetRepo(payload.issue?.body);
+      if (parsed) { repoOwner = parsed.owner; repoName = parsed.name; }
+    }
 
   } else if (event === 'issue_comment') {
     // Never process bot comments — prevents rejection comment feedback loops
@@ -70,6 +90,11 @@ module.exports = async ({ github, context, core }) => {
     issueNumber  = String(payload.issue.number);
     actor        = payload.sender.login;
     triggerEvent = 'issue_comment';
+    // Extract target repo from issue body when not provided via workflow inputs.
+    if (!process.env.INPUT_REPO_OWNER && !process.env.INPUT_REPO_NAME) {
+      const parsed = parseTargetRepo(payload.issue?.body);
+      if (parsed) { repoOwner = parsed.owner; repoName = parsed.name; }
+    }
 
   } else if (event === 'pull_request_review') {
     const body  = payload.review?.body || '';

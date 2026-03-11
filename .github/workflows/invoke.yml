@@ -172,7 +172,7 @@ jobs:
           repo-name:     ${{ needs.detect.outputs.repo-name }}
           issue-number:  ${{ needs.detect.outputs.issue-number }}
           agent:         ${{ needs.detect.outputs.agent }}
-          stage:         dispatching
+          stage:         ${{ needs.detect.outputs.agent == 'old-major' && 'assigning' || 'dispatching' }}
           dispatched-at: ${{ github.event.created_at }}
 
       - name: Increment invoker weekly counter
@@ -197,6 +197,20 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
             const fn = require('./.hall/scripts/manage-awaiting-label.js')
+            await fn({ github, core })
+
+      - name: Manage routing label
+        if: needs.detect.outputs.issue-number != '' && needs.detect.outputs.trigger-event == 'issue_labeled'
+        env:
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/manage-routing-label.js')
             await fn({ github, core })
 
       #[lore-keeper]: CLAUDE.md of target repo must stay immutable.
