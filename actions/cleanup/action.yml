@@ -30,6 +30,10 @@ inputs:
     description: "true if the PR was merged, false if just closed"
     required: false
     default: "false"
+  scripts-dir:
+    description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
+    required: false
+    default: ".hall/scripts"
 
 runs:
   using: composite
@@ -64,5 +68,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ github.action_path }}/../../scripts/cleanup-pr.js')
+          const fn = require('${{ inputs.scripts-dir }}/cleanup-pr.js')
           await fn({ github, core })

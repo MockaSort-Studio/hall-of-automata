@@ -19,6 +19,10 @@ inputs:
     description: JSON string to save (required when mode=save)
     required: false
     default: ""
+  scripts-dir:
+    description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
+    required: false
+    default: ".hall/scripts"
 
 outputs:
   memory-json:
@@ -53,7 +57,7 @@ runs:
       env:
         MODE:        ${{ inputs.mode }}
         MEMORY_JSON: ${{ inputs.memory-json }}
-      run: bash "${{ github.action_path }}/../../scripts/save-restore-memory.sh"
+      run: bash "${{ inputs.scripts-dir }}/save-restore-memory.sh"
 
     - name: Save memory cache
       if: inputs.mode == 'save'

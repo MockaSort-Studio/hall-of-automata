@@ -21,6 +21,10 @@ inputs:
   app-token:
     description: GitHub App installation token (environments:write required)
     required: true
+  scripts-dir:
+    description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
+    required: false
+    default: ".hall/scripts"
 
 outputs:
   count:
@@ -39,4 +43,4 @@ runs:
         ENV_NAME:      ${{ inputs.environment-name }}
         REPO_OWNER:    ${{ inputs.repo-owner }}
         REPO_NAME:     ${{ inputs.repo-name }}
-      run: bash "${{ github.action_path }}/../../scripts/increment-counter.sh"
+      run: bash "${{ inputs.scripts-dir }}/increment-counter.sh"

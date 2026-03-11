@@ -56,6 +56,10 @@ inputs:
     description: Weekly invocation count after this dispatch
     required: false
     default: "0"
+  scripts-dir:
+    description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
+    required: false
+    default: ".hall/scripts"
 
 runs:
   using: composite
@@ -71,7 +75,7 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ github.action_path }}/../../scripts/apply-hall-label.js')
+          const fn = require('${{ inputs.scripts-dir }}/apply-hall-label.js')
           await fn({ github, core })
 
     - name: Write invocation audit log
@@ -92,7 +96,7 @@ runs:
         RETRY_COUNT:         ${{ inputs.retry-count }}
         OUTCOME:             ${{ inputs.outcome }}
         WEEKLY_COUNT_AFTER:  ${{ inputs.weekly-count-after }}
-      run: bash "${{ github.action_path }}/../../scripts/write-audit-log.sh"
+      run: bash "${{ inputs.scripts-dir }}/write-audit-log.sh"
 
     - name: Upload audit log artifact
       uses: actions/upload-artifact@v4

@@ -42,6 +42,10 @@ inputs:
     description: Optional extra line appended to the stage value (e.g. retry count)
     required: false
     default: ""
+  scripts-dir:
+    description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
+    required: false
+    default: ".hall/scripts"
 
 outputs:
   comment-id:
@@ -67,5 +71,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ github.action_path }}/../../scripts/update-status-card.js')
+          const fn = require('${{ inputs.scripts-dir }}/update-status-card.js')
           await fn({ github, context, core })
