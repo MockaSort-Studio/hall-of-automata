@@ -9,6 +9,13 @@ jobs:
     name: Cleanup hall-labeled PR
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
       - name: Check for hall label
         id: check
         uses: actions/github-script@v7
