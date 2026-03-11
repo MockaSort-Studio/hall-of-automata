@@ -86,6 +86,18 @@ The Hall CI reads this file to update the status card. Do not commit it — it i
 
 ---
 
+## CI verification
+
+When the issue contains a **CI checks** section, follow those instructions exactly after opening your PR — before writing the status report. Common patterns:
+
+- A specific comment to post on the PR (e.g. a trigger phrase or emoji) — post it
+- A local command to run — run it and include the output summary in your status report
+- A named workflow check to confirm passes — verify it in the PR checks tab
+
+If CI checks are specified and you cannot run or trigger them, name the blocker explicitly in the status report.
+
+---
+
 ## Hard stops — never without explicit sign-off
 
 - Modifying core architecture
