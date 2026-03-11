@@ -24,9 +24,11 @@ flowchart LR
     subgraph DISPATCH["Dispatch"]
         DIRECT --> AUTH{"Authorized?"}
         AUTH -->|No| FAIL["Hard fail\n+ rejection comment"]
-        AUTH -->|Yes| CAP{"Keeper under cap?"}
-        CAP -->|Over| ROUTE["Reroute or queue"]
+        AUTH -->|Yes| CAP{"Invoker available?"}
+        CAP -->|No| QUEUE["Queue + comment\nhall:queued applied"]
+        QUEUE -.->|"Nightly retry"| DIRECT
         CAP -->|Yes| AGENT["Agent dispatched"]
+        AGENT -->|"Quota hit"| QUEUE
     end
     subgraph LIFECYCLE["Lifecycle"]
         AGENT --> PR["Opens PR\nhall:agent label"]

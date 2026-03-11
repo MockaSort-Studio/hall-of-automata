@@ -116,10 +116,6 @@ jobs:
     needs: [detect]
     if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != ''
     runs-on: ubuntu-latest
-    # Exit condition: this job gets exactly one retry (see select-retry-invoker + dispatch-retry).
-    # There is no retry loop. Max 2 total dispatch attempts per invocation.
-    # continue-on-error is required here so that the retry jobs can observe dispatch.result == 'failure'.
-    continue-on-error: true
     environment: invoker/${{ needs.detect.outputs.invoker }}
     concurrency:
       group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
@@ -340,6 +336,20 @@ jobs:
             const fn = require('./.hall/scripts/manage-awaiting-label.js')
             await fn({ github, core })
 
+      - name: Post quota-queued comment and label
+        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'queued' && needs.detect.outputs.issue-number != ''
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+          AGENT:        ${{ needs.detect.outputs.agent }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/post-quota-queued.js')
+            await fn({ github, core })
+
       - name: Close issue — advising/researching complete
         if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'done' && steps.final.outputs.pr-number == '' && needs.detect.outputs.issue-number != ''
         env:
@@ -370,264 +380,6 @@ jobs:
           issue-number:       ${{ needs.detect.outputs.issue-number }}
           pr-number:          ${{ steps.final.outputs.pr-number }}
           invoker:            ${{ needs.detect.outputs.invoker }}
-          team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
-          outcome:            ${{ steps.final.outputs.stage }}
-          weekly-count-after: ${{ steps.increment.outputs.count }}
-
-
-  # ── Job 4: re-select invoker when dispatch fails ─────────────────────────
-  # Runs only when the primary dispatch job failed (e.g. OAuth quota exhausted).
-  # Selects an alternate invoker, explicitly excluding the one that just failed.
-  # Exit condition: this is the only retry selector — no chaining, no loop.
-  select-retry-invoker:
-    name: Select retry invoker
-    needs: [detect, dispatch]
-    if: needs.dispatch.result == 'failure' && needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != ''
-    runs-on: ubuntu-latest
-    outputs:
-      invoker:       ${{ steps.pool.outputs.invoker }}
-      invoker-count: ${{ steps.pool.outputs.invoker-count }}
-    steps:
-      - name: Checkout Hall repo (scripts only)
-        uses: actions/checkout@v4
-        with:
-          path: .hall
-          sparse-checkout: scripts/
-          sparse-checkout-cone-mode: true
-
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id:      ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Select alternate invoker (excluding failed)
-        id: pool
-        uses: actions/github-script@v7
-        env:
-          EXCLUDE_INVOKER: ${{ needs.detect.outputs.invoker }}
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const fn = require('./.hall/scripts/select-invoker.js')
-            await fn({ github, context, core })
-
-  # ── Job 5: retry dispatch with alternate invoker ──────────────────────────
-  # Runs only when an alternate invoker was found. If this job also fails,
-  # the workflow fails — no further retries. This is the exit condition.
-  dispatch-retry:
-    name: Retry dispatch ${{ needs.detect.outputs.agent }}
-    needs: [detect, select-retry-invoker]
-    if: needs.detect.outputs.agent != '' && needs.select-retry-invoker.outputs.invoker != ''
-    runs-on: ubuntu-latest
-    environment: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
-    concurrency:
-      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
-      cancel-in-progress: false
-    steps:
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ needs.detect.outputs.repo-owner }}
-
-      - name: Checkout target repository
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          token:      ${{ steps.app-token.outputs.token }}
-
-      - name: Checkout Hall repo
-        uses: actions/checkout@v4
-        with:
-          path: .hall
-
-      - name: Read agent config
-        id: agent-cfg
-        env:
-          AGENT: ${{ needs.detect.outputs.agent }}
-        shell: bash
-        run: bash .hall/scripts/read-agent-config.sh
-
-      - name: Authorize invoker
-        id: auth
-        uses: ./.hall/actions/authorize
-        with:
-          org-read-token: ${{ steps.app-token.outputs.token }}
-          org:            ${{ needs.detect.outputs.repo-owner }}
-          team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
-          username:       ${{ needs.detect.outputs.actor }}
-          app-token:      ${{ steps.app-token.outputs.token }}
-          repo-owner:     ${{ needs.detect.outputs.repo-owner }}
-          repo-name:      ${{ needs.detect.outputs.repo-name }}
-          issue-number:   ${{ needs.detect.outputs.issue-number }}
-          trigger-event:  ${{ needs.detect.outputs.trigger-event }}
-          label-name:     hall:${{ needs.detect.outputs.agent }}
-          agent-name:     ${{ needs.detect.outputs.agent }}
-
-      - name: Update status card — retrying
-        if: needs.detect.outputs.issue-number != ''
-        uses: ./.hall/actions/status-card
-        with:
-          app-token:    ${{ steps.app-token.outputs.token }}
-          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
-          repo-name:    ${{ needs.detect.outputs.repo-name }}
-          issue-number: ${{ needs.detect.outputs.issue-number }}
-          agent:        ${{ needs.detect.outputs.agent }}
-          stage:        retrying
-
-      - name: Increment invoker weekly counter
-        id: increment
-        uses: ./.hall/actions/counter
-        with:
-          current-count:    ${{ needs.select-retry-invoker.outputs.invoker-count }}
-          environment-name: invoker/${{ needs.select-retry-invoker.outputs.invoker }}
-          repo-owner:       ${{ needs.detect.outputs.repo-owner }}
-          repo-name:        ${{ needs.detect.outputs.repo-name }}
-          app-token:        ${{ steps.app-token.outputs.token }}
-
-      - name: Inject agent persona
-        env:
-          AGENT: ${{ needs.detect.outputs.agent }}
-        shell: bash
-        run: cat ".hall/agents/automaton_base.md" ".hall/roster/${AGENT}.md" > CLAUDE.md
-
-      - name: Restore task memory (review re-dispatch)
-        id: memory
-        if: needs.detect.outputs.trigger-event == 'pr_review'
-        uses: ./.hall/actions/memory
-        with:
-          mode:      restore
-          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number: ${{ needs.detect.outputs.pr-number }}
-
-      - name: Append review context to CLAUDE.md
-        if: needs.detect.outputs.trigger-event == 'pr_review'
-        env:
-          PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
-          REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
-        shell: bash
-        run: bash .hall/scripts/append-review-context.sh
-
-      - name: Run agent
-        id: agent
-        uses: ./.hall/actions/dispatch
-        with:
-          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
-          prompt: >-
-            You have been dispatched to work on issue #${{ needs.detect.outputs.issue-number }}
-            in ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}.
-            Your persona is in CLAUDE.md. For a review re-dispatch the review feedback is also
-            appended there. Read the issue, follow your persona, and begin working.
-
-      - name: Find PR opened by agent
-        id: find-pr
-        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.trigger-event != 'pr_review'
-        env:
-          AGENT:        ${{ needs.detect.outputs.agent }}
-          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
-          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const fn = require('./.hall/scripts/find-agent-pr.js')
-            await fn({ github, core })
-
-      - name: Save task memory
-        if: always() && steps.auth.outcome == 'success' && steps.find-pr.outputs.pr-number != ''
-        uses: ./.hall/actions/memory
-        with:
-          mode:        save
-          repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number:   ${{ steps.find-pr.outputs.pr-number }}
-          memory-json: >-
-            {
-              "agent": "${{ needs.detect.outputs.agent }}",
-              "issue_number": "${{ needs.detect.outputs.issue-number }}",
-              "pr_number": "${{ steps.find-pr.outputs.pr-number }}",
-              "branch": "${{ steps.find-pr.outputs.branch }}",
-              "retry_count": 1,
-              "last_ci_failures": "",
-              "last_review_feedback": ""
-            }
-
-      - name: Resolve final stage
-        id: final
-        if: always() && steps.auth.outcome == 'success'
-        env:
-          TRIGGER:       ${{ needs.detect.outputs.trigger-event }}
-          FIND_PR:       ${{ steps.find-pr.outputs.pr-number }}
-          DETECT_PR:     ${{ needs.detect.outputs.pr-number }}
-          BRANCH:        ${{ steps.find-pr.outputs.branch }}
-          AGENT_OUTCOME: ${{ steps.find-pr.outputs.outcome }}
-          MODE:          ${{ needs.detect.outputs.mode }}
-        shell: bash
-        run: bash .hall/scripts/resolve-final-stage.sh
-
-      - name: Update status card
-        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.issue-number != ''
-        uses: ./.hall/actions/status-card
-        with:
-          app-token:    ${{ steps.app-token.outputs.token }}
-          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
-          repo-name:    ${{ needs.detect.outputs.repo-name }}
-          issue-number: ${{ needs.detect.outputs.issue-number }}
-          agent:        ${{ needs.detect.outputs.agent }}
-          stage:        ${{ steps.final.outputs.stage }}
-          pr-number:    ${{ steps.final.outputs.pr-number }}
-          branch:       ${{ steps.final.outputs.branch }}
-
-      - name: Apply awaiting-input label
-        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'awaiting-input' && needs.detect.outputs.issue-number != ''
-        env:
-          MODE:         apply
-          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
-          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            const fn = require('./.hall/scripts/manage-awaiting-label.js')
-            await fn({ github, core })
-
-      - name: Close issue — advising/researching complete
-        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'done' && steps.final.outputs.pr-number == '' && needs.detect.outputs.issue-number != ''
-        env:
-          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
-          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            await github.rest.issues.update({
-              owner: process.env.REPO_OWNER,
-              repo:  process.env.REPO_NAME,
-              issue_number: Number(process.env.ISSUE_NUMBER),
-              state: 'closed',
-              state_reason: 'completed',
-            })
-
-      - name: Post-dispatch audit
-        if: always() && steps.auth.outcome == 'success'
-        uses: ./.hall/actions/post-dispatch
-        with:
-          app-token:          ${{ steps.app-token.outputs.token }}
-          agent:              ${{ needs.detect.outputs.agent }}
-          agent-dispatched:   ${{ needs.detect.outputs.agent }}
-          repo-owner:         ${{ needs.detect.outputs.repo-owner }}
-          repo-name:          ${{ needs.detect.outputs.repo-name }}
-          issue-number:       ${{ needs.detect.outputs.issue-number }}
-          pr-number:          ${{ steps.final.outputs.pr-number }}
-          invoker:            ${{ needs.select-retry-invoker.outputs.invoker }}
           team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
           outcome:            ${{ steps.final.outputs.stage }}
           weekly-count-after: ${{ steps.increment.outputs.count }}
