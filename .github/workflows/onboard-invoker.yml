@@ -1,10 +1,10 @@
 name: Onboard Invoker
 
-# Three-phase flow:
-#   Phase 1 — issue labeled hall:onboard-invoker → provision environment, post instructions
-#   Phase 2a — invoker replies "ready"           → parse + confirm secret slot exists
-#   Phase 2b — test-token job                    → real Claude invocation in invoker env
-#   Phase 2c — finalize job                      → welcome on success, retry prompt on failure
+# Four-job flow:
+#   setup      — issue labeled hall:onboard-invoker → provision environment, post instructions
+#   parse-ready — invoker replies "ready"           → parse + confirm secret slot exists
+#   test-token  — dispatch action (1 turn)          → exposes token-status (ok|rate_limited|unauthorized|error)
+#   finalize    — resolve result → welcome on pass, retry prompt on fail
 
 concurrency:
   group: onboard-invoker-${{ github.event.issue.number || github.run_id }}
@@ -128,11 +128,10 @@ jobs:
             const fn = require('./.hall/scripts/verify-invoker-setup.js')
             await fn({ github, core })
 
-  # ── Phase 2b: validate the invoker's OAuth token ─────────────────────────────
-  # Run the dispatch action — confirms the full pipeline end-to-end.
-  # On failure, the dispatch action probes the API and exposes token-status
-  # (ok | rate_limited | unauthorized | error) so we can branch without a
-  # separate curl call.
+  # ── test-token: validate the invoker's OAuth token ───────────────────────────
+  # Runs the dispatch action (1 turn) — confirms the full pipeline end-to-end.
+  # The action exposes token-status (ok | rate_limited | unauthorized | error);
+  # resolve-token-result.sh maps that to test-passed=true|false.
   test-token:
     name: Validate invoker token
     needs: [parse-ready]
@@ -201,7 +200,6 @@ jobs:
           ISSUE_NUMBER:     ${{ github.event.issue.number }}
           INVOKER_USERNAME: ${{ needs.parse-ready.outputs.invoker-username }}
           TEST_PASSED:      ${{ needs.test-token.outputs.test-passed }}
-          QUOTA_EXCEEDED:   'false'
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
