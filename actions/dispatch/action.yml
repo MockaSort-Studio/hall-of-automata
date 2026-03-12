@@ -93,10 +93,11 @@ runs:
         [ -z "$COUNT" ] || [ "$COUNT" = "null" ] && COUNT=0
         echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
-    # When the SDK exits before the agent writes dispatch-result.json (e.g. rate-limit hit),
-    # write it here so the post-dispatch steps can correctly route to the queued stage.
-    # The authorize step already validated the actor, so SDK-level failures at this point
-    # are most commonly rate-limit hits. The nightly retry job will re-trigger dispatch.
+    # When the SDK exits before the agent writes dispatch-result.json, write it here so
+    # post-dispatch steps can route correctly. Two distinct failure modes:
+    #   rate_limited (HTTP 429) — quota hit; outcome=quota_exceeded → nightly retry
+    #   error/unauthorized     — error_max_turns, bad token, or other SDK error;
+    #                            outcome=failed → no retry (fix root cause first)
     - name: Write dispatch-result on SDK failure
       if: steps.run-claude.outcome == 'failure'
       shell: bash
@@ -106,8 +107,13 @@ runs:
           exit 0
         fi
         mkdir -p .hall
-        printf '{"outcome":"quota_exceeded","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
-        echo "Wrote dispatch-result.json with outcome: quota_exceeded"
+        if [[ "${{ steps.categorize.outputs.token-status }}" == "rate_limited" ]]; then
+          printf '{"outcome":"quota_exceeded","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
+          echo "Wrote dispatch-result.json with outcome: quota_exceeded"
+        else
+          printf '{"outcome":"failed","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
+          echo "Wrote dispatch-result.json with outcome: failed (token-status=${{ steps.categorize.outputs.token-status }})"
+        fi
 
     - name: Propagate agent failure
       if: steps.run-claude.outcome == 'failure'

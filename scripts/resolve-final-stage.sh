@@ -4,6 +4,7 @@
 # Optional env: AGENT_OUTCOME — value from dispatch-result.json (see automaton_base.md).
 #   When present, the agent's declared outcome takes precedence over inference.
 #   Valid values: pr_created | awaiting_input | quota_exceeded | failed
+#   Note: failed is also written by the dispatch fallback when SDK exits with error_max_turns.
 # Optional env: MODE — dispatch mode parsed from issue body (doing | advising | researching).
 #   When advising or researching and no PR was opened, output stage=done.
 # Outputs: stage, pr-number, branch

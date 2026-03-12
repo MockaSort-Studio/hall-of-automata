@@ -36,7 +36,7 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     invoker: mksetaro
     teams: [automata-invokers]
-    max_turns: 15
+    max_turns: 40
     max_retries: 2
     catalog:
       roles: [implement, debug, triage]
