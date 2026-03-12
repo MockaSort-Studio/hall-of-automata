@@ -129,9 +129,10 @@ jobs:
             await fn({ github, core })
 
   # ── Phase 2b: validate the invoker's OAuth token ─────────────────────────────
-  # Primary: run actual dispatch action — confirms the full pipeline end-to-end.
-  # Fallback: if dispatch fails, probe the API directly to distinguish quota-
-  # exceeded (429 → pass) from bad token (401/403 → fail).
+  # Run the dispatch action — confirms the full pipeline end-to-end.
+  # On failure, the dispatch action probes the API and exposes token-status
+  # (ok | rate_limited | unauthorized | error) so we can branch without a
+  # separate curl call.
   test-token:
     name: Validate invoker token
     needs: [parse-ready]
@@ -163,20 +164,12 @@ jobs:
           max-turns:   1
           prompt:      "Token validation check — do not use any tools, do not read any files. Reply with exactly one word: ready"
 
-      - name: Fallback probe (dispatch failed — check if quota-exceeded vs bad token)
-        id: fallback
-        if: steps.dispatch.outcome == 'failure'
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: bash scripts/probe-token.sh
-
       - name: Resolve result
         id: result
         shell: bash
         env:
           DISPATCH_OUTCOME: ${{ steps.dispatch.outcome }}
-          FALLBACK_PASSED:  ${{ steps.fallback.outputs.passed }}
+          TOKEN_STATUS:     ${{ steps.dispatch.outputs.token-status }}
         run: bash scripts/resolve-token-result.sh
 
   # ── Phase 2c: post result ─────────────────────────────────────────────────────

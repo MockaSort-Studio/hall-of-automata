@@ -21,6 +21,9 @@ inputs:
     default: ""
 
 outputs:
+  token-status:
+    description: Categorized API result — ok | unauthorized | rate_limited | error
+    value: ${{ steps.categorize.outputs.token-status }}
   turns-used:
     description: Number of agentic turns consumed by this dispatch
     value: ${{ steps.turns.outputs.count }}
@@ -48,6 +51,34 @@ runs:
         prompt: ${{ inputs.prompt }}
         show_full_output: "true"
 
+    - name: Categorize API result
+      id: categorize
+      if: always()
+      shell: bash
+      env:
+        DISPATCH_OUTCOME: ${{ steps.run-claude.outcome }}
+        OAUTH_TOKEN: ${{ inputs.oauth-token }}
+      run: |
+        if [[ "${DISPATCH_OUTCOME}" == "success" ]]; then
+          echo "token-status=ok" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+        HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+          --max-time 15 \
+          -X POST "https://api.anthropic.com/v1/messages" \
+          -H "Authorization: Bearer ${OAUTH_TOKEN}" \
+          -H "anthropic-version: 2023-06-01" \
+          -H "Content-Type: application/json" \
+          -d '{"model":"claude-haiku-4-5","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}') \
+          || HTTP=000
+        echo "probe HTTP: ${HTTP}"
+        if [[ "${HTTP}" == "429" ]]; then
+          echo "token-status=rate_limited" >> "${GITHUB_OUTPUT}"
+        elif [[ "${HTTP}" == "401" || "${HTTP}" == "403" ]]; then
+          echo "token-status=unauthorized" >> "${GITHUB_OUTPUT}"
+        else
+          echo "token-status=error" >> "${GITHUB_OUTPUT}"
+        fi
     - name: Extract turns used
       id: turns
       if: always()
