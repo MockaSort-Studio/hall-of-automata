@@ -61,6 +61,7 @@ runs:
       id: check
       uses: actions/github-script@v7
       env:
+        ACTION:         check-membership
         ORG:            ${{ inputs.org }}
         TEAM_SLUG:      ${{ inputs.team-slug }}
         USERNAME:       ${{ inputs.username }}
@@ -69,13 +70,14 @@ runs:
         github-token: ${{ inputs.org-read-token }}
         result-encoding: string
         script: |
-          const fn = require('${{ inputs.scripts-dir }}/check-team-membership.js')
+          const fn = require('${{ inputs.scripts-dir }}/auth-utils.js')
           return await fn({ github, core })
 
     - name: Reject — remove label, post comment, hard fail
       if: steps.check.outputs.result != 'true'
       uses: actions/github-script@v7
       env:
+        ACTION:        reject
         ORG:           ${{ inputs.org }}
         REPO_OWNER:    ${{ inputs.repo-owner }}
         REPO_NAME:     ${{ inputs.repo-name }}
@@ -87,5 +89,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ inputs.scripts-dir }}/reject-unauthorized.js')
+          const fn = require('${{ inputs.scripts-dir }}/auth-utils.js')
           await fn({ github, core })

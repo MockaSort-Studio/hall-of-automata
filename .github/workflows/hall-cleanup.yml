@@ -19,10 +19,12 @@ jobs:
       - name: Check for hall label
         id: check
         uses: actions/github-script@v7
+        env:
+          ACTION: cleanup
         with:
           script: |
-            const fn = require('./.hall/scripts/detect-cleanup-context.js')
-            await fn({ context, core })
+            const fn = require('./.hall/scripts/detect-context.js')
+            await fn({ github, context, core })
 
       - name: Create GitHub App token
         id: app-token

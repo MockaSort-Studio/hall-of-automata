@@ -27,9 +27,11 @@ jobs:
       - name: Resolve context from check_suite event
         id: ctx
         uses: actions/github-script@v7
+        env:
+          ACTION: ci
         with:
           script: |
-            const fn = require('./.hall/scripts/detect-ci-context.js')
+            const fn = require('./.hall/scripts/detect-context.js')
             await fn({ github, context, core })
 
   # ── Job 2: pool-select invoker ────────────────────────────────────────────
@@ -136,6 +138,7 @@ jobs:
       - name: Escalate — notify keeper on PR
         if: steps.retry.outputs.escalate == 'true'
         env:
+          ACTION:       escalate
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
           PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
@@ -146,7 +149,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/escalate-to-keeper.js')
+            const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
       - name: Update status card — escalated
@@ -178,13 +181,14 @@ jobs:
       - name: Inject persona and CI context
         if: steps.retry.outputs.escalate != 'true'
         env:
+          MODE:        ci
           AGENT:       ${{ needs.detect.outputs.agent }}
           ATTEMPT:     ${{ steps.retry.outputs.new-count }}
           MAX_RETRIES: ${{ steps.agent-cfg.outputs.max-retries }}
           PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
           CI_FAILURES: ${{ needs.detect.outputs.ci-failures }}
         shell: bash
-        run: bash .hall/scripts/inject-ci-context.sh
+        run: bash .hall/scripts/context-injection.sh
       #[lore-keeper]: inject temp claude.md of invoke.yml;
       - name: Run agent
         id: agent

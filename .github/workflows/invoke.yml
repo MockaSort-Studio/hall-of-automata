@@ -116,6 +116,7 @@ jobs:
         if: needs.detect.outputs.issue-number != ''
         uses: actions/github-script@v7
         env:
+          ACTION:       pool-exhausted
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
           ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
@@ -123,7 +124,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/post-queued-comment.js')
+            const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
   # ── Job 3: dispatch the resolved agent ───────────────────────────────────
@@ -210,6 +211,7 @@ jobs:
       - name: Remove awaiting-input label (if present)
         if: needs.detect.outputs.issue-number != ''
         env:
+          ACTION:       awaiting
           MODE:         remove
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
@@ -218,12 +220,13 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/manage-awaiting-label.js')
+            const fn = require('./.hall/scripts/label-utils.js')
             await fn({ github, core })
 
       - name: Manage routing label
         if: needs.detect.outputs.issue-number != '' && needs.detect.outputs.trigger-event == 'issue_labeled'
         env:
+          ACTION:       routing
           AGENT:        ${{ needs.detect.outputs.agent }}
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
@@ -232,7 +235,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/manage-routing-label.js')
+            const fn = require('./.hall/scripts/label-utils.js')
             await fn({ github, core })
 
       #[lore-keeper]: CLAUDE.md of target repo must stay immutable.
@@ -257,10 +260,11 @@ jobs:
       - name: Append review context to CLAUDE.md
         if: needs.detect.outputs.trigger-event == 'pr_review'
         env:
+          MODE:        review
           PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
           REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
         shell: bash
-        run: bash .hall/scripts/append-review-context.sh
+        run: bash .hall/scripts/context-injection.sh
 
       #[lore-keeper]: when feeding the informations to the agent we should also ask him to synthetise the context
       #we can list the important things to keep and let it consolidate it's knowledge
@@ -287,6 +291,7 @@ jobs:
         id: find-pr
         if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.trigger-event != 'pr_review'
         env:
+          ACTION:       find
           AGENT:        ${{ needs.detect.outputs.agent }}
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
@@ -295,7 +300,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/find-agent-pr.js')
+            const fn = require('./.hall/scripts/pr-utils.js')
             await fn({ github, core })
 
       - name: Save task memory
@@ -345,6 +350,7 @@ jobs:
       - name: Apply awaiting-input label
         if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'awaiting-input' && needs.detect.outputs.issue-number != ''
         env:
+          ACTION:       awaiting
           MODE:         apply
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
@@ -353,12 +359,13 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/manage-awaiting-label.js')
+            const fn = require('./.hall/scripts/label-utils.js')
             await fn({ github, core })
 
       - name: Post quota-queued comment and label
         if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'queued' && needs.detect.outputs.issue-number != ''
         env:
+          ACTION:       quota-queued
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
           ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
@@ -367,7 +374,7 @@ jobs:
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
-            const fn = require('./.hall/scripts/post-quota-queued.js')
+            const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
       - name: Post-dispatch audit
