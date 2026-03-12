@@ -24,6 +24,9 @@ outputs:
   token-status:
     description: Categorized API result — ok | unauthorized | rate_limited | error
     value: ${{ steps.categorize.outputs.token-status }}
+  turns-used:
+    description: Number of agentic turns consumed by this dispatch
+    value: ${{ steps.turns.outputs.count }}
 
 runs:
   using: composite
@@ -76,6 +79,19 @@ runs:
         else
           echo "token-status=error" >> "${GITHUB_OUTPUT}"
         fi
+    - name: Extract turns used
+      id: turns
+      if: always()
+      shell: bash
+      run: |
+        EXEC_FILE="${{ steps.run-claude.outputs.execution_file }}"
+        if [ -z "$EXEC_FILE" ] || [ ! -f "$EXEC_FILE" ]; then
+          echo "count=0" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        COUNT=$(jq -r '[.[] | select(.type == "result")] | last | .num_turns // 0' "$EXEC_FILE" 2>/dev/null)
+        [ -z "$COUNT" ] || [ "$COUNT" = "null" ] && COUNT=0
+        echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
     # When the SDK exits before the agent writes dispatch-result.json (e.g. rate-limit hit),
     # write it here so the post-dispatch steps can correctly route to the queued stage.
