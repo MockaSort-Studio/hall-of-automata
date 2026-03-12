@@ -25,15 +25,6 @@ nav = [
         {"Permissions" = "architecture/permissions-model.md"},
         {"Secrets & Storage" = "architecture/secrets-model.md"},
     ]},
-    {"Operations" = [
-        {"Token Management" = "key-management.md"},
-        {"Incident Response" = "incident-response.md"},
-    ]},
-    {"Federation" = [
-        {"Overview" = "federation/README.md"},
-        {"Joining the Hall" = "federation/joining.md"},
-        {"Leaving the Hall" = "federation/revoking.md"},
-    ]},
     {"Onboarding" = [
         {"Invokers" = "invoker-onboarding.md"},
         {"Automata" = "automaton-onboarding.md"},

@@ -73,8 +73,8 @@ Old Major never reads full persona gists when selecting an agent. It reads the c
 ```json
 {
   "display_name": "Hamlet 🐗",
-  "keeper": "mksetaro",
-  "keeper_env": "hall/hamlet",
+  "invoker": "mksetaro",
+  "invoker_env": "hall/hamlet",
   "roles": ["implement", "fix", "refactor"],
   "domains": ["cpp", "build-systems", "devops"],
   "scope_summary": "Deep implementation in C++ and build systems. Not for UI, docs, or infrastructure provisioning.",

@@ -1,5 +1,5 @@
 // Selects the least-used invoker from the invoker/* environment pool.
-// Queries all invoker/* (and legacy keeper/*) environments, reads HALL_USAGE_COUNT
+// Queries all invoker/* (and legacy invoker/*) environments, reads HALL_USAGE_COUNT
 // and HALL_WEEKLY_CAP for each, filters out at-cap members, and picks the least-used.
 // Env vars:
 //   FAIL_FAST    — if 'true', calls core.setFailed() when no invoker is available
@@ -14,19 +14,19 @@ module.exports = async ({ github, context, core }) => {
   const owner = context.repo.owner;
   const repo  = context.repo.repo;
 
-  // Paginate through all environments and collect invoker/* and keeper/* ones
+  // Paginate through all environments and collect invoker/* and invoker/* ones
   let envs = [], page = 1;
   while (true) {
     const res = await github.request('GET /repos/{owner}/{repo}/environments',
       { owner, repo, per_page: 100, page });
-    // TODO: remove keeper/ filter once all keeper/* envs are migrated to invoker/*
+    // TODO: remove invoker/ filter once all invoker/* envs are migrated to invoker/*
     const batch = (res.data.environments || [])
-      .filter(e => e.name.startsWith('invoker/') || e.name.startsWith('keeper/'));
+      .filter(e => e.name.startsWith('invoker/') || e.name.startsWith('invoker/'));
     envs = envs.concat(batch);
     if ((res.data.environments || []).length < 100) break;
     page++;
   }
-  core.info(`[select-invoker] found ${envs.length} invoker/keeper environment(s)`);
+  core.info(`[select-invoker] found ${envs.length} invoker/invoker environment(s)`);
 
   const candidates = [];
   for (const env of envs) {
@@ -44,7 +44,7 @@ module.exports = async ({ github, context, core }) => {
       )).data.value || '25', 10);
     } catch (_) { /* not set — default 25 */ }
     core.info(`[select-invoker] ${env.name}: count=${count} cap=${cap}`);
-    const handle = env.name.replace(/^(?:invoker|keeper)\//, '');
+    const handle = env.name.replace(/^(?:invoker|invoker)\//, '');
     if (count < cap) {
       candidates.push({ handle, count });
     }

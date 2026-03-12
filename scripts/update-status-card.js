@@ -45,7 +45,7 @@ module.exports = async ({ github, context, core }) => {
     'working':        `Working — \`${branch}\``,
     'pr-opened':      `PR opened — ${pr}`,
     'ci-fix':         `CI fix in progress${extra ? ` (${extra})` : ''}`,
-    'escalated':      'Escalated — keeper notified',
+    'escalated':      'Escalated — invoker notified',
     'failed':         'Failed — see comments',
     'done':           process.env.PR_NUMBER ? `Done — ${pr} merged` : 'Done — response posted',
   }[stage] ?? stage;
