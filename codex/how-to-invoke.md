@@ -4,15 +4,13 @@ icon: material/play-circle
 
 # How to Invoke an Automaton
 
-This page explains every supported way to trigger an agent, what happens at each step, and what to avoid.
-
 ---
 
 ## Invocation model
 
-The Hall is **label-driven**. Labels on issues and PRs are the canonical signal — they declare which agent owns that thread. Comments and reviews are only processed when a binding label is already present (or explicitly included).
+The Hall is **label-driven**. Labels declare which agent owns a thread. Comments and PR reviews extend a bound thread — they do not initiate dispatch on their own.
 
-There is no magic comment syntax. You cannot summon an agent by typing `@hall-of-automata do this` in a comment. Labels bind the thread; comments continue a bound thread.
+To start a new task: apply a `hall:*` label or use the issue template (which does it automatically). To continue an existing task: reply on an awaiting-input issue or submit a PR review with `@hall-of-automata <agent>` in the body.
 
 ---
 
@@ -139,7 +137,7 @@ Every dispatch creates or updates a `<!-- hall-status -->` comment on the issue 
 
 Invokers each have a weekly dispatch cap (`HALL_WEEKLY_CAP`, measured in hours × 3 dispatches per hour). The Hall automatically picks the least-used invoker under cap. You never choose which invoker's token backs your dispatch.
 
-If all invokers are at cap, the issue is labeled `hall:invoker-queued` and a comment explains the situation. The queue is not automatic — re-trigger manually after the weekly reset (Monday 00:00 UTC) or when a new invoker registers.
+If all invokers are at cap, the issue is labeled `hall:invoker-queued` and a comment explains the situation. Re-trigger after the weekly reset (Monday 00:00 UTC) or when a new invoker registers.
 
 ---
 

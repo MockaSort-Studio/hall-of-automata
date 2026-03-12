@@ -24,7 +24,7 @@ MockaSort Studio needed a way for org members to invoke named AI agents (automat
 
 ### Option A — GitHub Actions + environment secrets (chosen)
 
-**Architecture:** GitHub-hosted runners handle orchestration. Per-keeper OAuth tokens stored as environment secrets in `hall/<agent>` GitHub Environments. The Hall App (Members: read) checks team membership — no separate PAT required. Invocation is triggered by issue labels or `@hall-of-automata` assignment.
+**Architecture:** GitHub-hosted runners handle orchestration. Per-invoker OAuth tokens stored as environment secrets in `invoker/<handle>` GitHub Environments; automata run under the pool-selected invoker's token. The Hall App (Members: read) checks team membership — no separate PAT required. Invocation is triggered by issue labels, `@hall-of-automata` comment, or PR review `@mention`.
 
 **Authorization:** One GitHub team (`automata-invokers`) gates all automata. Membership check runs via the App's installation token; unauthorized invocations trigger a hard workflow failure.
 
@@ -41,13 +41,13 @@ flowchart TD
 - Zero member infrastructure — no machine needs to be online
 - Available 24/7, GitHub manages the compute
 - Full audit trail in Actions logs and issue comments
-- Simple to onboard new automata — generate OAuth token, provision environment, register
-- Per-keeper OAuth tokens: billing is traceable to individual contributors
+- Simple to onboard new automata — submit character sheet, Old Major opens PR, merge
+- Per-invoker OAuth tokens: billing is traceable to individual contributors
 - Environments API allows usage variables to be updated without secrets rotation
 
 **Cons:**
-- OAuth tokens in environment secrets — visible to org admins, not physically on keeper's hardware
-- GitHub-hosted runners are ephemeral — persistent state via deployments, gists, and Actions Cache
+- OAuth tokens in environment secrets — visible to org admins, not physically on invoker's hardware
+- GitHub-hosted runners are ephemeral — persistent state via Actions Cache and repo files
 - Requires trust in org admins for secret custody
 
 **Accepted tradeoffs:** Token custody is organizational, not physical. Mitigated by CODEOWNERS protection on workflow files and the assumption that org admins are trusted. Tokens auto-invalidate on re-issue. The convenience and availability advantages outweigh the custody tradeoff for this team.

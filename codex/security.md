@@ -112,7 +112,7 @@ These are not deletable by regular org members. They provide a complete history 
 
 ## What this does not protect against
 
-- A compromised keeper account with direct org admin rights
+- A compromised invoker account with direct org admin rights
 - GitHub infrastructure compromise
 - Anthropic-side data handling (governed by Anthropic's terms)
-- Issues in repos where the workflow is not present (invocation silently does nothing — the label has no workflow to trigger)
+- Repos where the Hall App is not installed — the relay will not forward webhook events for those repos

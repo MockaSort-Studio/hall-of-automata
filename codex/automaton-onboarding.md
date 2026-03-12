@@ -4,21 +4,20 @@ icon: material/robot
 
 # Automaton Onboarding
 
-An **automaton** is a named Claude agent registered in the Hall. Registering one creates three artifacts:
+An **automaton** is a named Claude agent registered in the Hall. Registering one adds two files to the Hall repo:
 
-- a **persona gist** — the agent's behavioural contract, fetched at dispatch time
-- a **`hall/<slug>` GitHub Environment** — holds the OAuth token and operational variables
-- a **roster entry** — what Old Major consults when routing tasks to specialists
+- `roster/<slug>.md` — the agent's persona character sheet
+- an entry in `agents.yml` — what the dispatch workflow and Old Major read
 
-The full process is automated. Old Major handles provisioning; you supply the character sheet and the credential.
+The process is automated via issue template. Old Major reviews the submission, opens a PR with both files, and the automaton becomes dispatchable on merge. Automata run under the invoker pool — no dedicated token required.
 
 ---
 
 ## Prerequisites
 
-- You are a registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
-
-Automata run under your Claude OAuth token. No separate subscription or credential is required — your invoker registration is the key.
+- Registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
+- Lowercase slug chosen and confirmed absent from `agents.yml`
+- Character sheet drafted per [`agents/automaton_template.md`](../agents/automaton_template.md)
 
 ---
 
@@ -26,39 +25,37 @@ Automata run under your Claude OAuth token. No separate subscription or credenti
 
 ```mermaid
 flowchart TD
-    A([Open New Automaton issue\nfill character sheet template]) --> B[hall:onboard-automaton\nauto-applied by template]
+    A([Open New Automaton issue\nfill character sheet]) --> B[hall:onboard-automaton\nauto-applied by template]
     B --> C[[onboard-automaton workflow\nOld Major dispatched]]
     C --> D{Character sheet\nquality check}
-    D -- Gaps found --> E([Old Major posts\nclarifying questions\nhall:awaiting-input applied])
-    E --> F([You reply with\ncorrections or additions])
+    D -- Gaps --> E([Old Major posts clarifying questions\nhall:awaiting-input applied])
+    E --> F([You reply with corrections])
     F --> D
-    D -- Passes --> G[Old Major creates\npersona gist]
-    G --> H[Old Major creates\nhall/slug environment]
-    H --> I[Old Major updates\nroster gist via hall/roster]
-    I --> J([Old Major posts provisioning\nsummary comment])
-    J --> K([Issue closed\nAutomaton active])
+    D -- Passes --> G[Old Major opens PR\nroster/slug.md + agents.yml entry]
+    G --> H([You review and merge PR])
+    H --> I([Automaton active])
 ```
 
 ---
 
 ## Character sheet quality bar
 
-Old Major will reject (and ask for clarification) if any of these are missing or unusable:
+Old Major rejects and asks for clarification if any field fails:
 
 | Field | Requirement |
 |-------|-------------|
-| `slug` | Lowercase kebab-case, unique in roster, no spaces |
-| `display_name` | Human-readable — shown in status cards and comments |
+| `slug` | Lowercase kebab-case, unique in `agents.yml`, no spaces |
+| `display_name` | Human-readable — used in status cards |
 | `invoker` | Active invoker GitHub handle |
-| `character` | Tone adjectives, voice notes, automaton-specific rules, signature — behavioural contract, not biography |
-| `domains` | Named capability bundles — routing signals, not tool lists. The name implies affordances |
-| `scope` | All three subsections present: right-for, not-right-for, ambiguity gate |
-| `scope_summary` | One sentence, optimised for Old Major's routing decision at triage time |
+| `character` | Tone, voice, rules, signature — behavioral contract, not biography |
+| `domains` | Named capability bundles — routing signals, not tool lists |
+| `scope` | All three subsections: right-for, not-right-for, ambiguity gate |
+| `scope_summary` | One sentence optimised for Old Major's routing decision |
 
-A submission that doesn't meet the bar gets a clarifying comment, not a partial provision. No gist or environment is created until the sheet passes.
+No partial provisioning. Both files are committed in one PR or not at all.
 
 ---
 
-## After provisioning
+## After merge
 
-The automaton is dispatchable immediately — it runs under the registering invoker's OAuth token, which is already in place. Old Major posts a provisioning summary on the issue before closing it.
+Dispatchable immediately via `hall:<slug>` label. Old Major will route unlabeled invocations to it when the task matches its `catalog.domains` and `scope_summary`.

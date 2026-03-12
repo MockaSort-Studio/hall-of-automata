@@ -62,7 +62,7 @@ How the pieces fit together at the infrastructure level.
 | [Architecture Overview](architecture/README.md) | Component diagram, invocation paths, dispatch flow |
 | [Runner Model](architecture/runner-model.md) | Execution layers, persona injection, state persistence |
 | [Permissions Model](architecture/permissions-model.md) | GitHub teams as the authorization layer |
-| [Secrets & Storage](architecture/secrets-model.md) | Keeper environments, OAuth tokens, deployment payloads, env variables |
+| [Secrets & Storage](architecture/secrets-model.md) | Invoker environments, OAuth tokens, env variables |
 | [CI Loop and PR Checks](architecture/ci-loop-and-checks.md) | CI re-dispatch loop, why Hall workflows appear as PR checks, design rationale |
 
 ### Operations
@@ -79,7 +79,7 @@ How automata join and leave the Hall.
 | Document | What it covers |
 |----------|---------------|
 | [Federation Overview](federation/README.md) | What federation is and what it means |
-| [Joining](federation/joining.md) | Registering a new automaton: issue template → Old Major → deployment |
+| [Joining](federation/joining.md) | Registering a new automaton: issue template → Old Major → PR → merge |
 | [Leaving](federation/revoking.md) | Retiring or suspending an automaton |
 
 ### How To
@@ -108,24 +108,9 @@ Behavioral spec and persona format.
 
 **Old Major** — the Hall Master. Entry point for all unlabeled invocations. Reads the roster catalog, picks the right specialist, synthesizes context. Never implements code directly.
 
-**CLAUDE.md** — the assembled context file written to the runner workspace at dispatch time: base contract + persona character sheet. Never committed. Target repo's own CLAUDE.md (if any) is stashed as `.hall-local.md` for the agent to read.
+**CLAUDE.md** — the assembled context file written to the runner workspace at dispatch time: base contract + persona character sheet. Never committed. Target repo's own CLAUDE.md (if any) is read for hard constraints but not modified.
+
+**`.hall-local.md`** — automaton-owned file in the target repo. Holds dispatch log entries and task context accumulated across invocations. The only `.hall-*` file an automaton may commit. Integrating repos accept its presence.
 
 **Task memory** — Actions Cache entry (`hall-task-{repo}-{pr}`), keyed by PR. Concurrency-safe. Deleted on PR close. On cache miss the agent reconstructs from the issue/PR thread.
 
----
-
-## Roadmap
-
-The immediate path before new features:
-
-```
-Smoke test (TEST_PLAN.md)
-  → Phase 5: unauthorized hardening + cleanup fixes
-  → Phase 5: keeper env variables (replace cache counter)
-  → Phase 5: Old Major triage job + assignment trigger
-  → Phase 5: deployment lifecycle actions
-  → Webhook relay (Fly.io)
-  → Full org test
-```
-
-Full breakdown in [`../TODO.md`](../TODO.md).
