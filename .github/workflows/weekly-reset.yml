@@ -50,3 +50,47 @@ jobs:
           done
 
           echo "Weekly reset complete: ${RESET_COUNT} environment(s) zeroed."
+
+      - name: Check routing.yml reset_day consistency
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO:     ${{ github.repository }}
+        shell: bash
+        # The cron schedule above is static YAML — it cannot be dynamic.
+        # This step validates that routing.yml reset_day agrees with the scheduled day.
+        # Cron '0 0 * * 1' fires on day-of-week 1 = Monday.
+        run: |
+          set -euo pipefail
+          CRON_DAY=1   # day-of-week from 'cron: 0 0 * * 1' above
+
+          ROUTING_CONTENT=$(gh api "/repos/${REPO}/contents/routing.yml" --jq '.content' | base64 -d 2>/dev/null || true)
+          if [ -z "${ROUTING_CONTENT}" ]; then
+            echo "::warning::Could not fetch routing.yml — skipping reset_day consistency check."
+            exit 0
+          fi
+
+          RESET_DAY=$(echo "${ROUTING_CONTENT}" | grep -E '^\s+reset_day:' | sed 's/.*reset_day:[[:space:]]*//' | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+          if [ -z "${RESET_DAY}" ]; then
+            echo "::warning::routing.yml has no reset_day field — skipping consistency check."
+            exit 0
+          fi
+
+          case "${RESET_DAY}" in
+            sunday)    ROUTING_DAY=0 ;;
+            monday)    ROUTING_DAY=1 ;;
+            tuesday)   ROUTING_DAY=2 ;;
+            wednesday) ROUTING_DAY=3 ;;
+            thursday)  ROUTING_DAY=4 ;;
+            friday)    ROUTING_DAY=5 ;;
+            saturday)  ROUTING_DAY=6 ;;
+            *)
+              echo "::warning::routing.yml reset_day='${RESET_DAY}' is not a recognised day name — skipping consistency check."
+              exit 0
+              ;;
+          esac
+
+          if [ "${ROUTING_DAY}" -ne "${CRON_DAY}" ]; then
+            echo "::warning::routing.yml reset_day='${RESET_DAY}' (day ${ROUTING_DAY}) does not match the cron schedule day ${CRON_DAY}. Update the cron in weekly-reset.yml or reset_day in routing.yml to keep them in sync."
+          else
+            echo "routing.yml reset_day='${RESET_DAY}' matches cron schedule (day ${CRON_DAY}). Consistent."
+          fi

@@ -138,6 +138,22 @@ module.exports = async ({ github, context, core }) => {
     const hallOwner = context.repo.owner;
     const hallRepo  = context.repo.repo;
 
+    // Read routing.fallback from routing.yml to determine cap-exceeded behaviour.
+    // 'queue' (default): set empty invoker — the notify-queued job handles it.
+    // 'fail': call core.setFailed() immediately.
+    let fallback = 'queue';
+    try {
+      const { data } = await github.rest.repos.getContent({ owner: hallOwner, repo: hallRepo, path: 'routing.yml' });
+      const content = Buffer.from(data.content, 'base64').toString('utf8');
+      for (const line of content.split('\n')) {
+        const m = line.match(/^\s+fallback:\s*(\S+)/);
+        if (m) { fallback = m[1]; break; }
+      }
+      core.info(`[detect] routing.fallback=${fallback}`);
+    } catch (err) {
+      core.warning(`[detect] could not read routing.yml (${err.message}) — defaulting fallback to queue`);
+    }
+
     // Paginate through all environments and collect invoker/* ones
     let envs = [];
     let page = 1;
@@ -185,7 +201,12 @@ module.exports = async ({ github, context, core }) => {
       invokerCount = candidates[0].count;
       core.info(`[detect] selected invoker=${invoker} (count=${invokerCount})`);
     } else {
-      core.info('[detect] no invoker available — all at cap');
+      core.info(`[detect] no invoker available — all at cap (fallback=${fallback})`);
+      if (fallback === 'fail') {
+        core.setFailed('[detect] all invokers are at cap and routing.fallback is set to fail.');
+        return;
+      }
+      // fallback === 'queue': leave invoker empty — the notify-queued job handles it
     }
   }
 
