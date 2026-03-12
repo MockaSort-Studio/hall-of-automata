@@ -115,7 +115,16 @@ runs:
           echo "Wrote dispatch-result.json with outcome: failed (token-status=${{ steps.categorize.outputs.token-status }})"
         fi
 
+    # Propagate SDK failure only when the agent did NOT complete successfully.
+    # The SDK wrapper sometimes exits 1 post-completion (cleanup errors); if the
+    # agent already wrote a success outcome in dispatch-result.json, suppress it.
     - name: Propagate agent failure
       if: steps.run-claude.outcome == 'failure'
       shell: bash
-      run: exit 1
+      run: |
+        OUTCOME=$(jq -r '.outcome // ""' .hall/dispatch-result.json 2>/dev/null || echo "")
+        if [[ "$OUTCOME" == "comment_posted" || "$OUTCOME" == "pr_created" || "$OUTCOME" == "awaiting_input" ]]; then
+          echo "Agent completed successfully (outcome=$OUTCOME); suppressing SDK wrapper exit 1"
+          exit 0
+        fi
+        exit 1
