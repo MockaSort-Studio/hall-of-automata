@@ -125,4 +125,3 @@ In priority order:
 | No webhook relay | Hall only reacts to its own repo events | Before full org use |
 | PR size cap not enforced | No diff size limit | Investigate |
 | Agent display names with emoji | Raw slug used in status card | Low |
-| `post-dispatch` pre-built inputs unused (`turns-used`, `retry-count` always 0) | Audit log incomplete | When FR-9 routing is implemented |

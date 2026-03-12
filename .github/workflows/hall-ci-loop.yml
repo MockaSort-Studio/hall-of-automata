@@ -99,6 +99,7 @@ jobs:
           path: .hall
 
       - name: Increment invoker weekly counter
+        id: increment
         uses: ./.hall/actions/counter
         with:
           current-count:    ${{ needs.select-invoker.outputs.invoker-count }}
@@ -216,6 +217,33 @@ jobs:
               "last_ci_failures": "${{ needs.detect.outputs.ci-failures }}",
               "last_review_feedback": ""
             }
+
+      - name: Read dispatch outcome
+        id: ci-outcome
+        if: always() && steps.retry.outputs.escalate != 'true'
+        shell: bash
+        run: |
+          OUTCOME=$(jq -r '.outcome // "comment_posted"' .hall/dispatch-result.json 2>/dev/null || echo "comment_posted")
+          echo "outcome=$OUTCOME" >> "$GITHUB_OUTPUT"
+
+      - name: Post-dispatch audit
+        if: always() && steps.retry.outputs.escalate != 'true'
+        uses: ./.hall/actions/post-dispatch
+        with:
+          app-token:          ${{ steps.app-token.outputs.token }}
+          agent:              ${{ needs.detect.outputs.agent }}
+          agent-dispatched:   ${{ needs.detect.outputs.agent }}
+          repo-owner:         ${{ needs.detect.outputs.repo-owner }}
+          repo-name:          ${{ needs.detect.outputs.repo-name }}
+          issue-number:       ${{ needs.detect.outputs.issue-number }}
+          pr-number:          ${{ needs.detect.outputs.pr-number }}
+          invoker:            ${{ needs.select-invoker.outputs.invoker }}
+          team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
+          turns-used:         ${{ steps.agent.outputs.turns-used }}
+          turns-max:          ${{ steps.agent-cfg.outputs.max-turns }}
+          retry-count:        ${{ steps.retry.outputs.new-count }}
+          outcome:            ${{ steps.ci-outcome.outputs.outcome }}
+          weekly-count-after: ${{ steps.increment.outputs.count }}
 
       - name: Update status card — pr-opened
         if: always() && steps.retry.outputs.escalate != 'true' && needs.detect.outputs.issue-number != ''
