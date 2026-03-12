@@ -40,7 +40,7 @@ A failed API call (user not found, token issue, API error) returns `false` and t
 
 ## Federation and team membership
 
-Federating an automaton does not automatically grant its keeper invocation rights. The keeper must be added to `automata-invokers` separately, or already be a member.
+Federating an automaton does not automatically grant its invoker invocation rights. The invoker must be added to `automata-invokers` separately, or already be a member.
 
 Adding a member:
 - Org → Teams → `automata-invokers` → Add member

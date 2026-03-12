@@ -57,7 +57,7 @@ flowchart TB
 
 **PR review path** — a reviewer `@mention`s the bot in a pull request review. The agent is re-dispatched with the review feedback appended to its task memory.
 
-**CI failure path** — a failing check suite on a `hall/*` branch triggers `hall-ci-loop.yml`. The agent is re-dispatched up to `max_retries` times before keeper escalation.
+**CI failure path** — a failing check suite on a `hall/*` branch triggers `hall-ci-loop.yml`. The agent is re-dispatched up to `max_retries` times before invoker escalation.
 
 **Assignment path** *(planned)* — an issue is assigned to `@hall-of-automata` without specifying an agent. Old Major runs first to triage, select the right specialist, and synthesize context.
 

@@ -15,9 +15,10 @@ The process is automated via issue template. Old Major reviews the submission, o
 
 ## Prerequisites
 
-- Registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
-- Lowercase slug chosen and confirmed absent from `agents.yml`
-- Character sheet drafted per [`agents/automaton_template.md`](../agents/automaton_template.md)
+- [] Registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
+- [] Lowercase slug chosen and confirmed absent from `agents.yml`
+- [] Character sheet drafted per [`agents/automaton_template.md`](../agents/automaton_template.md)
+- [] [Open Issue](https://github.com/MockaSort-Studio/hall-of-automata/issues/new/choose)
 
 ---
 
@@ -55,7 +56,3 @@ Old Major rejects and asks for clarification if any field fails:
 No partial provisioning. Both files are committed in one PR or not at all.
 
 ---
-
-## After merge
-
-Dispatchable immediately via `hall:<slug>` label. Old Major will route unlabeled invocations to it when the task matches its `catalog.domains` and `scope_summary`.

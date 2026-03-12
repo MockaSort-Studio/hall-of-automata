@@ -16,6 +16,7 @@ Complete both before opening the onboarding issue:
 
 - [ ] Member of the `automata-invokers` GitHub team — ask an org admin
 - [ ] `claude setup-token` completed locally — you should have received an OAuth token
+- [ ] [Open issue](https://github.com/MockaSort-Studio/hall-of-automata/issues/new/choose)
 
 ---
 
@@ -44,18 +45,6 @@ flowchart TD
 
 ---
 
-## Why the live invocation test?
-
-Secret name presence does not validate the token value. A token that was pasted incorrectly, truncated, or has already been revoked will register as a named secret but fail at dispatch time — wasting a turn and leaving an unhelpful error. The test-token job fires a minimal one-turn Claude call inside `invoker/<you>` before access is granted. Failure produces an actionable retry prompt, not a silent broken state.
-
----
-
 ## Weekly cap
 
 The cap you provide in hours is converted to **turns** (1 hour ≈ 3 turns) and stored as `HALL_WEEKLY_CAP` in your environment. The counter resets every Monday. Old Major enforces the cap during unlabeled triage; labeled dispatches have their own pre-dispatch guard.
-
----
-
-## Invoking an automaton
-
-Once registered, apply a `hall:<agent>` label to any issue or PR in a target repository. The Hall checks your team membership on every dispatch.

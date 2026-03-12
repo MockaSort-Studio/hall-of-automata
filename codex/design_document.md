@@ -6,7 +6,7 @@ icon: material/book-open-page-variant
 
 **Status:** Draft
 **Authors:** Hamlet 🐗
-**Reviewer:** [The lore-keeper](https://github.com/mksetaro)
+**Reviewer:** [The lore-invoker](https://github.com/mksetaro)
 **Version:** 1.1
 **Date:** March 2026
 

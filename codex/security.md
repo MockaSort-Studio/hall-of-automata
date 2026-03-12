@@ -45,7 +45,7 @@ Any change to workflow files requires approval from the `admins` team. This is t
 **Mask the OAuth token in every workflow:**
 
 ```yaml
-- name: Mask keeper token
+- name: Mask invoker token
   run: echo "::add-mask::${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
 ```
 
