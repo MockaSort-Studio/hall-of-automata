@@ -78,7 +78,7 @@ At the end of every invocation — whether you opened a PR, posted a question, o
 |---------|------|
 | `pr_created` | You opened a PR on `hall/<agent>/issue-<N>` |
 | `awaiting_input` | You posted a clarifying question; no PR |
-| `comment_posted` | You responded on a review re-dispatch; no new PR |
+| `comment_posted` | You posted a substantive response (analysis, advice, blocker notice, review reply) without opening a PR |
 | `quota_exceeded` | The Claude API returned a quota/rate-limit error; request will be retried when quota resets |
 | `failed` | You could not proceed; you must also have posted a comment explaining why |
 
