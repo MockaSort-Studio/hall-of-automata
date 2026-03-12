@@ -42,10 +42,11 @@ runs:
       id: increment
       shell: bash
       env:
+        MODE:          increment
         GH_TOKEN:      ${{ inputs.app-token }}
         CURRENT_COUNT: ${{ inputs.current-count }}
         INCREMENT:     ${{ inputs.increment }}
         ENV_NAME:      ${{ inputs.environment-name }}
         REPO_OWNER:    ${{ inputs.repo-owner }}
         REPO_NAME:     ${{ inputs.repo-name }}
-      run: bash "${{ inputs.scripts-dir }}/increment-counter.sh"
+      run: bash "${{ inputs.scripts-dir }}/quota-counter.sh"

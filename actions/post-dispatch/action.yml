@@ -68,6 +68,7 @@ runs:
       if: inputs.pr-number != ''
       uses: actions/github-script@v7
       env:
+        ACTION:     apply-agent
         REPO_OWNER: ${{ inputs.repo-owner }}
         REPO_NAME:  ${{ inputs.repo-name }}
         PR_NUMBER:  ${{ inputs.pr-number }}
@@ -75,7 +76,7 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ inputs.scripts-dir }}/apply-hall-label.js')
+          const fn = require('${{ inputs.scripts-dir }}/label-utils.js')
           await fn({ github, core })
 
     - name: Write invocation audit log

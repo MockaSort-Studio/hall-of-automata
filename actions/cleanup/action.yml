@@ -59,6 +59,7 @@ runs:
     - name: Cleanup PR labels and post summary
       uses: actions/github-script@v7
       env:
+        ACTION:       cleanup
         REPO_OWNER:   ${{ inputs.repo-owner }}
         REPO_NAME:    ${{ inputs.repo-name }}
         PR_NUMBER:    ${{ inputs.pr-number }}
@@ -68,5 +69,5 @@ runs:
       with:
         github-token: ${{ inputs.app-token }}
         script: |
-          const fn = require('${{ inputs.scripts-dir }}/cleanup-pr.js')
+          const fn = require('${{ inputs.scripts-dir }}/pr-utils.js')
           await fn({ github, core })
