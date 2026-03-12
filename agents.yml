@@ -46,6 +46,21 @@ agents:
         runtime misbehaviours in Bazel-managed codebases, working from CI output rather than
         running builds inline.
 
+  pyrate:
+    display_name: "Captain Pyrate 🦜"
+    # Persona: roster/pyrate.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: fpetracci
+    teams: [automata-invokers]
+    max_turns: 40
+    max_retries: 2
+    catalog:
+      roles: [implement, debug]
+      domains: [python]
+      scope_summary: >
+        Python software engineering specialist — implements features, fixes bugs, and handles
+        packaging and deployment in Bazel-managed and uv-managed Python codebases.
+
   mergio:
     display_name: "mergio 🤘"
     # Persona: roster/mergio.md
