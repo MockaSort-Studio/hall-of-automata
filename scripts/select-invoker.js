@@ -14,6 +14,26 @@ module.exports = async ({ github, context, core }) => {
   const owner = context.repo.owner;
   const repo  = context.repo.repo;
 
+  // Read routing.yml from the Hall repo to get the configured selection strategy.
+  // Falls back to 'least_used' if the file cannot be read.
+  let strategy = 'least_used';
+  try {
+    const { data } = await github.rest.repos.getContent({ owner, repo, path: 'routing.yml' });
+    const content = Buffer.from(data.content, 'base64').toString('utf8');
+    for (const line of content.split('\n')) {
+      const m = line.match(/^\s+strategy:\s*(\S+)/);
+      if (m) { strategy = m[1]; break; }
+    }
+    core.info(`[select-invoker] routing.strategy=${strategy}`);
+  } catch (err) {
+    core.warning(`[select-invoker] could not read routing.yml (${err.message}) — defaulting strategy to least_used`);
+  }
+
+  if (strategy !== 'least_used') {
+    core.setFailed(`[select-invoker] unrecognised routing.strategy: '${strategy}'. Only 'least_used' is supported.`);
+    return;
+  }
+
   // Paginate through all environments and collect invoker/* and invoker/* ones
   let envs = [], page = 1;
   while (true) {
@@ -56,6 +76,7 @@ module.exports = async ({ github, context, core }) => {
     return;
   }
 
+  // strategy === 'least_used': sort ascending by count, break ties randomly
   candidates.sort((a, b) => a.count - b.count || Math.random() - 0.5);
   const selected = candidates[0];
   core.info(`[select-invoker] selected invoker=${selected.handle} (count=${selected.count})`);
