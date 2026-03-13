@@ -8,9 +8,8 @@ This page covers what happens in your repository when the Hall is granted access
 
 ---
 
-## The `.hall-local.md` file
+!!! info "A file will be committed to your repository"
 
-!!! question "A file will be committed to your repository"
     When an automaton works in your repository for the first time, it creates and commits **`.hall-local.md`** at the repo root.
 
     This file is the Hall's persistent memory for that repository — a compact architectural map the agent writes so that future invocations can orient themselves immediately without re-reading the whole codebase. It contains:

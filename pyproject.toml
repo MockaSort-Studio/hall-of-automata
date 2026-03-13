@@ -39,7 +39,8 @@ nav = [
     {"State & Roadmap" = "state.md"},
     {"Contributing" = "contributing.md"},
 ]
-
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.pymdownx.details]
 [project.markdown_extensions.attr_list]
 [project.markdown_extensions.md_in_html]
 [project.markdown_extensions.pymdownx.blocks.caption]

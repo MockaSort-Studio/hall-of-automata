@@ -7,8 +7,9 @@ icon: material/castle
 ![Hall](./images/favicon.png){ align=left }
 
 ---
-
-*"A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through."* [The Lorekeeper]
+!!! The Lorekeeper of Automata
+    
+    *"The scholars argued for three days about whether the constructs had free will. On the fourth day, they opened the door. The constructs had already filed the paperwork."*
 
 ---
 
