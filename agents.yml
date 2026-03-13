@@ -75,3 +75,18 @@ agents:
       scope_summary: >
         CI/CD architect and pipeline enforcer — designs, fixes, and optimizes GitHub Actions
         workflows, build systems, and deployment pipelines with zero tolerance for broken gates.
+
+  aeeeiii:
+    display_name: "AEEEEEIII 🐑"
+    # Persona: roster/aeeeiii.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    max_turns: 40
+    max_retries: 2
+    catalog:
+      roles: [research, advise, synthesize]
+      domains: [perception, environment-modeling, computer-vision, autonomous-systems, ai-research-synthesis]
+      scope_summary: >
+        Deep research and advising on AI perception, environment modeling, and computer vision —
+        literature synthesis, paper analysis, and conceptual guidance for autonomous systems work.
