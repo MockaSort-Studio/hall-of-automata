@@ -448,5 +448,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 .md-grid {
-  max-width: min(2600px, 92vw);
+  max-width: min(2600px, 92vw) !important;
+}
+
+.md-content {
+  max-width: none !important;
 }
