@@ -19,7 +19,7 @@ To start a new task: apply a `hall:*` label or use the issue template (which doe
 Use this when you want an automaton to do work: implement a feature, fix a bug, write a script, research a question.
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '24px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
 
 graph LR
     A([Open issue from\nAutomaton Task template]) -->|auto-applies\nhall:old-major| B

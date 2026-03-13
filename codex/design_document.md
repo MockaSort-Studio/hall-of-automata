@@ -15,7 +15,7 @@ icon: material/book-open-page-variant
 ## Architecture Overview
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#080f1e', 'clusterBorder': '#1e3a5f', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#080f1e', 'clusterBorder': '#1e3a5f', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
 
 graph TB
     subgraph ORG["GitHub Organization"]
