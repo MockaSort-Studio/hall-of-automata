@@ -1,7 +1,7 @@
 name: "⚔️ Automaton Quest"
-description: "Send a task to a registered automaton. The agent operates on what you provide here — fill it out completely."
+description: "Send a task to a registered automaton. The agent operates on what you provide here — fill it out completely. Apply hall:dispatch-automaton to invoke the hall"
 title: "[Quest]: <short description>"
-labels: [hall:dispatch-automaton]
+labels: []
 body:
   - type: markdown
     attributes:
@@ -77,7 +77,7 @@ body:
       placeholder: |
         - Do not modify anything under infra/prod/
         - PR diff must not exceed 300 LOC
-        - Request review from @mksetaro before any merge
+        - Request review from @name before any merge
     validations:
       required: false
 

@@ -35,6 +35,8 @@ nav = [
         {"Org-Wide Setup" = "org-setup.md"},
         {"Webhook Relay (Fly.io)" = "relay-setup.md"},
     ]},
+    {"State & Roadmap" = "state.md"},
+    {"Contributing" = "contributing.md"},
 ]
 
 [project.markdown_extensions.attr_list]
@@ -44,6 +46,9 @@ nav = [
 custom_fences = [
   { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }
 ]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_index = "zensical.extensions.emoji.twemoji"
+emoji_generator = "zensical.extensions.emoji.to_svg"
 [project.markdown_extensions.pymdownx.tasklist]
 custom_checkbox = true
 
@@ -78,4 +83,3 @@ features = [
 
 [project.theme.icon]
 repo = "fontawesome/brands/github"
-roster = "./images/roster_logo.png"
