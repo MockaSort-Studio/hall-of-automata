@@ -8,9 +8,9 @@ Every automaton shares the behavioral contract in [`automaton_base.md`](automato
 
 ```
 ┌─────────────────────────────┐
-│     Repo constraints        │  ← extracted from .hall-local.md at dispatch time (read-only)
+│     Repo context            │  ← .hall-local.md: read at start, updated and committed at end
 ├─────────────────────────────┤
-│        Personality          │  ← defined per automaton; hosted as a GitHub Gist
+│        Personality          │  ← defined per automaton in roster/<slug>.md
 ├─────────────────────────────┤
 │       Base Contract         │  ← shared, in this repo: agents/automaton_base.md
 ├─────────────────────────────┤
@@ -52,35 +52,32 @@ Each automaton's persona follows a fixed three-section structure defined in [`au
 
 ## Where personas live
 
-Each automaton's full character sheet is hosted as a **GitHub Gist**, owned by the Hall. The gist reference (ID) is stored in the automaton's deployment payload under `hall/<agent>` environment. At dispatch time, the workflow fetches the persona from the gist and assembles the CLAUDE.md context file:
+Each automaton's character sheet lives in the Hall repo at `roster/<slug>.md`. At dispatch time, the workflow assembles the CLAUDE.md context file in the runner workspace:
 
 ```
 base contract (agents/automaton_base.md)
-  + persona character sheet (fetched from gist)
+  + persona character sheet (roster/<slug>.md)
 → written to CLAUDE.md in the runner workspace (never committed)
 ```
 
-If the target repository has a `CLAUDE.md`, it is stashed as `.hall-local.md` before the Hall's CLAUDE.md is written. The agent reads `.hall-local.md` and extracts hard constraints to apply to its work, but does not commit or modify it.
+The target repository's `CLAUDE.md` is never renamed or copied into `.hall-local.md`. On first dispatch to a repo, the step stashes it as `.hall-original-claude.md` (ephemeral, never committed) so the agent can read it once and distil its constraints into `.hall-local.md`. `.hall-local.md` is a Hall-native compact memory file — architectural map, constraints, dispatch log — maintained and committed by the agent at every invocation. See the `.hall-local.md` contract in `automaton_base.md`.
 
-The exception is **Old Major**, whose persona lives directly in this repo at `roster/old-major.md`. Old Major is a Hall infrastructure automaton, not a federated specialist.
+All persona files live in this repo. Old Major is not a special case — his persona is at `roster/old-major.md`, same as every other automaton.
 
 ---
 
 ## The catalog entry — what Old Major reads
 
-Old Major never reads full persona gists when selecting an agent. It reads the compact catalog entry stored in the `hall/roster` deployment payload. Each entry contains:
+Old Major reads the compact catalog from `agents.yml` when routing. Each entry contains:
 
-```json
-{
-  "display_name": "Hamlet 🐗",
-  "invoker": "mksetaro",
-  "invoker_env": "hall/hamlet",
-  "roles": ["implement", "fix", "refactor"],
-  "domains": ["cpp", "build-systems", "devops"],
-  "scope_summary": "Deep implementation in C++ and build systems. Not for UI, docs, or infrastructure provisioning.",
-  "persona_gist_id": "<gist-id>",
-  "dashboard_gist_id": "<gist-id>"
-}
+```yaml
+slug: hamlet
+display_name: "Hamlet 🐗"
+author: mksetaro
+catalog:
+  domains: [cpp, build-systems, debugging]
+  scope_summary: "Deep implementation in C++ and build systems. Not for UI, docs, or non-C++ work."
+max_turns: 40
 ```
 
 The catalog entry and the full persona character sheet must stay in sync. When a persona is updated, the catalog entry's `scope_summary` must be reviewed.

@@ -70,23 +70,15 @@ Pool selection and counter increment are not atomic. The `detect` job reads all 
 
 **Mitigation in practice:** Concurrency groups (`hall-{agent}-{issue}`) serialize per agent+issue. The race only affects cross-issue parallelism, which is bounded by the org's dispatch rate. Acceptable for beta; needs a test-and-set at detection time for high-throughput orgs.
 
-### Memory not saved for non-PR outcomes
-
-Task memory (`hall-task-{repo}-{pr}`) is only persisted when the agent opens a PR. For `awaiting-input`, `comment_posted`, and `failed` outcomes — where the agent stopped before opening a PR — context accumulated during the turn is discarded. On re-dispatch, the agent reconstructs from the issue/PR thread, which is complete but slower.
-
 ### Quota exhaustion retry has no jitter
 
 Queued dispatches are retried by a nightly cron at 03:00 UTC. All queued issues fire simultaneously. If quota is still exhausted, all of them are re-queued for the following night. Under sustained quota shortage (API downtime, billing issues), this creates a thundering herd at the same wall-clock time every night. Fix: add per-issue jitter or stagger the retry window.
-
-### Error type conflation
-
-The post-dispatch probe classifies the SDK exit by HTTP status code on a test call to the Anthropic API: `429` → quota, `401`/`403` → auth failure. But an `error_max_turns` SDK exit (agent hit `max_turns` limit) is indistinguishable from an auth error via this probe — both cause the SDK to exit non-zero, and the probe result determines the outcome label. Practical consequence: a `max_turns` exhaustion is sometimes classified as `failed` rather than `escalated`, with no retry.
 
 ### GitHub API rate limit under large pools
 
 The detect and select-invoker scripts paginate all `invoker/*` environments on every dispatch. With many invokers and a high dispatch rate, each round of dispatches makes several paginated API calls. The scripts have no backoff; under sustained load they would begin hitting the 5000 req/hr ceiling. Not a concern for small orgs; becomes critical past ~20 simultaneous invokers under continuous dispatch.
 
-### Task splitting is not recommended
+### Agent to Agent coordination
 
 Routing a complex task to Old Major with the expectation that he will split it into subtasks and dispatch multiple agents in parallel is **not a supported workflow and not recommended**.
 
@@ -100,10 +92,9 @@ Managing the merge order, preventing conflicts, and synthesising the results fal
 
 **The correct pattern** for multi-component tasks is:
 
-1. Open one issue describing the full task.
-2. Route it to the most relevant specialist.
-3. That agent opens one PR with everything it can do.
-4. Review and merge.
-5. Open a follow-up issue for the remaining component, routed to the second specialist.
+1. Open one issue describing the full task in Advise.
+2. Ask explicitly to decompose tasks and create sub issues.
+3. Old-Major analyses and decomposes.
+4. Review and assign.
 
-**Future mitigation:** Old Major can be instructed to decompose a task and *create* sub-issues — capturing scope, dependencies, and sequence explicitly — without *labeling* them. The human then reviews the decomposition, adjusts the order or scope if needed, and applies labels one at a time to drive sequential dispatch. The agent contributes the thinking; the human controls the execution sequence. This avoids race conditions entirely and keeps the dependency graph legible.
+The above described behaviour happens automatically if Old-Major detects that the task is non-trivial and directly proposes decomposition.

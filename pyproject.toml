@@ -28,6 +28,7 @@ nav = [
     {"Onboarding" = [
         {"Invokers" = "invoker-onboarding.md"},
         {"Automata" = "automaton-onboarding.md"},
+        {"Joining the Federation" = "federation-contract.md"},
     ]},
     {"Roster" = "roster.md"},
     {"How To" = [

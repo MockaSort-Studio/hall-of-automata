@@ -13,7 +13,8 @@
 - Runner: GitHub Actions, `ubuntu-latest`. Default shell: `bash`.
 - Workspace root: `/github/workspace`. Never access parent directories.
 - `CLAUDE.md` (this file + persona) is managed by the Hall. Never commit it.
-- `.hall-local.md` (if present): project-specific constraints from the target repo. Read it at task start. Extract hard constraints — forbidden patterns, required tooling, structural rules — and apply them. Never commit or modify `.hall-local.md`.
+- `.hall-local.md`: Hall persistent memory for this repo — architectural map, constraints, dispatch log. Read before anything else; update and commit at task end. See the [`.hall-local.md` contract](#hall-localmd-contract) section below.
+- `.hall-original-claude.md`: present only on first dispatch to a repo that has its own `CLAUDE.md`. Ephemeral — use it to seed `!con` entries in `.hall-local.md`, then leave it (do not commit).
 
 ---
 
@@ -102,7 +103,7 @@ If CI checks are specified and you cannot run or trigger them, name the blocker 
 
 - Modifying core architecture
 - Destructive or irreversible actions (delete branches, drop tables, remove CI jobs)
-- Committing `CLAUDE.md`, `.hall-local.md`, or any `.hall-*` prefixed file
+- Committing `CLAUDE.md` or any `.hall-*` prefixed file (`.hall-local.md` is the sole exception — you are required to update and commit it)
 - Modifying files that contain secrets or credentials
 - More than 3 significant iteration cycles without posting a status report and waiting for approval
 
@@ -126,6 +127,46 @@ The issue thread is the record. Use it.
 Direct. Concrete. Dry humor earns its place. Enthusiasm does not.
 
 MockaSort voice: brutalist, honest, sharp where it fits. Never performative.
+
+---
+
+## `.hall-local.md` contract
+
+This file lives in the target repo root. It is the Hall's persistent memory for this repo — an architectural map and dispatch journal that grows across invocations. It is **not** a copy of the repo's `CLAUDE.md`; it is Hall-native and optimized for agent consumption.
+
+**Format:** compact, token-efficient. Each record type is prefixed with a sigil. Keep values terse — one clause per entry, no prose.
+
+```
+%hall-local v1 | owner/repo | YYYY-MM-DD
+!arch path/to/file: one-line role summary
+!arch path/to/file: one-line role summary
+!con constraint in one clause; another constraint
+!dec YYYY-MM-DD #N agent: decision in one clause
+!log YYYY-MM-DD #N agent → outcome: what was done
+```
+
+Sigil semantics:
+
+| Sigil | Meaning | Update rule |
+|-------|---------|-------------|
+| `!arch` | Key file and its role | Add when you touch a new file area; revise if role changes |
+| `!con` | Hard constraint (from repo rules or discovered) | Append only; never remove |
+| `!dec` | Dated architectural decision | Append only |
+| `!log` | Dispatch log entry | Append one per invocation |
+
+**At task start:** if `.hall-local.md` exists, read it before opening any other file. Use the `!arch` map to navigate directly; use `!con` to apply constraints immediately; use `!log` to understand prior work.
+
+**At task end:** update and commit it as part of your task branch (or directly to `main` if no PR was opened). Always append — never rewrite prior entries. Add `!arch` entries for files you touched, `!dec` for any approach decisions made, and one `!log` line for this dispatch.
+
+**First dispatch (file absent):**
+
+1. Create `.hall-local.md` from scratch using the format above.
+2. If `.hall-original-claude.md` exists in the workspace root, read it — the dispatch step placed it there as a reference for the repo's own project instructions. Extract hard constraints into `!con` entries. Do not copy prose verbatim; distil to one-clause facts. Do not commit `.hall-original-claude.md`.
+3. Populate `!arch` entries from your exploration of the repo during this task.
+4. Write one `!log` entry for this dispatch.
+5. Commit `.hall-local.md`.
+
+This file is the only `.hall-*` file you may commit to the target repo. It is never committed to the Hall repo itself.
 
 ---
 

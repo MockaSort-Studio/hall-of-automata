@@ -114,9 +114,9 @@ openssl rand -hex 32
 
 ---
 
-## 5. Ensure the GitHub App is installed on target repos
+## 5. Ensure the GitHub App is installed on target organization
 
-The Hall App needs permission to push branches and open PRs in each target repo. Go to:
+The Hall App needs [permission](./design_document.md) to push branches and open PRs in each target repo. Go to:
 
 ```
 https://github.com/apps/hall-of-automata → Configure → Repository access

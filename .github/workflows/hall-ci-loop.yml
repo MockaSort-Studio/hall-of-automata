@@ -212,15 +212,15 @@ jobs:
           mode:        save
           repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
           pr-number:   ${{ needs.detect.outputs.pr-number }}
-          memory-json: >-
-            {
-              "agent": "${{ needs.detect.outputs.agent }}",
-              "issue_number": "${{ needs.detect.outputs.issue-number }}",
-              "pr_number": "${{ needs.detect.outputs.pr-number }}",
-              "retry_count": ${{ steps.retry.outputs.new-count }},
-              "last_ci_failures": "${{ needs.detect.outputs.ci-failures }}",
-              "last_review_feedback": ""
-            }
+          memory-json: |-
+            %hall-task v1 | ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+            !agent ${{ needs.detect.outputs.agent }}
+            !issue ${{ needs.detect.outputs.issue-number || '-' }}
+            !pr ${{ needs.detect.outputs.pr-number || '-' }}
+            !branch -
+            !retry ${{ steps.retry.outputs.new-count }}
+            !ci ${{ needs.detect.outputs.ci-failures || '-' }}
+            !review -
 
       - name: Read dispatch outcome
         id: ci-outcome

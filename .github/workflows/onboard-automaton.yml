@@ -120,11 +120,14 @@ jobs:
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
             If the sheet passes: create a new branch (hall/old-major/issue-<N>),
-            add the new agent entry to agents.yml and commit the persona character
-            sheet to roster/<slug>.md in the same commit, push the branch, open a
-            pull request targeting main with a concise title and body, post a
-            provisioning summary comment on the issue linking to the PR,
-            then close the issue.
+            then in a single commit: (1) add the new agent entry to agents.yml,
+            (2) write the persona character sheet to roster/<slug>.md, and
+            (3) append a new section to codex/roster.md following the exact format
+            of the existing agent entries there — h2 heading with the display name,
+            bold role summary, tone, domains table, right-call/not-right-call lines,
+            and signature. Push the branch, open a pull request targeting main with
+            a concise title and body, post a provisioning summary comment on the
+            issue linking to the PR, then close the issue.
 
       - name: Post quota-queued comment and label
         if: always() && hashFiles('.hall/dispatch-result.json') != ''
@@ -203,8 +206,11 @@ jobs:
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
             (create branch hall/old-major/issue-<N>, commit agents.yml + roster/<slug>.md
-            in one commit, push, open a PR targeting main, post a summary comment on
-            the issue linking to the PR, close the issue).
+            + the new codex/roster.md entry in one commit, push, open a PR targeting
+            main, post a summary comment on the issue linking to the PR, close the
+            issue). The codex/roster.md entry must follow the format of existing entries:
+            h2 heading, bold role summary, tone, domains table, right-call/not-right-call,
+            signature.
             If gaps remain, post updated feedback. Do not provision until the sheet is complete.
 
       - name: Post quota-queued comment and label

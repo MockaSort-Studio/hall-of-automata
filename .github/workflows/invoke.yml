@@ -105,6 +105,13 @@ jobs:
     if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker == ''
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
       - name: Create GitHub App token
         id: app-token
         uses: actions/create-github-app-token@v1
@@ -224,7 +231,7 @@ jobs:
             await fn({ github, core })
 
       - name: Manage routing label
-        if: needs.detect.outputs.issue-number != '' && needs.detect.outputs.trigger-event == 'issue_labeled'
+        if: needs.detect.outputs.issue-number != ''
         env:
           ACTION:       routing
           AGENT:        ${{ needs.detect.outputs.agent }}
@@ -238,13 +245,21 @@ jobs:
             const fn = require('./.hall/scripts/label-utils.js')
             await fn({ github, core })
 
-      #[lore-keeper]: CLAUDE.md of target repo must stay immutable.
-      # step must become PERSONA.md >> CLAUDE.tmp.md << CLAUDE.md (target repo if exists) --- This operation happens only on initial agent task dispatch
       - name: Inject agent persona
         env:
           AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
-        run: cat ".hall/agents/automaton_base.md" ".hall/roster/${AGENT}.md" > CLAUDE.md
+        run: |
+          # On first dispatch to this repo (.hall-local.md absent): if the repo has its own
+          # CLAUDE.md, stash it as .hall-original-claude.md so the agent can read it during
+          # this run and synthesize its constraints into .hall-local.md.
+          # .hall-original-claude.md is ephemeral — never committed. On all subsequent
+          # dispatches .hall-local.md already exists, stashing is skipped, and the agent
+          # reads the accumulated Hall memory directly.
+          if [ -f "CLAUDE.md" ] && [ ! -f ".hall-local.md" ]; then
+            cp CLAUDE.md .hall-original-claude.md
+          fi
+          cat ".hall/agents/automaton_base.md" ".hall/roster/${AGENT}.md" > CLAUDE.md
 
       #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
@@ -304,22 +319,22 @@ jobs:
             await fn({ github, core })
 
       - name: Save task memory
-        if: always() && steps.auth.outcome == 'success' && steps.find-pr.outputs.pr-number != ''
+        if: always() && steps.auth.outcome == 'success' && (steps.find-pr.outputs.pr-number != '' || needs.detect.outputs.issue-number != '')
         uses: ./.hall/actions/memory
         with:
-          mode:        save
-          repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number:   ${{ steps.find-pr.outputs.pr-number }}
-          memory-json: >-
-            {
-              "agent": "${{ needs.detect.outputs.agent }}",
-              "issue_number": "${{ needs.detect.outputs.issue-number }}",
-              "pr_number": "${{ steps.find-pr.outputs.pr-number }}",
-              "branch": "${{ steps.find-pr.outputs.branch }}",
-              "retry_count": 0,
-              "last_ci_failures": "",
-              "last_review_feedback": ""
-            }
+          mode:         save
+          repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:    ${{ steps.find-pr.outputs.pr-number }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          memory-json: |-
+            %hall-task v1 | ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+            !agent ${{ needs.detect.outputs.agent }}
+            !issue ${{ needs.detect.outputs.issue-number || '-' }}
+            !pr ${{ steps.find-pr.outputs.pr-number || '-' }}
+            !branch ${{ steps.find-pr.outputs.branch || '-' }}
+            !retry 0
+            !ci -
+            !review -
 
       - name: Resolve final stage
         id: final

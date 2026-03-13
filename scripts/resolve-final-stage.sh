@@ -3,8 +3,7 @@
 # Required env: TRIGGER, FIND_PR, DETECT_PR, BRANCH
 # Optional env: AGENT_OUTCOME — value from dispatch-result.json (see automaton_base.md).
 #   When present, the agent's declared outcome takes precedence over inference.
-#   Valid values: pr_created | awaiting_input | comment_posted | quota_exceeded | failed
-#   Note: failed is also written by the dispatch fallback when SDK exits with error_max_turns.
+#   Valid values: pr_created | awaiting_input | comment_posted | rerouted | quota_exceeded | failed | max_turns_exceeded
 # Optional env: MODE — dispatch mode parsed from issue body (doing | advising | researching).
 #   When advising or researching and no PR was opened, output stage=done.
 # Outputs: stage, pr-number, branch
@@ -24,13 +23,19 @@ elif [ "${AGENT_OUTCOME:-}" = "quota_exceeded" ]; then
   echo "stage=queued"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
+elif [ "${AGENT_OUTCOME:-}" = "max_turns_exceeded" ]; then
+  # Agent hit the max_turns cap — task is incomplete but not a hard failure.
+  # Treated as escalated: human review required to decide next step.
+  echo "stage=escalated"         >> "$GITHUB_OUTPUT"
+  echo "pr-number="              >> "$GITHUB_OUTPUT"
+  echo "branch="                 >> "$GITHUB_OUTPUT"
 elif [ "${AGENT_OUTCOME:-}" = "failed" ]; then
   echo "stage=failed"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
-elif [ "${AGENT_OUTCOME:-}" = "comment_posted" ]; then
-  # Agent posted a substantive response (analysis, advice, blocker notice) but no PR.
-  # Thread is done from the agent's perspective; re-dispatch is manual if needed.
+elif [ "${AGENT_OUTCOME:-}" = "comment_posted" ] || [ "${AGENT_OUTCOME:-}" = "rerouted" ]; then
+  # Agent posted a substantive response (analysis, advice, blocker notice, or routing
+  # decision) but no PR. Thread is done from the agent's perspective.
   echo "stage=done"              >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"

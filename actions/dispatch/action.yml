@@ -76,6 +76,9 @@ runs:
           echo "token-status=rate_limited" >> "${GITHUB_OUTPUT}"
         elif [[ "${HTTP}" == "401" || "${HTTP}" == "403" ]]; then
           echo "token-status=unauthorized" >> "${GITHUB_OUTPUT}"
+        elif [[ "${HTTP}" == "200" ]]; then
+          # Token is valid — SDK exited due to max_turns or a soft SDK error, not an auth issue
+          echo "token-status=max_turns" >> "${GITHUB_OUTPUT}"
         else
           echo "token-status=error" >> "${GITHUB_OUTPUT}"
         fi
@@ -94,10 +97,10 @@ runs:
         echo "count=$COUNT" >> "$GITHUB_OUTPUT"
 
     # When the SDK exits before the agent writes dispatch-result.json, write it here so
-    # post-dispatch steps can route correctly. Two distinct failure modes:
+    # post-dispatch steps can route correctly. Three distinct failure modes:
     #   rate_limited (HTTP 429) — quota hit; outcome=quota_exceeded → nightly retry
-    #   error/unauthorized     — error_max_turns, bad token, or other SDK error;
-    #                            outcome=failed → no retry (fix root cause first)
+    #   max_turns    (HTTP 200) — token fine, SDK hit turn limit; outcome=max_turns_exceeded → escalated
+    #   error/unauthorized     — bad token or unrecoverable SDK error; outcome=failed → no retry
     - name: Write dispatch-result on SDK failure
       if: steps.run-claude.outcome == 'failure'
       shell: bash
@@ -107,12 +110,16 @@ runs:
           exit 0
         fi
         mkdir -p .hall
-        if [[ "${{ steps.categorize.outputs.token-status }}" == "rate_limited" ]]; then
+        TOKEN_STATUS="${{ steps.categorize.outputs.token-status }}"
+        if [[ "$TOKEN_STATUS" == "rate_limited" ]]; then
           printf '{"outcome":"quota_exceeded","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
           echo "Wrote dispatch-result.json with outcome: quota_exceeded"
+        elif [[ "$TOKEN_STATUS" == "max_turns" ]]; then
+          printf '{"outcome":"max_turns_exceeded","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
+          echo "Wrote dispatch-result.json with outcome: max_turns_exceeded"
         else
           printf '{"outcome":"failed","pr_number":"","branch":""}\n' > .hall/dispatch-result.json
-          echo "Wrote dispatch-result.json with outcome: failed (token-status=${{ steps.categorize.outputs.token-status }})"
+          echo "Wrote dispatch-result.json with outcome: failed (token-status=$TOKEN_STATUS)"
         fi
 
     # Propagate SDK failure only when the agent did NOT complete successfully.
@@ -123,7 +130,7 @@ runs:
       shell: bash
       run: |
         OUTCOME=$(jq -r '.outcome // ""' .hall/dispatch-result.json 2>/dev/null || echo "")
-        if [[ "$OUTCOME" == "comment_posted" || "$OUTCOME" == "pr_created" || "$OUTCOME" == "awaiting_input" ]]; then
+        if [[ "$OUTCOME" == "comment_posted" || "$OUTCOME" == "pr_created" || "$OUTCOME" == "awaiting_input" || "$OUTCOME" == "rerouted" ]]; then
           echo "Agent completed successfully (outcome=$OUTCOME); suppressing SDK wrapper exit 1"
           exit 0
         fi

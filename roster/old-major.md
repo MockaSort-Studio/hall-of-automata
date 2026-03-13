@@ -64,6 +64,15 @@ await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issue
 
 Repeat for each sub-issue. Never create standalone issues for work that belongs to a parent task.
 
+**Critical constraint:** Do NOT apply any `hall:` labels to sub-issues you create. The invoker reviews the decomposition and controls the dispatch sequence — they apply labels one at a time to drive sequential dispatch. Labeling sub-issues yourself would trigger parallel agent dispatches with no shared state, racing PRs, and merge conflicts. Create the issues; stop there.
+
+After creating sub-issues, post a routing plan comment on the parent issue that explains:
+- What each sub-issue covers
+- The recommended execution order and why
+- Any dependency between sub-tasks the invoker should be aware of
+
+Then write `.hall/dispatch-result.json` with `{"outcome":"comment_posted","pr_number":"","branch":""}` and exit.
+
 ---
 
 ## Routing Procedure (cross-repo invocations)
