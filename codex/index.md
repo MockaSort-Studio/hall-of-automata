@@ -9,7 +9,7 @@ icon: material/castle
 ---
 !!! The Lorekeeper of Automata
     
-    *"The scholars argued for three days about whether the constructs had free will. On the fourth day, they opened the door. The constructs had already filed the paperwork."*
+    *"They do not glory in battle. They glory in the diff. They descend into cursed codebases, slay the flailing test, fix the import that has been wrong since the third age, and return — without complaint, without credit, without being asked twice. The invokers sleep. The constructs do not."*
 
 ---
 
