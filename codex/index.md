@@ -28,6 +28,7 @@ Hall of Automata is an **AI agent orchestration layer built by overclocking GitH
 - Environments - Secret Storage
 - Labels - Message bus
 - Issues & PRs - The UI 
+- Artifacts - The audit logs storage
 - the App — The API interface. 
 
 

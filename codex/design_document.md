@@ -103,33 +103,33 @@ Review feedback and CI failures on a `hall:<agent>`-labeled PR both re-dispatch 
 
 ### Functional
 
-| ID | Requirement | Detail |
-|----|-------------|--------|
-| FR-1 | **Invocation paths** | Label (`hall:<agent>` on issue/PR), comment (`@hall-of-automata <agent>`), or PR review triggers dispatch. On the triage path, Old Major resolves the agent from `agents.yml` and applies the label. |
-| FR-2 | **Authorization** | Actor must be a member of the agent's authorized `teams` list. Unauthorized invocations: hard workflow failure, rejection comment tagging `@automata-invokers`, no counter increment, no status card. |
-| FR-3 | **Invoker pool selection** | `detect` job queries all `invoker/*` environments, reads `HALL_USAGE_COUNT` / `HALL_WEEKLY_CAP`, excludes at-cap invokers, selects the lowest-count eligible invoker. Pool exhaustion: `notify-queued` posts comment and applies `hall:invoker-queued`; dispatch does not run. |
-| FR-4 | **Dispatch** | `dispatch` job runs under `environment: invoker/<handle>`. Persona assembled from `automaton_base.md` + `roster/<slug>.md` and written to `CLAUDE.md`. `anthropics/claude-code-action@v1` runs with `CLAUDE_CODE_OAUTH_TOKEN` and a prompt from issue/PR context and task memory. |
-| FR-5 | **PR labeling** | When an agent opens a PR, apply `hall:<agent>` to bind subsequent events (CI, review) to the same agent. |
-| FR-6 | **CI loop** | On CI failure on an agent-labeled PR: restore task memory, re-dispatch the agent with failure context. Repeat up to `max_retries`. On exhaustion: escalation comment `@mentioning` the invoker, status card `Escalated`. |
-| FR-7 | **Review loop** | Human review comments on an agent-labeled PR re-dispatch the bound agent with review context. |
-| FR-8 | **Usage tracking** | `HALL_USAGE_COUNT` (env var on `invoker/<handle>`) incremented via Environments API after each dispatch. `HALL_WEEKLY_CAP` set at onboarding. Weekly-reset workflow zeros all counts every Monday 00:00 UTC. |
-| FR-9 | **Task memory** | Cache key `hall-task-{repo}-{pr}`. Written at dispatch end, restored at dispatch start. On 7-day eviction: agent reconstructs from issue/PR thread. |
-| FR-10 | **Cleanup** | On PR close: delete task memory cache entry, remove `hall:<agent>` label, post mandatory summary comment on originating issue. |
-| FR-11 | **Target repo contract** | `.hall-local.md` at repo root is owned by the automaton — holds dispatch log and accumulated context. Only `.hall-*` file the automaton may commit. The target repo's `CLAUDE.md` is read-only at dispatch time, never modified or committed. |
-| FR-12 | **Dispatch outcome contract** | Agent writes `.hall/dispatch-result.json` with `outcome` ∈ {`pr_created`, `awaiting_input`, `comment_posted`, `quota_exceeded`, `failed`}, `pr_number`, and `branch`. Post-dispatch reads this to drive the status card update. |
-| FR-13 | **Co-authorship** | Every automaton commit must include `Co-authored-by: <name> <hall-of-automata[bot]@users.noreply.github.com>`. |
-| FR-14 | **Token validation** | During onboarding: HTTP probe to Anthropic API (`POST /v1/messages`, `max_tokens: 1`). `200` = valid; `429` = valid but quota-exhausted; `401`/`403` = invalid; `5xx`/timeout = inconclusive (pass with warning). |
-| FR-15 | **Quota-exhausted onboarding** | HTTP 429 on probe: apply `hall:active-invoker` + `hall:invoker-queued`, close issue with queued message. Invoker is fully registered and activates on quota reset. |
+| ID | Requirement | Detail | Done |
+|----|-------------|--------|:----:|
+| FR-1 | **Invocation paths** | Label (`hall:<agent>` on issue/PR), comment (`@hall-of-automata <agent>`), or PR review triggers dispatch. On the triage path, Old Major resolves the agent from `agents.yml` and applies the label. | ✅ |
+| FR-2 | **Authorization** | Actor must be a member of the agent's authorized `teams` list. Unauthorized invocations: hard workflow failure, rejection comment tagging `@automata-invokers`, no counter increment, no status card. | ✅ |
+| FR-3 | **Invoker pool selection** | `detect` job queries all `invoker/*` environments, reads `HALL_USAGE_COUNT` / `HALL_WEEKLY_CAP`, excludes at-cap invokers, selects the lowest-count eligible invoker. Pool exhaustion: `notify-queued` posts comment and applies `hall:invoker-queued`; dispatch does not run. | ✅ |
+| FR-4 | **Dispatch** | `dispatch` job runs under `environment: invoker/<handle>`. Persona assembled from `automaton_base.md` + `roster/<slug>.md` and written to `CLAUDE.md`. `anthropics/claude-code-action@v1` runs with `CLAUDE_CODE_OAUTH_TOKEN` and a prompt from issue/PR context and task memory. | ✅ |
+| FR-5 | **PR labeling** | When an agent opens a PR, apply `hall:<agent>` to bind subsequent events (CI, review) to the same agent. | ✅ |
+| FR-6 | **CI loop** | On CI failure on an agent-labeled PR: restore task memory, re-dispatch the agent with failure context. Repeat up to `max_retries`. On exhaustion: escalation comment `@mentioning` the invoker, status card `Escalated`. | ✅ |
+| FR-7 | **Review loop** | Human review comments on an agent-labeled PR re-dispatch the bound agent with review context. | ✅ |
+| FR-8 | **Usage tracking** | `HALL_USAGE_COUNT` (env var on `invoker/<handle>`) incremented via Environments API after each dispatch. `HALL_WEEKLY_CAP` set at onboarding. Configurable weekly-reset workflow. | ✅ |
+| FR-9 | **Task memory** | Cache key `hall-task-{repo}-{pr}`. Written at dispatch end, restored at dispatch start. On 7-day eviction: agent reconstructs from issue/PR thread. | ✅ |
+| FR-10 | **Cleanup** | On PR close: delete task memory cache entry, remove `hall:<agent>` label, post mandatory summary comment on originating issue. | ✅ |
+| FR-11 | **Target repo contract** | `.hall-local.md` at repo root is owned by the automaton — holds dispatch log and accumulated context. Only `.hall-*` file the automaton may commit. The target repo's `CLAUDE.md` is read-only at dispatch time, never modified or committed. | ✅ |
+| FR-12 | **Dispatch outcome contract** | Agent writes `.hall/dispatch-result.json` with `outcome` ∈ {`pr_created`, `awaiting_input`, `comment_posted`, `quota_exceeded`, `failed`}, `pr_number`, and `branch`. Post-dispatch reads this to drive the status card update. | ✅ |
+| FR-13 | **Co-authorship** | Every automaton commit must include `Co-authored-by: <name> <hall-of-automata[bot]@users.noreply.github.com>`. | ✅ |
+| FR-14 | **Token validation** | During onboarding: HTTP probe to Anthropic API (`POST /v1/messages`, `max_tokens: 1`). `200` = valid; `429` = valid but quota-exhausted; `401`/`403` = invalid; `5xx`/timeout = inconclusive (pass with warning). | ✅ |
+| FR-15 | **Quota-exhausted onboarding** | HTTP 429 on probe: apply `hall:active-invoker` + `hall:invoker-queued`, close issue with queued message. Invoker is fully registered and activates on quota reset. | ✅ |
 
 ### Non-Functional
 
-| ID | Requirement | Detail |
-|----|-------------|--------|
-| NFR-1 | **No runtime artifacts in Hall repo** | Runtime state in GitHub infrastructure only: Actions Cache (task memory), Environment Variables (invoker counters and caps), Artifacts (audit logs). |
-| NFR-2 | **Org-scoped** | App installable at org level; operates across all installed repos. |
-| NFR-3 | **Secret isolation** | OAuth tokens stored as secrets in `invoker/<handle>` environments only — not as repo-level secrets. |
-| NFR-4 | **Claude OAuth** | Targets Claude Pro/Max subscriptions via `claude setup-token`. All dispatches use the `claude_code_oauth_token` action input. |
-| NFR-5 | **Audit trail** | Every dispatch produces an immutable Artifact with: agent, invoker, repo, timestamp, outcome, turns used. |
+| ID | Requirement | Detail | Done |
+|----|-------------|--------|:----:|
+| NFR-1 | **No runtime artifacts in Hall repo** | Runtime state in GitHub infrastructure only: Actions Cache (task memory), Environment Variables (invoker counters and caps), Artifacts (audit logs). | ✅ |
+| NFR-2 | **Org-scoped** | App installable at org level; operates across all installed repos. | ✅ |
+| NFR-3 | **Secret isolation** | OAuth tokens stored as secrets in `invoker/<handle>` environments only — not as repo-level secrets. | ✅ |
+| NFR-4 | **Claude OAuth** | Targets Claude Pro/Max subscriptions via `claude setup-token`. All dispatches use the `claude_code_oauth_token` action input. | ✅ |
+| NFR-5 | **Audit trail** | Every dispatch produces an immutable Artifact with: agent, invoker, repo, timestamp, outcome, turns used. | ✅ |
 
 ---
 
@@ -250,7 +250,7 @@ Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry in
 
 <!-- hall-status -->
 ### Hall — mergio
-| | |
+| Quest Tracker|  |
 |---|---|
 | **Stage** | Analyzing... |
 | **Dispatched** | 2026-03-06 14:22 UTC |
@@ -259,6 +259,7 @@ Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry in
 
 
 **Legend**
+
 | Stage | Value |
 |---|---|
 | Queuing | `Dispatching agent...` |

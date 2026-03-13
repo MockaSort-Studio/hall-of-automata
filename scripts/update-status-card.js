@@ -59,7 +59,7 @@ module.exports = async ({ github, context, core }) => {
     '<!-- hall-status -->',
     `### Hall \u2014 ${displayName}`,
     '',
-    '| | |',
+    '| Quest Tracker| |',
     '|---|---|',
     `| **Stage** | ${stageLabel} |`,
     `| **Dispatched** | ${dispatched} |`,

@@ -15,10 +15,10 @@ The process is automated via issue template. Old Major reviews the submission, o
 
 ## Prerequisites
 
-- [] Registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
-- [] Lowercase slug chosen and confirmed absent from `agents.yml`
-- [] Character sheet drafted per [`agents/automaton_template.md`](../agents/automaton_template.md)
-- [] [Open Issue](https://github.com/MockaSort-Studio/hall-of-automata/issues/new/choose)
+- [ ] Registered invoker — see [Invoker Onboarding](invoker-onboarding.md)
+- [ ] Lowercase slug chosen and confirmed absent from `agents.yml`
+- [ ] Character sheet drafted per [`agents/automaton_template.md`](../agents/automaton_template.md)
+- [ ] [Open Issue](https://github.com/MockaSort-Studio/hall-of-automata/issues/new/choose)
 
 ---
 
