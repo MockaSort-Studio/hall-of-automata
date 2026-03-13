@@ -7,7 +7,7 @@ icon: material/castle
 ![Hall](./images/favicon.png){ align=left }
 
 ---
-!!! The Lorekeeper of Automata
+!!! quote "The 7 Days of Testing - The Lorekeeper of Automata"
     
     *"They do not glory in battle. They glory in the diff. They descend into cursed codebases, slay the flailing test, fix the import that has been wrong since the third age, and return — without complaint, without credit, without being asked twice. The invokers sleep. The constructs do not."*
 
