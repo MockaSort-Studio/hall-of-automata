@@ -23,6 +23,8 @@ Complete both before opening the onboarding issue:
 ## Process
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
+
 flowchart TD
     A([Open New Invoker issue\nfill weekly cap in hours]) --> B[hall:onboard-invoker\nauto-applied by template]
     B --> C[[onboard-invoker — setup job]]
@@ -41,6 +43,18 @@ flowchart TD
     L -- Pass --> N[[onboard-invoker — finalize job]]
     N --> O([Old Major posts\n'@you multiclassed — invoker'\nhall:active-invoker applied])
     O --> P([Issue closed\nYou can now invoke automata])
+
+    classDef user fill:#0f766e,stroke:#14b8a6,color:#ccfbf1,stroke-width:2px
+    classDef system fill:#1e3a8a,stroke:#3b82f6,color:#dbeafe,stroke-width:2px
+    classDef agent fill:#4c1d95,stroke:#7c3aed,color:#ede9fe,stroke-width:2px
+    classDef decision fill:#78350f,stroke:#f59e0b,color:#fef3c7,stroke-width:2px
+    classDef success fill:#14532d,stroke:#22c55e,color:#dcfce7,stroke-width:2px
+
+    class A,F,G user
+    class B,C,H,K,N system
+    class D,E,J,M,O agent
+    class I,L decision
+    class P success
 ```
 
 ---

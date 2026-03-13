@@ -19,20 +19,32 @@ To start a new task: apply a `hall:*` label or use the issue template (which doe
 Use this when you want an automaton to do work: implement a feature, fix a bug, write a script, research a question.
 
 ```mermaid
-flowchart TD
-    A([Open issue from\n"Automaton Task" template]) -->|template auto-applies\nhall:dispatch-automaton| B
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '24px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#0f1929'}}}%%
+
+graph LR
+    A([Open issue from\nAutomaton Task template]) -->|auto-applies\nhall:old-major| B
     B[[invoke.yml fires\nOld Major dispatched]] --> C
-    C[Old Major reads issue,\npicks the right specialist\napplies hall:agent] --> D
-    D[[invoke.yml fires again\nspecialist agent dispatched]] --> E
-    E[Agent works,\nopens PR or replies] --> F([Status card updated\non your issue])
+    C[Old Major reads issue\npicks specialist\napplies hall:agent] --> D
+    D[[invoke.yml fires again\nspecialist dispatched]] --> E
+    E[Agent works\nopens PR or replies] --> F([Status card updated\non your issue])
+
+    classDef user fill:#0f766e,stroke:#14b8a6,color:#ccfbf1,stroke-width:2px
+    classDef system fill:#1e3a8a,stroke:#3b82f6,color:#dbeafe,stroke-width:2px
+    classDef agent fill:#4c1d95,stroke:#7c3aed,color:#ede9fe,stroke-width:2px
+    classDef success fill:#14532d,stroke:#22c55e,color:#dcfce7,stroke-width:2px
+
+    class A user
+    class B,D system
+    class C,E agent
+    class F success
 ```
 
 **Steps:**
 
 1. Open a new issue using the **Automaton Task** template.
 2. Fill in: what you want done, which repository, and which mode (`doing` / `advising` / `researching`).
-3. Submit — the template auto-applies `hall:dispatch-automaton`.
-4. Old Major is dispatched automatically. He reads the issue, selects the right agent, and applies `hall:<agent>` (e.g. `hall:hamlet`).
+3. Submit — the template auto-applies `hall:old-major`.
+4. Old Major is dispatched automatically. He reads the issue, selects the right agent, and applies `hall:<agent>` (e.g. `hall:mergio`).
 5. The specialist agent is dispatched. A status card appears on the issue tracking its progress.
 6. The agent opens a PR when done (in `doing` mode), or replies directly on the issue (in `advising`/`researching` mode).
 
@@ -72,7 +84,7 @@ Use this when a PR opened by an agent needs correction after a code review.
 3. Submit as **Comment** or **Request changes** — both trigger dispatch.
 
 ```
-@hall-of-automata hamlet the test in src/foo_test.cpp is missing the edge case
+@hall-of-automata mergio the test in src/foo_test.cpp is missing the edge case
 for empty input. Please add coverage.
 ```
 
@@ -86,9 +98,8 @@ If you know exactly which agent you want and want to skip Old Major, apply `hall
 
 | Label | Dispatched agent |
 |-------|-----------------|
-| `hall:dispatch-automaton` | Old Major (triage → routes to specialist) |
-| `hall:hamlet` | Hamlet (C++ / build / devops) |
-| `hall:old-major` | Old Major (direct) |
+| `hall:old-major` | Old Major (triage → routes to specialist, or direct) |
+| `hall:mergio` | Mergio (CI/CD / GitHub Actions / devops) |
 
 Apply the label yourself via the GitHub UI or `gh issue edit --add-label`.
 

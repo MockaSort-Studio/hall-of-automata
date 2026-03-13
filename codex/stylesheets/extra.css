@@ -318,65 +318,6 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MERMAID DIAGRAMS — framed, pannable, zoomable
-   ═══════════════════════════════════════════════════════════════ */
-
-.mermaid {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(201, 168, 76, 0.38);
-  border-left: 3px solid var(--hall-gold);
-  box-shadow: var(--hall-shadow-hard);
-  background: hsl(37, 28%, 5%);
-  margin: 1.6em 0;
-  cursor: grab;
-}
-
-.mermaid:active {
-  cursor: grabbing;
-}
-
-/* Hint overlay */
-.mermaid::after {
-  content: "scroll · zoom  ·  drag · pan";
-  position: absolute;
-  bottom: 6px;
-  right: 10px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
-  color: rgba(201, 168, 76, 0.35);
-  pointer-events: none;
-}
-
-.mermaid > svg {
-  display: block;
-  margin: 0 auto;
-  max-width: none !important;
-}
-
-/* svg-pan-zoom control button theming */
-.mermaid .svg-pan-zoom-control rect {
-  fill: hsl(37, 28%, 8%) !important;
-  stroke: rgba(201, 168, 76, 0.5) !important;
-}
-
-.mermaid .svg-pan-zoom-control path,
-.mermaid .svg-pan-zoom-control polygon {
-  fill: rgba(201, 168, 76, 0.7) !important;
-}
-
-.mermaid .svg-pan-zoom-control:hover rect {
-  fill: hsl(37, 28%, 12%) !important;
-  stroke: var(--hall-gold) !important;
-}
-
-.mermaid .svg-pan-zoom-control:hover path,
-.mermaid .svg-pan-zoom-control:hover polygon {
-  fill: var(--hall-gold) !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════
    SEARCH
    ═══════════════════════════════════════════════════════════════ */
 
@@ -500,4 +441,12 @@
 /* Progress bar */
 .md-progress-bar {
   background-color: var(--hall-gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   WIDE SCREEN — expand content area beyond Material's 61rem cap
+   ═══════════════════════════════════════════════════════════════ */
+
+.md-grid {
+  max-width: min(2600px, 92vw);
 }

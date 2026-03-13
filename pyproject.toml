@@ -7,11 +7,11 @@ requires-python = ">=3.14"
 dependencies = []
 site_name = "Hall of Automata"
 site_url = "https://mockasort-studio.github.io/hall-of-automata/"
+repo_url = "https://github.com/MockaSort-Studio/hall-of-automata"
 site_description = "Federated AI agent orchestration for GitHub organisations — built on Claude Code and GitHub Actions."
 site_author = "MockaSort Studio"
 docs_dir = "codex"
 extra_css = ["stylesheets/extra.css"]
-extra_javascript = ["javascripts/mermaid-zoom.js"]
 nav = [
     {"Home" = "index.md"},
     {"Design" = [
@@ -37,6 +37,14 @@ nav = [
     ]},
 ]
 
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.blocks.caption]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }
+]
+
 [dependency-groups]
 dev = [
     "zensical>=0.0.2",
@@ -48,6 +56,8 @@ font.code = "JetBrains Mono"
 palette.scheme = "slate"
 palette.primary = "custom"
 palette.accent = "custom"
+favicon = "./images/favicon.png"
+logo="./images/favicon.png"
 features = [
     "navigation.instant",
     "navigation.instant.progress",
@@ -63,3 +73,7 @@ features = [
     "content.code.copy",
     "content.code.annotate",
 ]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+roster = "./images/roster_logo.png"

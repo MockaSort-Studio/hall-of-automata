@@ -4,13 +4,17 @@ icon: material/castle
 
 # Hall of Automata
 
-> *A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through.*
+![Hall](./images/favicon.png){ align=left }
 
 ---
 
-You have a GitHub repo. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
+*"A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through."* [The Lorekeeper]
 
-No server to run. No API key to manage. No external platform to pay for. GitHub is the entire backend.
+---
+
+You work on multiple GitHub repos, you're ovewhealmed of work. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
+
+ **No server to run. No API key to manage. No external platform to pay for. GitHub is the entire backend.**
 
 ---
 
@@ -18,16 +22,20 @@ No server to run. No API key to manage. No external platform to pay for. GitHub 
 
 Hall of Automata is an **AI agent orchestration layer built by overclocking GitHub itself**.
 
-The ingredients GitHub already provides — Actions, Environments, Labels, Issues, PRs, the App API — turn out to be exactly sufficient for a full agent dispatch system. Workflows are the microservices. Repository environments are the secrets store. Actions Cache is task memory. Labels are the message bus. A bot identity becomes a coordinator.
+**The ingredients GitHub already provides:**
 
-No Kubernetes. No cloud functions. No message queues. The infra you already trust, doing things it wasn't designed for.
+- Actions - The microservices built on top of [Claude Actions](https://github.com/anthropics/claude-code-action)
+- Environments - Secret Storage
+- Labels - Message bus
+- Issues & PRs - The UI 
+- the App — The API interface. 
+
 
 **What gets added on top:**
+
 - Named agents (automata) with distinct characters, domains, and rules of engagement
 - An orchestrator (Old Major) who reads incoming tasks, picks the right specialist, and dispatches
 - A lifecycle that manages authorization, queueing, review loops, and cleanup
-
-The result: drop a label on any issue in the org, and the right agent shows up to do the work.
 
 ---
 

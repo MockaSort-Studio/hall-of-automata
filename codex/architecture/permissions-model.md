@@ -11,12 +11,24 @@ Access to every automaton in the Hall is controlled by one GitHub team: **`autom
 Members of this team can invoke any automaton via label or `@hall-of-automata` assignment. Non-members trigger a hard workflow failure: the invocation is aborted, an explanatory comment is posted tagging both `@automata-invokers` and the invoker, and no usage counter is incremented.
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#1e293b'}}}%%
+
 flowchart TD
-    A[Label applied or assignment] --> B{sender in automata-invokers?}
-    B -- Yes --> C[Invocation proceeds]
+    A([Label applied or assignment]) --> B{sender in\nautomata-invokers?}
+    B -- Yes --> C([Invocation proceeds])
     B -- No --> D[Workflow exits non-zero]
-    D --> E[Comment posted — tags @automata-invokers and sender]
-    E --> F[No label left, no counter incremented]
+    D --> E[Comment posted\ntags @automata-invokers and sender]
+    E --> F([No label applied\nno counter incremented])
+
+    classDef trigger fill:#4c1d95,stroke:#7c3aed,color:#ede9fe,stroke-width:2px
+    classDef decision fill:#78350f,stroke:#f59e0b,color:#fef3c7,stroke-width:2px
+    classDef success fill:#14532d,stroke:#22c55e,color:#dcfce7,stroke-width:2px
+    classDef failure fill:#7f1d1d,stroke:#ef4444,color:#fee2e2,stroke-width:2px
+
+    class A trigger
+    class B decision
+    class C success
+    class D,E,F failure
 ```
 
 ---

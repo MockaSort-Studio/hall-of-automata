@@ -25,6 +25,8 @@ The process is automated via issue template. Old Major reviews the submission, o
 ## Process
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#1e3a5f', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#60a5fa', 'secondaryColor': '#1e293b', 'tertiaryColor': '#0f1929', 'clusterBkg': '#0d1b2e', 'clusterBorder': '#334155', 'titleColor': '#c0cfe4', 'edgeLabelBackground': '#1e293b'}}}%%
+
 flowchart TD
     A([Open New Automaton issue\nfill character sheet]) --> B[hall:onboard-automaton\nauto-applied by template]
     B --> C[[onboard-automaton workflow\nOld Major dispatched]]
@@ -35,6 +37,18 @@ flowchart TD
     D -- Passes --> G[Old Major opens PR\nroster/slug.md + agents.yml entry]
     G --> H([You review and merge PR])
     H --> I([Automaton active])
+
+    classDef user fill:#0f766e,stroke:#14b8a6,color:#ccfbf1,stroke-width:2px
+    classDef system fill:#1e3a8a,stroke:#3b82f6,color:#dbeafe,stroke-width:2px
+    classDef agent fill:#4c1d95,stroke:#7c3aed,color:#ede9fe,stroke-width:2px
+    classDef decision fill:#78350f,stroke:#f59e0b,color:#fef3c7,stroke-width:2px
+    classDef success fill:#14532d,stroke:#22c55e,color:#dcfce7,stroke-width:2px
+
+    class A,F,H user
+    class B,C system
+    class D decision
+    class E,G agent
+    class I success
 ```
 
 ---
