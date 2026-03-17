@@ -13,7 +13,7 @@ icon: material/castle
 
 ---
 
-You work on multiple GitHub repos, you're ovewhealmed of work. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
+You work on multiple GitHub repos, you're overwhelmed of work. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
 
  **No server to run. No API key to manage. No external platform to pay for. GitHub is the entire backend.**
 
@@ -33,11 +33,11 @@ Hall of Automata is an **AI agent orchestration layer built by overclocking GitH
 - the App — The API interface. 
 
 
-**What gets added on top:**
+**What the Hall adds on top:**
 
-- Named agents (automata) with distinct characters, domains, and rules of engagement
-- An orchestrator (Old Major) who reads incoming tasks, picks the right specialist, and dispatches
-- A lifecycle that manages authorization, queueing, review loops, and cleanup
+- Named agents (automata): entities with distinct characters, domains, and rules of engagement
+- An orchestrator (Old Major): a central logic layer that reads incoming tasks, picks the right specialist, and dispatches them
+- A lifecycle management: system for authorization, queueing, review loops, and cleanup
 
 ---
 
