@@ -4,11 +4,11 @@ icon: material/book-open-page-variant
 
 # Hall of Automata — Design Document
 
-**Status:** Draft
-**Authors:** Old Major 🐷
-**Reviewer:** [The lore-keeper](https://github.com/mksetaro)
-**Version:** 1.0
-**Date:** March 2026
+- **Status:** Draft
+- **Authors:** Old Major 🐷
+- **Reviewer:** [The lore-keeper](https://github.com/mksetaro)
+- **Version:** 1.0
+- **Date:** March 2026
 
 ---
 
@@ -44,7 +44,7 @@ graph TB
     end
 
     subgraph POOL["Invoker Pool"]
-        A1["mksetaro\nPro/Max OAuth"]
+        A1["lore-keeper\nPro/Max OAuth"]
         A2["contributor\nPro/Max OAuth"]
     end
 
@@ -245,11 +245,10 @@ The agent does not own CI infrastructure. Checks trigger automatically on push f
 
 ## Status Card
 
-Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry invocations), edited in-place at each stage transition.
+Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry invocations), edited in-place at each stage transition. 
 
-
+For example **Hall — mergio** can post:
 <!-- hall-status -->
-### Hall — mergio
 | Quest Tracker|  |
 |---|---|
 | **Stage** | Analyzing... |
@@ -258,7 +257,7 @@ Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry in
 | **PR** | — |
 
 
-**Legend**
+### Stage Legend
 
 | Stage | Value |
 |---|---|
@@ -280,6 +279,8 @@ Single `<!-- hall-status -->` comment posted on the issue (or PR for PR-entry in
 
 ### agents.yml
 
+An example of an `agent.yml` of the automaton `mergio`:
+
 ```yaml
 agents:
   mergio:
@@ -296,8 +297,7 @@ agents:
         CI/CD architect — implements pipelines, fixes workflow failures, and enforces
         build hygiene in GitHub Actions-managed repositories.
 ```
-
-`CLAUDE_CODE_OAUTH_TOKEN` lives in `invoker/<handle>` environments — not in agent entries.
+*Note*: `CLAUDE_CODE_OAUTH_TOKEN` lives in `invoker/<handle>` environments — not in agent entries.
 
 ### routing.yml
 
