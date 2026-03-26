@@ -1,60 +1,76 @@
 #!/usr/bin/env bash
-# Deploys the Hall webhook relay to Fly.io.
-# Run from repo root: bash deploy/relay/deploy.sh
-# Prerequisites: flyctl installed and authenticated (fly auth login)
+# deploy.sh — build and deploy the Hall relay to any Linux VPS over SSH.
+# Usage: ./deploy.sh <vps-host>
+# CI:    invoked by .github/workflows/deploy.yml on push to main.
+#
+# Required env vars (never stored in repo — inject via CI secrets or shell):
+#   WEBHOOK_SECRET, APP_ID, APP_PRIVATE_KEY
+#
+# Optional:
+#   HALL_OPERATOR      (default: MockaSort-Studio)
+#   HALL_REPO          (default: hall-of-automata)
+#   HALL_REF           (default: main)
+#   RELAY_DOMAIN       (default: hall.relay.mockasort-studio.eu)
+#   RELAY_ADMIN_EMAIL  (default: mockasortstudio@gmail.com)
 set -euo pipefail
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=.secrets.env
+[ -f "${SCRIPT_DIR}/.secrets.env" ] && source "${SCRIPT_DIR}/.secrets.env"
 
-echo "=== Hall Relay — Fly.io deploy ==="
+HOST="${1:-${VPS_HOST:-${RELAY_HOST:?'Pass VPS host as $1 or set $VPS_HOST'}}}"
 
-# First-time setup: create the app if it doesn't exist
-if ! fly status --app hall-relay &>/dev/null; then
-  echo "→ Creating Fly app..."
-  fly launch --name hall-relay --region lhr --no-deploy --copy-config
-fi
+echo "=== Hall Relay — deploy ==="
 
-# Set required secrets if not already present
-echo ""
-echo "→ Checking secrets..."
-
-MISSING=()
-SECRETS_LIST=$(fly secrets list --app hall-relay 2>/dev/null || true)
-for VAR in WEBHOOK_SECRET APP_ID APP_PRIVATE_KEY; do
-  if ! echo "$SECRETS_LIST" | grep -qw "$VAR"; then
-    MISSING+=("$VAR")
-  fi
+echo "→ Checking required secrets..."
+for var in WEBHOOK_SECRET APP_ID APP_PRIVATE_KEY; do
+  [[ -z "${!var:-}" ]] && { echo "ERROR: $var is not set"; exit 1; }
 done
 
-if [ ${#MISSING[@]} -gt 0 ]; then
-  echo ""
-  echo "The following secrets are required but not set:"
-  for VAR in "${MISSING[@]}"; do
-    echo "  - $VAR"
-  done
-  echo ""
-  echo "Set them with:"
-  echo "  fly secrets set \\"
-  echo "    WEBHOOK_SECRET=\"\$(openssl rand -hex 32)\" \\"
-  echo "    APP_ID=\"<Hall GitHub App ID>\" \\"
-  echo "    APP_PRIVATE_KEY=\"\$(cat path/to/private-key.pem)\" \\"
-  echo "    HALL_OWNER=\"MockaSort-Studio\" \\"
-  echo "    HALL_REPO=\"hall-of-automata\""
-  echo ""
-  echo "APP_ID and APP_PRIVATE_KEY are the same values stored in the Hall repo secrets."
-  echo "Then re-run this script."
-  exit 1
-fi
+echo "→ Syncing relay source to $HOST..."
+rsync -az --exclude='.secrets.env' --exclude='node_modules' \
+  "${SCRIPT_DIR}/" "deploy@${HOST}:~/relay/"
 
-echo "→ Deploying..."
-fly deploy --app hall-relay
+# Encode the private key as base64 for safe transport over SSH heredoc.
+# index.js expects \n-escaped PEM; base64 avoids heredoc breakage on newlines.
+ENCODED_KEY=$(echo "${APP_PRIVATE_KEY}" | base64 -w0)
+
+echo "→ Building and starting on $HOST..."
+ssh "deploy@${HOST}" bash << REMOTE
+  set -euo pipefail
+  cd ~/relay
+
+  # Decode key and convert newlines to \n literals (index.js reverses this)
+  KEY=\$(echo '${ENCODED_KEY}' | base64 -d | awk '{printf "%s\\\\n", \$0}')
+
+  # Write runtime env file — never persisted in repo
+  cat > .env << ENV
+WEBHOOK_SECRET=${WEBHOOK_SECRET}
+APP_ID=${APP_ID}
+APP_PRIVATE_KEY="\${KEY}"
+HALL_OPERATOR=${HALL_OPERATOR:-MockaSort-Studio}
+HALL_REPO=${HALL_REPO:-hall-of-automata}
+HALL_REF=${HALL_REF:-main}
+RELAY_DOMAIN=${RELAY_DOMAIN:-hall.relay.mockasort-studio.eu}
+RELAY_ADMIN_EMAIL=${RELAY_ADMIN_EMAIL:-mockasortstudio@gmail.com}
+ENV
+  chmod 600 .env
+
+  # Build via compose so it manages its own image correctly
+  docker compose build --no-cache relay
+
+  # Bring up relay + caddy, force-recreate to pick up new image
+  docker compose up -d --force-recreate --remove-orphans
+
+  echo "→ Waiting for relay..."
+  sleep 5
+  curl -sf http://localhost:3000/health && echo " healthy" || { echo " unhealthy — check logs"; docker compose logs relay; exit 1; }
+REMOTE
 
 echo ""
 echo "=== Deploy complete ==="
-echo "Relay URL: https://hall-relay.fly.dev/webhook"
+echo "Relay health:   https://${HOST}/health"
+echo "Webhook URL:    https://${HOST}/webhook"
 echo ""
-echo "Register this URL as an org webhook in GitHub:"
-echo "  https://github.com/organizations/MockaSort-Studio/settings/hooks"
-echo "  Events: Issues, Issue comments"
-echo "  Content type: application/json"
-echo "  Secret: (the WEBHOOK_SECRET you set above)"
+echo "Register this URL in the Hall GitHub App webhook settings."
+echo "Required events: Issues, Issue comments, Installation, Release, Repository"

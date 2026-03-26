@@ -1,0 +1,56 @@
+#cloud-config
+# Bootstrap script for the Hall relay VPS (Ubuntu 24.04 LTS).
+# Attached at VPS creation via Aruba Cloud API / Terraform.
+# Runs once on first boot — idempotent.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ufw
+  - curl
+  - git
+
+runcmd:
+  # ── Docker ────────────────────────────────────────────────────────────────
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable docker
+  - systemctl start docker
+
+  # ── Unprivileged deploy user ───────────────────────────────────────────────
+  - useradd -m -s /bin/bash deploy
+  - usermod -aG docker deploy
+
+  # ── Firewall ───────────────────────────────────────────────────────────────
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp    # SSH
+  - ufw allow 80/tcp    # Caddy ACME
+  - ufw allow 443/tcp   # HTTPS webhook endpoint
+  - ufw --force enable
+
+  # ── GitHub webhook IP allowlist (initial seed) ─────────────────────────────
+  # GitHub publishes its hook source CIDRs at api.github.com/meta → .hooks[]
+  # The weekly-cidr-refresh cron job keeps these current.
+  - |
+    HOOKS=$(curl -sf https://api.github.com/meta | python3 -c "import sys,json; [print(c) for c in json.load(sys.stdin)['hooks']]")
+    for cidr in $HOOKS; do
+      ufw allow from "$cidr" to any port 443 proto tcp
+    done
+
+  # ── Weekly CIDR refresh cron ───────────────────────────────────────────────
+  - |
+    cat > /usr/local/bin/refresh-gh-cidrs.sh << 'EOF'
+    #!/bin/bash
+    set -e
+    HOOKS=$(curl -sf https://api.github.com/meta | python3 -c "import sys,json; [print(c) for c in json.load(sys.stdin)['hooks']]")
+    ufw delete allow 443/tcp 2>/dev/null || true
+    for cidr in $HOOKS; do
+      ufw allow from "$cidr" to any port 443 proto tcp
+    done
+    ufw reload
+    EOF
+    chmod +x /usr/local/bin/refresh-gh-cidrs.sh
+    echo "0 3 * * 1 root /usr/local/bin/refresh-gh-cidrs.sh" > /etc/cron.d/gh-cidr-refresh
+
+final_message: "Hall relay VPS bootstrap complete."

@@ -98,7 +98,7 @@ flowchart LR
 | Persona injection | `CLAUDE.md` assembled at runtime from `agents/` + `roster/` |
 | Status tracking | Single bot comment, updated in-place |
 | Audit trail | Actions Artifacts per dispatch |
-| Cross-repo events | GitHub App webhook → Fly.io relay → `workflow_dispatch` |
+| Cross-repo events | GitHub App webhook → relay → `workflow_dispatch` |
 | Weekly quota reset | Scheduled workflow, Monday 00:00 UTC |
 
 ---
@@ -112,7 +112,7 @@ flowchart LR
 | [`actions/`](actions/) | Composite actions (authorize, dispatch, memory, cleanup…) |
 | [`scripts/`](scripts/) | JS/bash helpers called by workflows |
 | [`.github/workflows/`](.github/workflows/) | Dispatch, onboarding, CI loop, cleanup workflows |
-| [`deploy/`](deploy/) | Relay server (Fly.io) and admin scripts |
+| [`deploy/`](deploy/) | Relay server and admin scripts |
 | [`agents.yml`](agents.yml) | Agent registry |
 | [`codex/`](codex/) | Full documentation |
 

@@ -34,7 +34,7 @@ graph TB
             RA["reusable actions/"]
         end
         APP(["hall-of-automata[bot]\nGitHub App"])
-        RELAY["Relay\nFly.io"]
+        RELAY["Relay\nAruba VPS"]
     end
 
     subgraph GHINFRA["GitHub Infrastructure"]
@@ -137,7 +137,7 @@ Review feedback and CI failures on a `hall:<agent>`-labeled PR both re-dispatch 
 
 ### GitHub App
 
-**Identity:** `hall-of-automata[bot]`. Registered at org level. Webhook URL points to the relay on Fly.io.
+**Identity:** `hall-of-automata[bot]`. Registered at org level. Webhook URL points to the relay.
 
 #### Repository Permissions
 
@@ -171,7 +171,7 @@ None required.
 | `check_suite` | CI failures on `hall/*` branches → CI loop |
 | `pull_request` | PR close/merge → cleanup |
 
-**Relay.** The App webhook URL points to a Node.js ESM service on Fly.io (`hall-relay`). The relay authenticates via GitHub App JWT → installation token (no PAT) and calls `workflow_dispatch` on the hall-of-automata `.github` repo. Events from the `hall-of-automata` repo itself bypass the relay (handled natively by `issues.labeled` / `issue_comment`).
+**Relay.** The App webhook URL points to a Node.js ESM service (`hall-relay`) self-hosted on an Aruba VPS behind Caddy. The relay authenticates via GitHub App JWT → installation token (no PAT) and calls `workflow_dispatch` on each org's `hall-of-automata` repo. Events from any org's `hall-of-automata` repo bypass the relay (handled natively by `issues.labeled` / `issue_comment`).
 
 ### Dispatch Workflow
 

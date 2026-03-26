@@ -24,7 +24,7 @@ This is intentional for now — the architecture is still settling, and locking 
 - Full dispatch lifecycle: label trigger → authorize → dispatch → status card → cleanup.
 - Old Major onboarding and PR creation flow.
 - CI loop (re-dispatch on failure up to `max_retries`).
-- Cross-repo dispatch via App webhook + Fly.io relay.
+- Cross-repo dispatch via App webhook + relay (self-hosted on Aruba VPS).
 - Composite action interface (`authorize`, `dispatch`, `memory`, `counter`, `status-card`, `cleanup`, `post-dispatch`).
 
 **What is not stable:**
@@ -44,7 +44,7 @@ The current model requires each org to self-host everything. The target model is
 | Layer | Today | Target |
 |-------|-------|--------|
 | GitHub App | Self-registered per org | Single published App; orgs install it |
-| Relay | Self-hosted on Fly.io | Managed relay (shared infra) |
+| Relay | Self-hosted on Aruba VPS | Managed relay (shared infra) |
 | Invoker pool | Configured manually per org | per-org, no shared state |
 | Execution Environment | Repo file in the org's fork | Per-org, no shared state |
 | Invoker secrets | `invoker/<handle>` envs in forked repo | `invoker/<handle>` envs in org's own Hall repo |

@@ -53,7 +53,7 @@ body:
         Do NOT enumerate tools. Domains are routing signals, not tool lists.
       placeholder: |
         - python: data pipelines, pandas, pytest, type-annotated APIs
-        - devops: GitHub Actions, Docker, Fly.io deployment
+        - devops: GitHub Actions, Docker, VPS deployment
         - code-review: architectural critique, security patterns
     validations:
       required: true

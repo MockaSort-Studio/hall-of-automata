@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run view 22807298227 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh api repos/MockaSort-Studio/hall-of-automata/issues/1/comments --jq '.[] | {user: .user.login, body: .body}')",
+      "Bash(gh run list --repo MockaSort-Studio/hall-of-automata --limit 5 --json databaseId,status,conclusion,createdAt,workflowName)",
+      "Bash(gh run view 22807304508 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run list --repo MockaSort-Studio/hall-of-automata --limit 10 --json databaseId,status,conclusion,createdAt,workflowName)",
+      "Bash(gh run view 22807273306 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run view 22807264948 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run list --repo MockaSort-Studio/hall-of-automata --limit 3 --json databaseId,status,conclusion,createdAt,workflowName,displayTitle)",
+      "Bash(gh run view 22807558871 --repo MockaSort-Studio/hall-of-automata --json jobs)",
+      "Bash(gh api repos/MockaSort-Studio/hall-of-automata/issues/1 --jq '.labels[] | .name')",
+      "Bash(gh run view 22807558871 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run view 22807264948 --repo MockaSort-Studio/hall-of-automata --json jobs)",
+      "Bash(gh run list --repo MockaSort-Studio/hall-of-automata --limit 5)",
+      "Bash(gh run view 22807870185 --repo MockaSort-Studio/hall-of-automata)",
+      "Bash(gh run view --job=66159845637 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run list --repo MockaSort-Studio/hall-of-automata --limit 20 --json databaseId,event,createdAt,status,conclusion)",
+      "Bash(gh run view 22807864475 --repo MockaSort-Studio/hall-of-automata --log)",
+      "Bash(gh run view 22807864475 --repo MockaSort-Studio/hall-of-automata)",
+      "Bash(gh run view --job=66159833633 --repo MockaSort-Studio/hall-of-automata --log)"
+    ]
+  }
+}
