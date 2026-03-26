@@ -25,7 +25,7 @@ agents:
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
     catalog:
       roles: [triage, route, onboard, synthesize]
-      domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding]
+      domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
       scope_summary: >
         Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
         specialist, synthesizes task context. Does not implement code or open PRs.
