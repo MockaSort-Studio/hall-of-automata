@@ -62,7 +62,7 @@ graph TB
     app -->|"release webhook"| caddy
     relay -.->|triggers| broadcast
     broadcast -->|"hall.sync dispatch\n(all N orgs)"| sync
-    sync -->|"opens PR\n(core paths only)"| hall
+    sync -->|"push to main\n(core paths only)"| hall
 ```
 
 ### Security boundaries
@@ -204,7 +204,7 @@ The welcome issue triggers `onboard-invoker.yml` (already in the template) — n
 
 ## Phase 6 — Sync Mechanism (`broadcast.js` + `hall-sync.yml`)
 
-*Two-part: relay broadcasts on release; each org instance receives and PRs the update.*
+*Two-part: relay broadcasts on release; each org instance receives and applies the update directly to main.*
 
 ### `broadcast.js` (relay server)
 
@@ -225,7 +225,7 @@ On trigger:
 1. Fetch MockaSort's release tag
 2. Apply changes to **core paths only**: `.github/workflows/`, `actions/`, `scripts/`, `agents/automaton_base.md`
 3. **Skip org-customized paths**: `agents.yml`, `roster/`, `routing.yml`
-4. Open PR — `"sync: Hall v1.2.3"` — for org admin to review and merge
+4. Push directly to `main` — `"chore(sync): Hall v1.2.3"` — no PR, operator updates are trusted
 
 **Output:** Hall updates propagate to all installed orgs on every release. Org customizations are never overwritten.
 
