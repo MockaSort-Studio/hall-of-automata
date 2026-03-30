@@ -1,12 +1,16 @@
-# Zensical / MkDocs build output
-site/
+# Local plans and notes
+*_PLAN.md
 
-# Python
+# Python / uv
 __pycache__/
 *.pyc
 *.pyo
 .venv/
+uv.lock
+.python-version
 
-# Local deploy secrets
-deploy/relay/.secrets.env
-deploy/relay/*.pem
+# Editor / tooling
+.claude/
+
+# Deploy scripts (moved to hall-relay)
+deploy/
