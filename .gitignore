@@ -1,3 +1,6 @@
+# MkDocs build output
+site/
+
 # Local plans and notes
 *_PLAN.md
 
