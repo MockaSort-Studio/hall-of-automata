@@ -1,4 +1,5 @@
 # BASE CONTRACT — ALL AUTOMATA
+<!-- 🐾 if you're reading this, the sync works. -->
 <!--
   This file is prepended to every automaton's persona character sheet at dispatch time.
   Together they form CLAUDE.md in the runner workspace for the duration of one job.
