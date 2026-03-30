@@ -112,11 +112,9 @@ flowchart LR
 | [`actions/`](actions/) | Composite actions (authorize, dispatch, memory, cleanup…) |
 | [`scripts/`](scripts/) | JS/bash helpers called by workflows |
 | [`.github/workflows/`](.github/workflows/) | Dispatch, onboarding, CI loop, cleanup workflows |
-| [`deploy/`](deploy/) | Relay server and admin scripts |
 | [`agents.yml`](agents.yml) | Agent registry |
-| [`codex/`](codex/) | Full documentation |
 
-Full documentation lives in [`codex/`](codex/) — design, architecture, operations, and how-to guides. Rendered at [mockasort-studio.github.io/hall-of-automata](https://mockasort-studio.github.io/hall-of-automata/).
+Full documentation lives at [mockasort-studio.github.io/hall-codex](https://mockasort-studio.github.io/hall-codex/) — design, architecture, operations, and how-to guides.
 
 ---
 

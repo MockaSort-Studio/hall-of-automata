@@ -39,8 +39,7 @@ jobs:
             scripts/ \
             agents/automaton_base.md \
             roster/old-major.md \
-            roster/mergio.md \
-            codex/
+            roster/mergio.md
 
       - name: Push if changed
         run: |
