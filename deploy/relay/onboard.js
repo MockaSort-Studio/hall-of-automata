@@ -1,7 +1,18 @@
 // onboard.js — runs once per new org installation.
 // Called by index.js on installation.created with an installation-scoped token.
 
+import sodium from 'libsodium-wrappers'
 import { HALL_LABELS } from './labels.js'
+
+// Encrypt a secret value using GitHub's required sealed-box algorithm.
+// publicKeyB64: Base64-encoded Curve25519 public key from the secrets API.
+async function sealSecret(publicKeyB64, value) {
+  await sodium.ready
+  const key       = sodium.from_base64(publicKeyB64, sodium.base64_variants.ORIGINAL)
+  const message   = Buffer.from(value)
+  const encrypted = sodium.crypto_box_seal(message, key)
+  return Buffer.from(encrypted).toString('base64')
+}
 
 const UA = 'hall-relay/2.0'
 
@@ -22,7 +33,7 @@ function api(token) {
   }
 }
 
-export async function onboardOrg(org, token, hallOperator, hallRepo) {
+export async function onboardOrg(org, token, hallOperator, hallRepo, appId, appPrivateKey) {
   const gh = api(token)
 
   // 1. Create hall-of-automata from template ─────────────────────────────────
@@ -74,7 +85,7 @@ export async function onboardOrg(org, token, hallOperator, hallRepo) {
       const raw = await fetch(tpl.download_url)
       if (!raw.ok) continue
       const content = await raw.text()
-      const putRes = await gh(`/repos/${org}/.github/contents/ISSUE_TEMPLATE/${tpl.name}`, {
+      const putRes = await gh(`/repos/${org}/.github/contents/.github/ISSUE_TEMPLATE/${tpl.name}`, {
         method: 'PUT',
         body:   { message: `chore: seed Hall issue template — ${tpl.name}`, content: Buffer.from(content).toString('base64') },
       })
@@ -94,7 +105,35 @@ export async function onboardOrg(org, token, hallOperator, hallRepo) {
   }
   console.log(`[onboard] labels seeded for ${org}/${hallRepo}`)
 
-  // 6. Open welcome issue ────────────────────────────────────────────────────
+  // 6. Seed APP_ID + APP_PRIVATE_KEY as org secrets scoped to hall-of-automata ─
+  // Stored at org level (not repo level) so only org admins can manage them.
+  // Requires organization_secrets:write App permission.
+  if (appId && appPrivateKey) {
+    try {
+      const pkRes  = await gh(`/orgs/${org}/actions/secrets/public-key`)
+      const { key: pubKey, key_id } = await pkRes.json()
+
+      const repoIdRes = await gh(`/repos/${org}/${hallRepo}`)
+      const { id: repoId } = await repoIdRes.json()
+
+      const putSecret = async (name, value) => {
+        const encrypted_value = await sealSecret(pubKey, value)
+        const res = await gh(`/orgs/${org}/actions/secrets/${name}`, {
+          method: 'PUT',
+          body:   { encrypted_value, key_id, visibility: 'selected', selected_repository_ids: [repoId] },
+        })
+        if (!res.ok) console.warn(`[onboard] secret seed failed: ${name} for ${org}`, res.status)
+      }
+
+      await putSecret('APP_ID', String(appId))
+      await putSecret('APP_PRIVATE_KEY', appPrivateKey)
+      console.log(`[onboard] org secrets seeded for ${org}`)
+    } catch (err) {
+      console.warn(`[onboard] org secret seeding failed for ${org}`, err.message)
+    }
+  }
+
+  // 7. Open welcome issue ────────────────────────────────────────────────────
   const issueBody = `\
 # Welcome to Hall of Automata
 
@@ -119,6 +158,19 @@ and submit Old Major's character sheet. He will self-provision as your Hall Mast
 
 Apply \`hall:dispatch-automaton\` or \`hall:<agent>\` labels to issues in any repo \
 in this organisation. The Hall relay routes the event to your instance automatically.
+
+---
+
+## ⚠️ Security note for org admins
+
+Two org-level secrets have been created in your organisation: \`APP_ID\` and \`APP_PRIVATE_KEY\`. \
+These are the Hall GitHub App credentials that allow your workflows to authenticate. They are:
+
+- Scoped exclusively to this repository — no other repo in your org can access them
+- Managed at the **org level** — only org admins can view or modify them
+
+**Do not delete, rotate, or modify these secrets** unless you are coordinating a key rotation with the Hall operator. \
+Removing them will cause all Hall workflows in this org to fail.
 
 ---
 *Provisioned by Hall Relay · ${new Date().toISOString().split('T')[0]}*`

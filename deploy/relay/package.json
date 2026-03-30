@@ -9,5 +9,8 @@
   },
   "scripts": {
     "start": "node index.js"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "^0.8.2"
   }
 }

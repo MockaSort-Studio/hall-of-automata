@@ -227,8 +227,15 @@ createServer(async (req, res) => {
     installationRegistry.set(installationId, org)
     audit({ event: 'installation_created', org, installationId })
     try {
-      const token = await getToken(installationId, { actions: 'write', contents: 'write', issues: 'write', members: 'write', administration: 'write' })
-      await onboardOrg(org, token, HALL_OPERATOR, HALL_REPO)
+      const token = await getToken(installationId, {
+        actions:              'write',
+        contents:             'write',
+        issues:               'write',
+        members:              'write',       // team creation
+        administration:       'write',       // repo creation
+        organization_secrets: 'write',       // seed APP_ID + APP_PRIVATE_KEY as org secrets
+      })
+      await onboardOrg(org, token, HALL_OPERATOR, HALL_REPO, APP_ID, APP_PRIVATE_KEY)
     } catch (err) {
       console.error('[relay] onboard failed', mask(org), err.message)
     }
