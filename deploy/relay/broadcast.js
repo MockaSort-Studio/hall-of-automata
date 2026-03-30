@@ -3,11 +3,12 @@
 
 const UA = 'hall-relay/2.0'
 
-export async function broadcastSync(version, installationRegistry, getToken) {
+export async function broadcastSync(version, installationRegistry, getToken, operatorOrg) {
   let dispatched = 0
   let failed     = 0
 
   for (const [installationId, org] of installationRegistry) {
+    if (org === operatorOrg) continue  // operator is the source, not a sync target
     try {
       const token = await getToken(installationId)
       const res   = await fetch(`https://api.github.com/repos/${org}/hall-of-automata/dispatches`, {

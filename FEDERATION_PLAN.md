@@ -307,20 +307,25 @@ Phase 3   Relay refactor                 ✓ index.js rewritten (multi-org, audi
                                           ✓ hall:old-major blocked in relay SYSTEM_LABELS
                                           ✓ audit log: all org/repo identifiers masked
 Phase 4   Deploy to Aruba, cut over      ✓ relay live on Aruba, end-to-end verified
-                                          ○ Fly.io not yet decommissioned
-Phase 5   onboard.js                     ✓ complete (part of Phase 3 deliverables)
-Phase 6   broadcast.js + hall-sync.yml   ✓ broadcast.js complete
-                                          → hall-sync.yml not yet written
-Phase 7   Template prep                  → pending
-Phase 8   GitHub App permissions         ○ last — triggers re-auth on existing installs
+                                          ✓ Fly.io decommissioned
+Phase 5   onboard.js                     ✓ complete; issue template path fixed (.github/ISSUE_TEMPLATE/)
+Phase 6   broadcast.js + hall-sync.yml   ✓ broadcast.js: operator org skipped in sync loop
+                                          ✓ hall-sync.yml: direct push to main (no PR)
+                                          ✓ App webhook: Releases event must be enabled
+Phase 7   Template prep                  → remove deploy/relay/ from public template (move to hall-relay repo)
+                                          → remove codex/ from public template (move to hall-relay repo or standalone docs)
+Phase 8   GitHub App permissions         ○ Members:write (team creation in onboardOrg)
+                                          ○ Administration:write (repo creation in onboardOrg — already works)
+                                          ○ Release webhook event (broadcast trigger)
+                                          ○ Repository webhook event (label seeding on new repos)
+                                          ○ Installation webhook event (onboard trigger)
 ```
 
 ### Next steps (in order)
 
-1. **Decommission Fly.io** — see section below
-2. **`hall-sync.yml`** — write the workflow that receives `hall.sync` dispatches and opens sync PRs (Phase 6 remainder)
-3. **Template prep** — remove `deploy/relay/` when carving to private repo, enable template flag (Phase 7)
-4. **GitHub App permissions** — add Installation, Release, Repository webhook events; Members:write + Administration:write permissions (Phase 8)
+1. **Add Releases webhook event** to GitHub App (enables broadcast on tag/release)
+2. **Template prep** — move `deploy/relay/` to private `hall-relay` repo; decide docs fate (Phase 7)
+3. **GitHub App permissions** — Members:write, Repository + Installation webhook events (Phase 8)
 
 ---
 

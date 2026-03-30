@@ -251,7 +251,7 @@ createServer(async (req, res) => {
     if (org === HALL_OPERATOR && repo === HALL_REPO) {
       const version = payload.release.tag_name
       audit({ event: 'release_published', version })
-      broadcastSync(version, installationRegistry, getToken).catch(err =>
+      broadcastSync(version, installationRegistry, getToken, HALL_OPERATOR).catch(err =>
         console.error('[relay] broadcast failed', err.message)
       )
     }
