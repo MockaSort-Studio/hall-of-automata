@@ -31,8 +31,13 @@ jobs:
 
       - name: Apply operator-managed paths
         run: |
-          # Sync Hall infrastructure. Never touches org-specific files:
+          # Wipe synced directories so deletions propagate, then re-apply from upstream.
+          # Never touches org-specific files:
           #   agents.yml, routing.yml, roster/<custom>.md, .hall-local.md, CLAUDE.md
+          git rm -r --ignore-unmatch \
+            .github/workflows/ \
+            actions/ \
+            scripts/
           git checkout upstream/main -- \
             .github/workflows/ \
             actions/ \
