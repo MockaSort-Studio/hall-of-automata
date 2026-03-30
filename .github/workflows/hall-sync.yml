@@ -11,20 +11,26 @@ on:
         default: 'manual'
 
 permissions:
-  contents: write
-  workflows: write
+  contents: read
 
 jobs:
   sync:
-    name: Sync ${{ github.event.client_payload.version }}
+    name: Sync ${{ github.event.client_payload.version || inputs.version }}
     runs-on: ubuntu-latest
     # Never run on the operator org — it is the source, not a target
     if: github.repository_owner != 'MockaSort-Studio'
     steps:
+      - name: Generate app token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:     ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git
         run: |
