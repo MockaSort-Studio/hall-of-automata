@@ -271,23 +271,23 @@ Existing permissions unchanged: Actions, Contents, Issues, Metadata, Pull reques
 
 ---
 
-## Open Issue — Third-Party Org Secrets (`APP_ID` + `APP_PRIVATE_KEY`)
+## Org Secrets — `APP_ID` + `APP_PRIVATE_KEY`
 
-Every workflow in the templated `hall-of-automata` repo uses `actions/create-github-app-token@v1` with `secrets.APP_ID` and `secrets.APP_PRIVATE_KEY` for cross-repo API calls (posting comments, applying labels, managing environments). Third-party orgs that install the App will not have these secrets set — their workflows will fail silently.
+Every workflow in the templated `hall-of-automata` uses `actions/create-github-app-token@v1` with `secrets.APP_ID` and `secrets.APP_PRIVATE_KEY`. These are seeded automatically by the relay during `installation.created`.
 
-**Chosen approach: relay seeds secrets during `installation.created`.**
+**Implementation (complete):** `onboardOrg()` step 6:
+1. `GET /orgs/{org}/actions/secrets/public-key` — fetch org-level encryption key
+2. Sealed-box encrypt `APP_ID` and `APP_PRIVATE_KEY` via `libsodium-wrappers`
+3. `PUT /orgs/{org}/actions/secrets/APP_ID` — visibility: selected, repos: [hall-of-automata]
+4. `PUT /orgs/{org}/actions/secrets/APP_PRIVATE_KEY` — same
 
-`onboardOrg()` to be extended:
-1. Fetch the new repo's Actions public key (`GET /repos/{org}/hall-of-automata/actions/secrets/public-key`)
-2. Encrypt `APP_ID` and `APP_PRIVATE_KEY` with that key (libsodium sealed box, same as GitHub's own encryption)
-3. `PUT /repos/{org}/hall-of-automata/actions/secrets/APP_ID`
-4. `PUT /repos/{org}/hall-of-automata/actions/secrets/APP_PRIVATE_KEY`
+**Why org-level (not repo-level):** Org secrets can only be managed by org admins. Repo secrets can be deleted by any repo admin, breaking all Hall workflows. Selected-repository visibility ensures no other repo in the org can read them.
 
-Requires `secrets: write` permission added to the App (Phase 8 scope).
+**Security note:** The App private key is replicated into each org's encrypted secrets. Acceptable trade-off: secrets are encrypted at rest (GitHub's sealed box), never readable via API, and only accessible to workflow runners. Org admins are informed via the welcome issue not to modify these secrets.
 
-**Security note:** The private key is replicated into each org's encrypted repo secrets. Acceptable because: secrets are encrypted at rest, never exposed in logs, and only accessible to workflows — same trust boundary the relay VPS already holds.
+**MockaSort-Studio:** Migrated from repo secrets to org secrets via `gh secret set --org`. Old repo-level secrets deleted.
 
-**Deferred to:** after Phase 8 App permission update is complete.
+Requires: `organization_secrets: write` App permission (Phase 8).
 
 ---
 
@@ -312,10 +312,13 @@ Phase 5   onboard.js                     ✓ complete; issue template path fixed
 Phase 6   broadcast.js + hall-sync.yml   ✓ broadcast.js: operator org skipped in sync loop
                                           ✓ hall-sync.yml: direct push to main (no PR)
                                           ✓ App webhook: Releases event must be enabled
-Phase 7   Template prep                  → remove deploy/relay/ from public template (move to hall-relay repo)
-                                          → remove codex/ from public template (move to hall-relay repo or standalone docs)
-Phase 8   GitHub App permissions         ○ Members:write (team creation in onboardOrg)
-                                          ○ Administration:write (repo creation in onboardOrg — already works)
+Phase 7   Template prep                  ✓ codex/generate-token.md written; nav entry added
+                                          ✓ welcome issue points to codex docs page
+                                          → deploy/relay/ still in public template (Phase 2 deferred)
+                                          → Enable Template repository flag (manual — GitHub repo settings)
+Phase 8   GitHub App permissions         ○ organization_secrets:write (org secret seeding)
+                                          ○ Members:write (team creation)
+                                          ○ Administration:write (repo creation)
                                           ○ Release webhook event (broadcast trigger)
                                           ○ Repository webhook event (label seeding on new repos)
                                           ○ Installation webhook event (onboard trigger)
@@ -323,9 +326,10 @@ Phase 8   GitHub App permissions         ○ Members:write (team creation in onb
 
 ### Next steps (in order)
 
-1. **Add Releases webhook event** to GitHub App (enables broadcast on tag/release)
-2. **Template prep** — move `deploy/relay/` to private `hall-relay` repo; decide docs fate (Phase 7)
-3. **GitHub App permissions** — Members:write, Repository + Installation webhook events (Phase 8)
+1. **GitHub App permissions** — organization_secrets:write, Members:write, Administration:write; Release + Repository + Installation webhook events (Phase 8)
+2. **Enable Template repository** flag on `MockaSort-Studio/hall-of-automata` (manual — repo settings)
+3. **Test sync** — create a release tag; verify test org receives `hall.sync` and pushes to main
+4. **Phase 2** — move `deploy/relay/` to private `hall-relay` repo when ready
 
 ---
 

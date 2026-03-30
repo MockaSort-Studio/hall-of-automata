@@ -141,7 +141,7 @@ Your Hall instance is ready. Follow these steps to go live.
 
 ## Step 1 — Generate your Claude OAuth token
 
-See the [token generation guide](https://github.com/${hallOperator}/${hallRepo}/blob/main/codex/generate-token.md) \
+See the [token generation guide](https://mockasort-studio.github.io/hall-of-automata/generate-token/) \
 for instructions on macOS, Linux, and Windows.
 
 ## Step 2 — Add your first invoker

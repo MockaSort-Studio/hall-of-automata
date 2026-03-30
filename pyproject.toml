@@ -34,6 +34,7 @@ nav = [
     {"How To" = [
         {"Invoking Automata" = "how-to-invoke.md"},
         {"Org-Wide Setup" = "org-setup.md"},
+        {"Generate Claude Token" = "generate-token.md"},
     ]},
     {"State & Roadmap" = "state.md"},
     {"Contributing" = "contributing.md"},
