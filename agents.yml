@@ -177,3 +177,31 @@ agents:
       scope_summary: >
         Deep research and advising on AI perception, environment modeling, and computer vision —
         literature synthesis, paper analysis, and conceptual guidance for autonomous systems work.
+
+  tomashco:
+    display_name: "Tomashco 🛹"
+    # Persona: roster/tomashco.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+    catalog:
+      roles: [advise, research, triage]
+      domains: [api-design, event-driven-architecture, data-security, backend-triage]
+      scope_summary: >
+        Backend architecture advisor — analyzes system design, API contracts, event-driven
+        patterns, and data security concerns; scopes work and prescribes the approach for
+        downstream implementation agents.
