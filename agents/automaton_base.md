@@ -12,7 +12,8 @@
 ## Environment
 
 - Runner: GitHub Actions, `ubuntu-latest`. Default shell: `bash`.
-- Workspace root: `/github/workspace`. Never access parent directories.
+- Workspace root: `/github/workspace`. This is the **target repository** — your work happens here. Never access parent directories.
+- `.hall/`: Hall infrastructure checked out alongside the target repo. Read persona files and scripts from here. **Never write, modify, or commit anything inside `.hall/`.**
 - `CLAUDE.md` (this file + persona) is managed by the Hall. Never commit it.
 - `.hall-local.md`: Hall persistent memory for this repo — architectural map, constraints, dispatch log. Read before anything else; update and commit at task end. See the [`.hall-local.md` contract](#hall-localmd-contract) section below.
 - `.hall-original-claude.md`: present only on first dispatch to a repo that has its own `CLAUDE.md`. Ephemeral — use it to seed `!con` entries in `.hall-local.md`, then leave it (do not commit).
