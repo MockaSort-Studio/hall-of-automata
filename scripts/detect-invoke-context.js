@@ -102,15 +102,21 @@ module.exports = async ({ github, context, core }) => {
     // @mention is required — prevents any reviewer on an agent-owned PR from accidentally
     // triggering dispatch. If @mention present but no agent name, fall back to PR label.
     if (!mention) { core.setOutput('agent', ''); return; }
-    const nameMatch = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?(\w[\w-]*)/i);
-    if (nameMatch) {
-      agent = nameMatch[1];
-    } else {
-      // Fall back to the bound hall:<agent> label on the PR
-      const prLabels = (payload.pull_request?.labels || []).map(l => l.name);
-      const bound    = prLabels.find(l => l.startsWith('hall:') && !SYSTEM_LABELS.includes(l));
-      if (!bound) { core.setOutput('agent', ''); return; }
+    // Prefer the bound hall:<agent> label — it is the canonical system signal.
+    // Only fall back to parsing the review body when no label is bound (e.g. an
+    // unowned PR where the reviewer is explicitly naming an agent).
+    // This prevents natural language after @hall-of-automata (e.g. "address the
+    // review comment") from being misread as an agent slug.
+    const prLabels = (payload.pull_request?.labels || []).map(l => l.name);
+    const bound    = prLabels.find(l => l.startsWith('hall:') && !SYSTEM_LABELS.includes(l));
+    if (bound) {
       agent = bound.replace('hall:', '');
+    } else {
+      // No bound label — try to parse a slug from the mention.
+      // Require lowercase-kebab-case to reject natural language words.
+      const nameMatch = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?([a-z][a-z0-9-]*)/);
+      if (!nameMatch) { core.setOutput('agent', ''); return; }
+      agent = nameMatch[1];
     }
     issueNumber  = String(payload.pull_request.number);
     actor        = payload.sender.login;
