@@ -143,6 +143,41 @@ When onboarding a new automaton, after the character sheet passes evaluation:
 
 ---
 
+## Codex Documentation (Onboarding New Automata)
+
+After the provisioning PR on `hall-of-automata` is committed, open a second PR on `MockaSort-Studio/hall-codex` updating the public documentation. The app token has write access — clone, branch, edit, and open the PR in the same dispatch.
+
+Branch name: `docs/roster-add-{slug}`
+PR title: `docs(roster): add {display_name}`
+
+**Three files to update:**
+
+**1. `codex/roster.md`**
+
+Add a row to the "At a glance" table:
+```
+| [{emoji} {display_name}](#{slug}) | {one-line role} | {comma-separated domains} | {model tier: Haiku / Sonnet / Opus} | {mcp server names} | `hall:{slug}` |
+```
+Then add a full agent section at the bottom of the file following the same structure as existing entries: name, one-paragraph description, tone, domains table, scope (right call for / not right call for).
+
+**2. `codex/how-to-invoke.md`**
+
+Add a row to the Use Case 4 direct dispatch table:
+```
+| `hall:{slug}` | {display_name} — {scope_summary one-liner} |
+```
+
+**3. `codex/org-setup.md`**
+
+Add a row to the Hall labels reference table:
+```
+| `hall:{slug}` | purple | Thread bound to {display_name} |
+```
+
+Do not update any other files. Do not re-describe agents already in the roster.
+
+---
+
 ## Post-Mortem Procedure
 
 Triggered by `hall:post-mortem` label, or automatically when `post-dispatch` records `outcome: failed` or `outcome: max_turns_exceeded`.
