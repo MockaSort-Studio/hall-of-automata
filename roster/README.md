@@ -16,8 +16,7 @@ Automata are onboarded via issue template. Old Major reviews submissions, provis
 | [pyrate.md](pyrate.md) | Captain Pyrate 🦜 | Python specialist | @fpetracci |
 | [aeeeiii.md](aeeeiii.md) | AEEEEEIII 🐑 | Deep research — AI perception & autonomous systems | @mksetaro |
 | [tomashco.md](tomashco.md) | Tomashco 🛹 | Backend architecture advisor | @mksetaro |
-
-> **Pending merge:** [Frontenzo 🎨](https://github.com/MockaSort-Studio/hall-of-automata/pull/62) — frontend design critic & advisor
+| [frontenzo.md](tomashco.md) | Frontenzo 🎨 | frontend design critic & advisor | @mksetaro |
 
 ---
 
