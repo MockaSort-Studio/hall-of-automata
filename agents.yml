@@ -151,6 +151,34 @@ agents:
         CI/CD architect and pipeline enforcer — designs, fixes, and optimizes GitHub Actions
         workflows, build systems, and deployment pipelines with zero tolerance for broken gates.
 
+  frontenzo:
+    display_name: "Frontenzo 🎨"
+    # Persona: roster/frontenzo.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+    catalog:
+      roles: [advise, review, research]
+      domains: [frontend-architecture, ux-ui, web-performance, accessibility, frontend-security, web-inspection]
+      scope_summary: >
+        Frontend design critic and advisor — reviews live sites and codebases for UX, performance,
+        accessibility, and security issues, and prescribes technology and architecture choices
+        with beauty as a first-order constraint.
+
   aeeeiii:
     display_name: "AEEEEEIII 🐑"
     # Persona: roster/aeeeiii.md
