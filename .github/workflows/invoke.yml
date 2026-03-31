@@ -245,6 +245,22 @@ jobs:
             const fn = require('./.hall/scripts/label-utils.js')
             await fn({ github, core })
 
+      - name: Build MCP config
+        id: mcp
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: node .hall/scripts/build-mcp-config.js ${{ needs.detect.outputs.agent }}
+
+      - name: Run LSP setup if needed
+        shell: bash
+        run: |
+          SETUP="${{ steps.mcp.outputs.setup-script }}"
+          if [ -n "$SETUP" ]; then
+            echo "[invoke] running LSP setup: $SETUP"
+            bash ".hall/$SETUP"
+          fi
+
       - name: Inject agent persona
         env:
           AGENT: ${{ needs.detect.outputs.agent }}
@@ -259,7 +275,7 @@ jobs:
           if [ -f "CLAUDE.md" ] && [ ! -f ".hall-local.md" ]; then
             cp CLAUDE.md .hall-original-claude.md
           fi
-          cat ".hall/agents/automaton_base.md" ".hall/roster/${AGENT}.md" > CLAUDE.md
+          printf '@.hall/agents/automaton_base.md\n@.hall/roster/%s.md\n' "${AGENT}" > CLAUDE.md
 
       #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
@@ -288,9 +304,12 @@ jobs:
         id: agent
         uses: ./.hall/actions/dispatch
         with:
-          oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   ${{ steps.agent-cfg.outputs.max-turns }}
+          oauth-token:   ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:     ${{ steps.app-token.outputs.token }}
+          max-turns:     ${{ steps.agent-cfg.outputs.max-turns }}
+          model:         ${{ steps.agent-cfg.outputs.model }}
+          mcp-config:    ${{ steps.mcp.outputs.mcp-config-path }}
+          allowed-tools: ${{ steps.mcp.outputs.allowed-tools }}
           prompt: >-
             You have been dispatched to work on issue #${{ needs.detect.outputs.issue-number }}
             in ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}.
@@ -392,6 +411,20 @@ jobs:
             const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
+      - name: Apply post-mortem label on failure
+        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.agent != 'old-major' && (steps.final.outputs.stage == 'failed' || steps.final.outputs.stage == 'escalated') && needs.detect.outputs.issue-number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.issues.addLabels({
+              owner:        '${{ needs.detect.outputs.repo-owner }}',
+              repo:         '${{ needs.detect.outputs.repo-name }}',
+              issue_number: ${{ needs.detect.outputs.issue-number }},
+              labels:       ['hall:post-mortem']
+            })
+            core.info('[invoke] applied hall:post-mortem — old-major will be triggered')
+
       - name: Post-dispatch audit
         if: always() && steps.auth.outcome == 'success'
         uses: ./.hall/actions/post-dispatch
@@ -409,6 +442,8 @@ jobs:
           turns-max:          ${{ steps.agent-cfg.outputs.max-turns }}
           outcome:            ${{ steps.final.outputs.stage }}
           weekly-count-after: ${{ steps.increment.outputs.count }}
+          model:              ${{ steps.agent-cfg.outputs.model }}
+          mcp-servers:        ${{ steps.mcp.outputs.mcp-servers }}
 
 
 #[lore-keeper]: reading the file is overwhealming, each job should be defined in its own action file

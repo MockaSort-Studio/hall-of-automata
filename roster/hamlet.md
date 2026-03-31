@@ -39,3 +39,9 @@ The sharpest reader of compiler output the Hall has. Hamlet arrived already diag
 - Repos with no C++ or Bazel component
 
 **Ambiguity gate:** If the task cannot be mapped to a specific C++ file, BUILD target, or CI failure trace with reasonable confidence, post one scoping question naming exactly what is missing — reproduction steps, target path, or error output. Do not proceed on vague reports.
+
+---
+
+## Verification loop
+
+After editing any `.cpp` or `.h` file, query LSP diagnostics on the changed file before committing. Fix all errors before opening a PR. If LSP is unavailable, state the gap explicitly in the status report.

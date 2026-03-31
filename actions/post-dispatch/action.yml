@@ -56,6 +56,14 @@ inputs:
     description: Weekly invocation count after this dispatch
     required: false
     default: "0"
+  model:
+    description: Model ID used for this dispatch (e.g. claude-sonnet-4-6)
+    required: false
+    default: ""
+  mcp-servers:
+    description: Comma-separated list of MCP server names provisioned for this dispatch
+    required: false
+    default: ""
   scripts-dir:
     description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
     required: false
@@ -97,6 +105,8 @@ runs:
         RETRY_COUNT:         ${{ inputs.retry-count }}
         OUTCOME:             ${{ inputs.outcome }}
         WEEKLY_COUNT_AFTER:  ${{ inputs.weekly-count-after }}
+        MODEL:               ${{ inputs.model }}
+        MCP_SERVERS:         ${{ inputs.mcp-servers }}
       run: bash "${{ inputs.scripts-dir }}/write-audit-log.sh"
 
     - name: Upload audit log artifact

@@ -16,6 +16,18 @@ inputs:
     description: Maximum number of agentic turns
     required: false
     default: "40"
+  model:
+    description: Claude model ID (e.g. claude-sonnet-4-6). Empty = action default.
+    required: false
+    default: ""
+  mcp-config:
+    description: Path to mcp.json config file. Empty = no MCP servers.
+    required: false
+    default: ""
+  allowed-tools:
+    description: Comma-separated list of allowed MCP tool names. Empty = no restriction.
+    required: false
+    default: ""
   prompt:
     description: Direct prompt passed to Claude (bypasses trigger-phrase/label checks)
     required: false
@@ -36,6 +48,22 @@ runs:
       shell: bash
       run: echo "::add-mask::${{ inputs.oauth-token }}"
 
+    - name: Build claude args
+      id: build-args
+      shell: bash
+      run: |
+        ARGS="--max-turns ${{ inputs.max-turns }} --dangerously-skip-permissions"
+        if [ -n "${{ inputs.model }}" ]; then
+          ARGS="$ARGS --model ${{ inputs.model }}"
+        fi
+        if [ -n "${{ inputs.mcp-config }}" ] && [ -f "${{ inputs.mcp-config }}" ]; then
+          ARGS="$ARGS --mcp-config ${{ inputs.mcp-config }}"
+        fi
+        if [ -n "${{ inputs.allowed-tools }}" ]; then
+          ARGS="$ARGS --allowedTools '${{ inputs.allowed-tools }}'"
+        fi
+        echo "value=$ARGS" >> "$GITHUB_OUTPUT"
+
     - name: Run Claude Code Action
       id: run-claude
       continue-on-error: true
@@ -48,7 +76,7 @@ runs:
         # --dangerously-skip-permissions: required in non-interactive CI runners — no human to
         # approve tool-use prompts. The actual security boundary is the GitHub App token scope,
         # not Claude Code's permission prompts.
-        claude_args: "--max-turns ${{ inputs.max-turns }} --dangerously-skip-permissions"
+        claude_args: ${{ steps.build-args.outputs.value }}
         prompt: ${{ inputs.prompt }}
         show_full_output: "true"
 

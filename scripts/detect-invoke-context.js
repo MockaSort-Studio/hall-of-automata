@@ -51,8 +51,8 @@ module.exports = async ({ github, context, core }) => {
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
     // Ignore system labels — they are applied by the Hall itself, not invokers
     if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
-    // hall:dispatch-automaton — standard invocation path; routes to Old Major for triage
-    if (label === 'hall:dispatch-automaton') {
+    // hall:dispatch-automaton and hall:post-mortem both route to Old Major
+    if (label === 'hall:dispatch-automaton' || label === 'hall:post-mortem') {
       agent = 'old-major';
     } else {
       agent = label.replace('hall:', '');

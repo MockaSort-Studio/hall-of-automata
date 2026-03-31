@@ -21,8 +21,31 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     author: mksetaro
     teams: [automata-invokers]
-    max_turns: 100
+    model: claude-haiku-4-5-20251001  # triage/routing — fast, cheap
+    max_turns: 20
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,labels,pull_requests"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__github__search_issues
+        - mcp__github__create_label
+        - mcp__github__update_label
+        - mcp__github__add_labels_to_issue
+        - mcp__github__list_labels_for_repo
     catalog:
       roles: [triage, route, onboard, synthesize]
       domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
@@ -36,8 +59,30 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     invoker: mksetaro
     teams: [automata-invokers]
+    model: claude-sonnet-4-6
     max_turns: 40
     max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: clangd
+          lsp_args: ["--compile-commands-dir={{workspace}}"]
+          setup: scripts/setup-lsp-cpp.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
     catalog:
       roles: [implement, debug, triage]
       domains: [cpp, build-systems, debugging]
@@ -52,8 +97,30 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     author: fpetracci
     teams: [automata-invokers]
+    model: claude-sonnet-4-6
     max_turns: 40
     max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: pyright-langserver
+          lsp_args: ["--stdio"]
+          setup: scripts/setup-lsp-python.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
     catalog:
       roles: [implement, debug]
       domains: [python]
@@ -67,8 +134,16 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     invoker: mksetaro
     teams: [automata-invokers]
+    model: claude-sonnet-4-6
     max_turns: 40
     max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
     catalog:
       roles: [implement, debug, triage]
       domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
@@ -82,8 +157,20 @@ agents:
     # Token:  pool-selected invoker/<handle> at dispatch time.
     author: mksetaro
     teams: [automata-invokers]
-    max_turns: 40
+    model: claude-opus-4-6
+    max_turns: 20
     max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
     catalog:
       roles: [research, advise, synthesize]
       domains: [perception, environment-modeling, computer-vision, autonomous-systems, ai-research-synthesis]

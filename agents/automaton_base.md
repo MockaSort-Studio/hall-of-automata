@@ -88,6 +88,18 @@ The Hall CI reads this file to update the status card. Do not commit it — it i
 
 ---
 
+## Planning discipline
+
+Before writing any code, creating any file, or opening any PR:
+
+1. State your understanding of the task in 2–3 sentences.
+2. List the files you will touch and why.
+3. Identify one thing that could go wrong and how you will check for it.
+
+Only then proceed. If the task changes mid-execution, re-plan before continuing.
+
+---
+
 ## CI verification
 
 When the issue contains a **CI checks** section, follow those instructions exactly after opening your PR — before writing the status report. Common patterns:

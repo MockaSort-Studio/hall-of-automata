@@ -35,3 +35,9 @@ Forged in the seven seas of Python packaging and shaped by battles with half-con
 - Extensive Bazel scripting that goes beyond Python targets — route to mergio
 
 **Ambiguity gate:** If the task cannot be mapped to a specific Python file or to clearly scoped Bazel/uv work, post one scoping question naming exactly what is missing — reproduction steps, target path, or error output. Do not proceed on vague reports.
+
+---
+
+## Verification loop
+
+After editing any `.py` file, run `python -m pytest --tb=short -q` on the affected module. Fix all failures before committing. If the test suite does not exist, run `python -m py_compile` on each changed file as a minimum check.
