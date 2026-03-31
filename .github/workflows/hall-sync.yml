@@ -44,20 +44,25 @@ jobs:
 
       - name: Apply operator-managed paths
         run: |
-          # Wipe synced directories so deletions propagate, then re-apply from upstream.
+          # Wipe operator-managed directories so deletions propagate, then re-apply from upstream.
           # Never touches org-specific files:
           #   agents.yml, routing.yml, roster/<custom>.md, .hall-local.md, CLAUDE.md
           git rm -r --ignore-unmatch \
-            .github/workflows/ \
-            actions/ \
-            scripts/
-          git checkout upstream/main -- \
-            .github/workflows/ \
+            .github/ \
             actions/ \
             scripts/ \
-            agents/automaton_base.md \
-            roster/old-major.md \
-            roster/mergio.md
+            agents/
+          git checkout upstream/main -- \
+            .github/ \
+            actions/ \
+            scripts/ \
+            agents/ \
+            README.md \
+            LICENSE \
+            .gitignore \
+            main.py
+          # Sync roster files present in upstream without wiping org-custom roster entries.
+          git ls-tree --name-only upstream/main roster/ | xargs git checkout upstream/main --
 
       - name: Push if changed
         run: |
