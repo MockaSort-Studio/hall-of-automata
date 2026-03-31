@@ -64,6 +64,23 @@ jobs:
           # Sync roster files present in upstream without wiping org-custom roster entries.
           git ls-tree --name-only upstream/main roster/ | xargs git checkout upstream/main --
 
+      - name: Merge agents.yml
+        run: |
+          # Get upstream agents.yml (not staged — just read it)
+          git show upstream/main:agents.yml > /tmp/upstream-agents.yml
+          # Merge: upstream is authoritative for all existing agent entries.
+          # Org-specific agents (keys absent from upstream) are preserved.
+          if [ -f agents.yml ]; then
+            yq '. as $up |
+              .agents += (load("agents.yml").agents
+                | with_entries(select(.key as $k | ($up.agents | has($k)) | not)))
+            ' /tmp/upstream-agents.yml > /tmp/merged-agents.yml
+          else
+            cp /tmp/upstream-agents.yml /tmp/merged-agents.yml
+          fi
+          mv /tmp/merged-agents.yml agents.yml
+          git add agents.yml
+
       - name: Push if changed
         run: |
           if git diff --cached --quiet; then
