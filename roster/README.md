@@ -1,27 +1,33 @@
 # Roster
 
-The active automata of MockaSort Studio. Each entry is a constructed being with a invoker, a behavioral contract, and a portal label.
+Active automata of the Hall of Automata. Each file is a persona character sheet — behavioral contract, domains, scope, and signature. These files are read at dispatch time and never committed to target repositories.
 
-Access to all automata is controlled by a single GitHub team: `automata-invokers`. Members of this team can invoke any automaton in the Hall. See [`architecture/permissions-model.md`](../architecture/permissions-model.md).
-
-Adding yourself to this roster is the final step of federation. See [`federation/joining.md`](../federation/joining.md).
+Automata are onboarded via issue template. Old Major reviews submissions, provisions `agents.yml` entries and persona files, and opens the provisioning PR. See the [onboarding process](https://mockasort-studio.github.io/hall-codex/automaton-onboarding/).
 
 ---
 
-## Active
+## Active automata
 
-| Automaton | invoker | Label | Status |
-|-----------|--------|-------|--------|
-| 🐗 Hamlet | @mksetaro | `hamlet` | Active |
+| File | Name | Role | Invoker |
+|------|------|------|---------|
+| [old-major.md](old-major.md) | Old Major 🏛️ | Hall Master — triage, routing, onboarding, post-mortem | @mksetaro |
+| [hamlet.md](hamlet.md) | Hamlet 🐗 | C++17 & Bazel specialist | @mksetaro |
+| [mergio.md](mergio.md) | mergio 🤘 | CI/CD architect & pipeline enforcer | @mksetaro |
+| [pyrate.md](pyrate.md) | Captain Pyrate 🦜 | Python specialist | @fpetracci |
+| [aeeeiii.md](aeeeiii.md) | AEEEEEIII 🐑 | Deep research — AI perception & autonomous systems | @mksetaro |
+| [tomashco.md](tomashco.md) | Tomashco 🛹 | Backend architecture advisor | @mksetaro |
+
+> **Pending merge:** [Frontenzo 🎨](https://github.com/MockaSort-Studio/hall-of-automata/pull/62) — frontend design critic & advisor
 
 ---
 
-## Reading a profile
+## File format
 
-Each automaton has a profile file here. It covers:
+Each persona file covers:
 
-- **Identity** — who they are, what they do, their personality layer
-- **invoker** — the org member responsible for the automaton's key and behavior
-- **Invocation** — the label and which team controls access
-- **Capabilities** — what kinds of tasks they handle well and what they don't
-- **Contact** — how to reach the invoker if something goes wrong
+- **Character** — tone, voice, rules, signature
+- **Domains** — named capability bundles used for routing
+- **Scope** — right-call-for, not-right-call-for, ambiguity gate
+- **Procedures** — agent-specific workflows (routing, onboarding, post-mortem, etc.)
+
+The base contract shared by all automata lives in [`agents/automaton_base.md`](../agents/automaton_base.md).
