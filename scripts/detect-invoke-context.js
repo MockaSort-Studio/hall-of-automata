@@ -46,7 +46,7 @@ module.exports = async ({ github, context, core }) => {
     'hall:active-invoker',
   ];
 
-  if (event === 'issues' && payload.action === 'labeled') {
+  if ((event === 'issues' || event === 'pull_request') && payload.action === 'labeled') {
     const label = payload.label?.name || '';
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
     // Ignore system labels — they are applied by the Hall itself, not invokers
@@ -57,16 +57,18 @@ module.exports = async ({ github, context, core }) => {
     } else {
       agent = label.replace('hall:', '');
     }
-    issueNumber  = String(payload.issue.number);
+    // pull_request events use payload.pull_request; issues events use payload.issue
+    const thread = payload.issue || payload.pull_request;
+    issueNumber  = String(thread.number);
     // If the label was applied by the Hall bot (e.g. Old Major delegating to an agent),
-    // inherit the issue author so the original invoker's authz carries through.
+    // inherit the thread author so the original invoker's authz carries through.
     actor        = payload.sender?.type === 'Bot'
-                     ? (payload.issue?.user?.login || context.actor)
+                     ? (thread?.user?.login || context.actor)
                      : payload.sender.login;
     triggerEvent = 'issue_labeled';
-    // Extract target repo from issue body when not provided via workflow inputs.
+    // Extract target repo from thread body when not provided via workflow inputs.
     if (!process.env.INPUT_REPO_OWNER && !process.env.INPUT_REPO_NAME) {
-      const parsed = parseTargetRepo(payload.issue?.body);
+      const parsed = parseTargetRepo(thread?.body);
       if (parsed) { repoOwner = parsed.owner; repoName = parsed.name; }
     }
 
