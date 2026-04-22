@@ -233,3 +233,39 @@ agents:
         Backend architecture advisor — analyzes system design, API contracts, event-driven
         patterns, and data security concerns; scopes work and prescribes the approach for
         downstream implementation agents.
+
+  indiana-docs:
+    display_name: "Indiana Docs 🤠"
+    # Persona: roster/indiana-docs.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: fpetracci
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: pyright-langserver
+          lsp_args: ["--stdio"]
+          setup: scripts/setup-lsp-python.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_hover
+    catalog:
+      roles: [write, review, research]
+      domains: [documentation]
+      scope_summary: >
+        MkDocs documentation specialist — reads the codebase, then writes coherent,
+        style-consistent Markdown pages, Google-style docstrings, and navigation config.
