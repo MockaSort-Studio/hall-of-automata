@@ -53,6 +53,45 @@ agents:
         Entry point for all unlabeled invocations. Reads the roster catalog, picks the right
         specialist, synthesizes task context. Does not implement code or open PRs.
 
+  snowball:
+    display_name: "Snowball 🐷"
+    # Persona: roster/snowball.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_turns: 30
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__github__get_file_contents
+        - mcp__github__create_or_update_file
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
+    catalog:
+      roles: [implement, review]
+      domains: [hall-infrastructure, persona-engineering]
+      scope_summary: >
+        Hall infrastructure specialist and Old Major's squire — writes and maintains skill files,
+        methodology documents, and persona overlay templates in hall-of-automata-cli; drafts and
+        reviews automaton character sheets.
+
   hamlet:
     display_name: "Hamlet 🐗"
     # Persona: roster/hamlet.md
