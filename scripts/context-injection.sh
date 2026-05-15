@@ -36,6 +36,25 @@ HALLCTX
       "$ATTEMPT" "$MAX_RETRIES" "$PR_NUMBER" "$CI_FAILURES" >> CLAUDE.md
     ;;
 
+  post-mortem)
+    FAILED_RUN_URL=""
+    if [ -n "${FAILED_RUN_ID:-}" ]; then
+      FAILED_RUN_URL="${SERVER_URL}/${HALL_REPO}/actions/runs/${FAILED_RUN_ID}"
+    fi
+    cat >> CLAUDE.md << 'HALLCTX'
+
+## Post-Mortem Context
+
+You are running a post-mortem, not a triage dispatch. Apply your Post-Mortem Procedure.
+
+HALLCTX
+    printf -- '- Failed issue: #%s in %s/%s\n' "$ISSUE_NUMBER" "$REPO_OWNER" "$REPO_NAME" >> CLAUDE.md
+    [ -n "$FAILED_RUN_URL" ] && printf -- '- Failed run: %s\n' "$FAILED_RUN_URL" >> CLAUDE.md
+    printf -- '- Artifact pattern: `hall-log-*-%s-*`\n' "$ISSUE_NUMBER" >> CLAUDE.md
+    printf -- '- Artifact API: `GET https://api.github.com/repos/%s/actions/artifacts?per_page=100`\n' "$HALL_REPO" >> CLAUDE.md
+    printf -- '  Filter by name prefix, then fetch the download URL. Use `Authorization: Bearer ${GITHUB_TOKEN}`.\n' >> CLAUDE.md
+    ;;
+
   *)
     echo "context-injection: unknown MODE=${MODE}" >&2
     exit 1

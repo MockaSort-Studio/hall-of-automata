@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: ""
+      failed-run-id:
+        description: Run ID of the failed dispatch (post-mortem only)
+        required: false
+        type: string
+        default: ""
   workflow_dispatch:
     inputs:
       agent:
@@ -40,6 +45,11 @@ on:
         default: ""
       issue-number:
         description: Issue or PR number in the target repository
+        required: false
+        type: string
+        default: ""
+      failed-run-id:
+        description: Run ID of the failed dispatch (post-mortem only)
         required: false
         type: string
         default: ""
@@ -66,9 +76,10 @@ jobs:
       trigger-event: ${{ steps.ctx.outputs.trigger-event }}
       repo-owner:    ${{ steps.ctx.outputs.repo-owner }}
       repo-name:     ${{ steps.ctx.outputs.repo-name }}
-      pr-number:     ${{ steps.ctx.outputs.pr-number }}
-      review-body:   ${{ steps.ctx.outputs.review-body }}
-      mode:          ${{ steps.ctx.outputs.mode }}
+      pr-number:      ${{ steps.ctx.outputs.pr-number }}
+      review-body:    ${{ steps.ctx.outputs.review-body }}
+      mode:           ${{ steps.ctx.outputs.mode }}
+      trigger-reason: ${{ steps.ctx.outputs.trigger-reason }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -310,6 +321,19 @@ jobs:
           MODE:        review
           PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
           REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
+        shell: bash
+        run: bash .hall/scripts/context-injection.sh
+
+      - name: Inject post-mortem context into CLAUDE.md
+        if: needs.detect.outputs.trigger-reason == 'post-mortem'
+        env:
+          MODE:          post-mortem
+          ISSUE_NUMBER:  ${{ needs.detect.outputs.issue-number }}
+          REPO_OWNER:    ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:     ${{ needs.detect.outputs.repo-name }}
+          FAILED_RUN_ID: ${{ inputs.failed-run-id }}
+          SERVER_URL:    ${{ github.server_url }}
+          HALL_REPO:     ${{ github.repository }}
         shell: bash
         run: bash .hall/scripts/context-injection.sh
 

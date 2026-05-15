@@ -51,8 +51,9 @@ module.exports = async ({ github, context, core }) => {
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
     // Ignore system labels — they are applied by the Hall itself, not invokers
     if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
-    // hall:dispatch-automaton and hall:post-mortem both route to Old Major
-    if (label === 'hall:dispatch-automaton' || label === 'hall:post-mortem') {
+    // hall:dispatch-automaton routes to Old Major; other pseudo-agent aliases
+    // are resolved by the unified AGENT_ALIASES map below (e.g. hall:post-mortem).
+    if (label === 'hall:dispatch-automaton') {
       agent = 'old-major';
     } else {
       agent = label.replace('hall:', '');
@@ -134,6 +135,12 @@ module.exports = async ({ github, context, core }) => {
     core.setOutput('agent', '');
     return;
   }
+
+  // ── Normalize pseudo-agent aliases to canonical handlers ─────────────────
+  // Applied after all event-parsing branches so every trigger path is covered.
+  const AGENT_ALIASES = { 'post-mortem': 'old-major' };
+  let triggerReason = '';
+  if (AGENT_ALIASES[agent]) { triggerReason = agent; agent = AGENT_ALIASES[agent]; }
 
   // ── Pool-select the least-used invoker under cap ──────────────────────────
   // Query all invoker/* environments in the Hall repo, read usage vars via
@@ -229,13 +236,14 @@ module.exports = async ({ github, context, core }) => {
     else mode = 'doing';
   }
 
-  core.setOutput('actor',         actor);
-  core.setOutput('agent',         agent);
-  core.setOutput('issue-number',  issueNumber);
-  core.setOutput('invoker',       invoker);
-  core.setOutput('invoker-count', String(invokerCount));
-  core.setOutput('trigger-event', triggerEvent);
-  core.setOutput('repo-owner',    repoOwner);
-  core.setOutput('repo-name',     repoName);
-  core.setOutput('mode',          mode);
+  core.setOutput('actor',          actor);
+  core.setOutput('agent',          agent);
+  core.setOutput('issue-number',   issueNumber);
+  core.setOutput('invoker',        invoker);
+  core.setOutput('invoker-count',  String(invokerCount));
+  core.setOutput('trigger-event',  triggerEvent);
+  core.setOutput('repo-owner',     repoOwner);
+  core.setOutput('repo-name',      repoName);
+  core.setOutput('mode',           mode);
+  core.setOutput('trigger-reason', triggerReason);
 };
