@@ -76,10 +76,13 @@ jobs:
       trigger-event: ${{ steps.ctx.outputs.trigger-event }}
       repo-owner:    ${{ steps.ctx.outputs.repo-owner }}
       repo-name:     ${{ steps.ctx.outputs.repo-name }}
-      pr-number:      ${{ steps.ctx.outputs.pr-number }}
-      review-body:    ${{ steps.ctx.outputs.review-body }}
-      mode:           ${{ steps.ctx.outputs.mode }}
-      trigger-reason: ${{ steps.ctx.outputs.trigger-reason }}
+      pr-number:       ${{ steps.ctx.outputs.pr-number }}
+      review-body:     ${{ steps.ctx.outputs.review-body }}
+      mode:            ${{ steps.ctx.outputs.mode }}
+      trigger-reason:  ${{ steps.ctx.outputs.trigger-reason }}
+      onboarding-type: ${{ steps.ctx.outputs.onboarding-type }}
+      issue-body:      ${{ steps.ctx.outputs.issue-body }}
+      issue-login:     ${{ steps.ctx.outputs.issue-login }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -109,7 +112,35 @@ jobs:
             const fn = require('./.hall/scripts/detect-invoke-context.js')
             await fn({ github, context, core })
 
-  # ── Job 2: notify when the invoker pool is exhausted ────────────────────
+  # ── Job 2a: route onboard-automaton via workflow_call ────────────────────
+  # Fires instead of direct issues:labeled trigger — eliminates triple-queuing.
+  route-onboard-automaton:
+    name: Route — onboard automaton
+    needs: [detect]
+    if: needs.detect.outputs.onboarding-type == 'automaton'
+    uses: ./.github/workflows/onboard-automaton.yml
+    with:
+      issue-number: ${{ needs.detect.outputs.issue-number }}
+      repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+      repo-name:    ${{ needs.detect.outputs.repo-name }}
+      issue-login:  ${{ needs.detect.outputs.issue-login }}
+    secrets: inherit
+
+  # ── Job 2b: route onboard-invoker via workflow_call ───────────────────────
+  route-onboard-invoker:
+    name: Route — onboard invoker
+    needs: [detect]
+    if: needs.detect.outputs.onboarding-type == 'invoker'
+    uses: ./.github/workflows/onboard-invoker.yml
+    with:
+      issue-number: ${{ needs.detect.outputs.issue-number }}
+      repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+      repo-name:    ${{ needs.detect.outputs.repo-name }}
+      issue-body:   ${{ needs.detect.outputs.issue-body }}
+      issue-login:  ${{ needs.detect.outputs.issue-login }}
+    secrets: inherit
+
+  # ── Job 3: notify when the invoker pool is exhausted ────────────────────
   # Detect's pool-selection already picked the best invoker (least-used, under
   # cap). This job only runs when the pool is fully exhausted (invoker == '').
   notify-queued:

@@ -49,6 +49,18 @@ module.exports = async ({ github, context, core }) => {
   if ((event === 'issues' || event === 'pull_request') && payload.action === 'labeled') {
     const label = payload.label?.name || '';
     if (!label.startsWith('hall:')) { core.setOutput('agent', ''); return; }
+    // Onboarding labels: route via invoke.yml → workflow_call instead of direct trigger
+    if (label === 'hall:onboard-automaton' || label === 'hall:onboard-invoker') {
+      const thread = payload.issue || payload.pull_request;
+      core.setOutput('onboarding-type', label === 'hall:onboard-automaton' ? 'automaton' : 'invoker');
+      core.setOutput('issue-number',    String(thread.number));
+      core.setOutput('issue-body',      thread.body || '');
+      core.setOutput('issue-login',     thread.user?.login || '');
+      core.setOutput('repo-owner',      repoOwner);
+      core.setOutput('repo-name',       repoName);
+      core.setOutput('agent',           '');
+      return;
+    }
     // Ignore system labels — they are applied by the Hall itself, not invokers
     if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
     // hall:dispatch-automaton routes to Old Major; other pseudo-agent aliases
@@ -236,14 +248,15 @@ module.exports = async ({ github, context, core }) => {
     else mode = 'doing';
   }
 
-  core.setOutput('actor',          actor);
-  core.setOutput('agent',          agent);
-  core.setOutput('issue-number',   issueNumber);
-  core.setOutput('invoker',        invoker);
-  core.setOutput('invoker-count',  String(invokerCount));
-  core.setOutput('trigger-event',  triggerEvent);
-  core.setOutput('repo-owner',     repoOwner);
-  core.setOutput('repo-name',      repoName);
-  core.setOutput('mode',           mode);
-  core.setOutput('trigger-reason', triggerReason);
+  core.setOutput('actor',           actor);
+  core.setOutput('agent',           agent);
+  core.setOutput('issue-number',    issueNumber);
+  core.setOutput('invoker',         invoker);
+  core.setOutput('invoker-count',   String(invokerCount));
+  core.setOutput('trigger-event',   triggerEvent);
+  core.setOutput('repo-owner',      repoOwner);
+  core.setOutput('repo-name',       repoName);
+  core.setOutput('mode',            mode);
+  core.setOutput('trigger-reason',  triggerReason);
+  core.setOutput('onboarding-type', '');
 };
