@@ -36,7 +36,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "issues,labels,pull_requests"
+            GITHUB_TOOLSETS: "issues,labels,pull_requests,actions"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -45,6 +45,8 @@ agents:
         - mcp__github__update_label
         - mcp__github__add_labels_to_issue
         - mcp__github__list_labels_for_repo
+        - mcp__github__list_workflow_run_artifacts
+        - mcp__github__download_workflow_run_artifact
     catalog:
       roles: [triage, route, onboard, synthesize]
       domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
@@ -86,9 +88,10 @@ agents:
       roles: [implement, review]
       domains: [hall-infrastructure, persona-engineering]
       scope_summary: >
-        Hall infrastructure specialist and Old Major's squire — writes and maintains skill files,
-        methodology documents, and persona overlay templates in hall-of-automata-cli; drafts and
-        reviews automaton character sheets.
+        Hall infrastructure specialist and Old Major's squire — writes and maintains CI workflows,
+        composite actions, scripts, and agent catalog entries in hall-of-automata; writes and
+        maintains skill files, methodology documents, and persona overlay templates in
+        hall-of-automata-cli; drafts and reviews automaton character sheets.
 
   hamlet:
     display_name: "Hamlet 🐗"
