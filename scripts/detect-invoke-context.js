@@ -100,6 +100,31 @@ module.exports = async ({ github, context, core }) => {
     core.info(`[detect] labels=${JSON.stringify(labels.map(l => l.name))}`);
     const hallLabel  = labels.find(l => l.name.startsWith('hall:') && !SYSTEM_LABELS.includes(l.name));
     core.info(`[detect] hallLabel=${hallLabel?.name}`);
+    // Onboarding Phase 2: comment on an onboarding issue routes back through invoke.yml.
+    // ISSUE_LABELS_JSON is injected by the invoke.yml detect step for issue_comment events.
+    const issueLabels = JSON.parse(process.env.ISSUE_LABELS_JSON || '[]');
+    if (issueLabels.includes('hall:onboard-automaton')) {
+      core.setOutput('agent',           '');
+      core.setOutput('onboarding-type', 'automaton');
+      core.setOutput('issue-number',    String(payload.issue.number));
+      core.setOutput('issue-login',     payload.issue?.user?.login || '');
+      core.setOutput('repo-owner',      repoOwner);
+      core.setOutput('repo-name',       repoName);
+      core.setOutput('awaiting-input',  issueLabels.includes('hall:awaiting-input') ? 'true' : 'false');
+      return;
+    }
+    if (issueLabels.includes('hall:onboard-invoker')) {
+      core.setOutput('agent',           '');
+      core.setOutput('onboarding-type', 'invoker');
+      core.setOutput('issue-number',    String(payload.issue.number));
+      core.setOutput('issue-body',      payload.issue?.body || '');
+      core.setOutput('issue-login',     payload.issue?.user?.login || '');
+      core.setOutput('repo-owner',      repoOwner);
+      core.setOutput('repo-name',       repoName);
+      core.setOutput('comment-body',    payload.comment?.body || '');
+      core.setOutput('awaiting-input',  'true');
+      return;
+    }
     if (!hallLabel)  { core.setOutput('agent', ''); return; }
     agent = hallLabel.name === 'hall:dispatch-automaton' ? 'old-major' : hallLabel.name.replace('hall:', '');
     issueNumber  = String(payload.issue.number);

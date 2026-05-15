@@ -1,8 +1,9 @@
 name: Onboard Invoker
 
 # Four-job flow:
-#   setup      — invoke.yml routes hall:onboard-invoker → workflow_call here
-#   parse-ready — invoker replies "ready"           → parse + confirm secret slot exists
+#   setup      — invoke.yml routes hall:onboard-invoker → workflow_call here (re-evaluate='')
+#   parse-ready — invoker replies "ready" → invoke.yml detects via ISSUE_LABELS_JSON,
+#                routes here via workflow_call with re-evaluate='true', comment-body='ready...'
 #   test-token  — dispatch action (1 turn)          → exposes token-status (ok|rate_limited|unauthorized|error)
 #   finalize    — resolve result → welcome on pass, retry prompt on fail
 
@@ -35,14 +36,22 @@ on:
         required: false
         type: string
         default: ''
-  issue_comment:
-    types: [created]
+      re-evaluate:
+        description: "'true' for Phase 2 (invoker replies ready)"
+        required: false
+        type: string
+        default: ''
+      comment-body:
+        description: Comment body for Phase 2 ready signal
+        required: false
+        type: string
+        default: ''
 
 jobs:
   # ── Phase 1: provision environment ───────────────────────────────────────────
   setup:
     name: Provision invoker environment
-    if: github.event_name == 'workflow_call'
+    if: github.event_name == 'workflow_call' && inputs.re-evaluate != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (scripts only)
@@ -89,10 +98,7 @@ jobs:
   # ── Phase 2a: parse "ready" reply, confirm secret slot exists ────────────────
   parse-ready:
     name: Parse ready signal
-    if: >-
-      github.event_name == 'issue_comment' &&
-      github.event.sender.type != 'Bot' &&
-      contains(github.event.issue.labels.*.name, 'hall:onboard-invoker')
+    if: github.event_name == 'workflow_call' && inputs.re-evaluate == 'true'
     runs-on: ubuntu-latest
     outputs:
       is-ready:         ${{ steps.signal.outputs.is-ready }}
@@ -102,9 +108,11 @@ jobs:
       - name: Check for ready signal
         id: signal
         uses: actions/github-script@v7
+        env:
+          COMMENT_BODY: ${{ inputs.comment-body }}
         with:
           script: |
-            const body = context.payload.comment.body.trim().toLowerCase()
+            const body = (process.env.COMMENT_BODY || '').trim().toLowerCase()
             core.setOutput('is-ready', body.startsWith('ready') ? 'true' : 'false')
 
       - name: Checkout (scripts only)
@@ -129,8 +137,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           ACTION:      parse
-          ISSUE_BODY:  ${{ github.event.issue.body }}
-          ISSUE_LOGIN: ${{ github.event.issue.user.login }}
+          ISSUE_BODY:  ${{ inputs.issue-body }}
+          ISSUE_LOGIN: ${{ inputs.issue-login }}
         with:
           script: |
             const fn = require('./.hall/scripts/invoker-onboarding.js')
@@ -142,10 +150,10 @@ jobs:
         uses: actions/github-script@v7
         env:
           ACTION:           verify
-          REPO_OWNER:       ${{ github.repository_owner }}
-          REPO_NAME:        ${{ github.event.repository.name }}
+          REPO_OWNER:       ${{ inputs.repo-owner }}
+          REPO_NAME:        ${{ inputs.repo-name }}
           INVOKER_USERNAME: ${{ steps.fields.outputs.invoker-username }}
-          ISSUE_NUMBER:     ${{ github.event.issue.number }}
+          ISSUE_NUMBER:     ${{ inputs.issue-number }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -220,9 +228,9 @@ jobs:
         uses: actions/github-script@v7
         env:
           ACTION:           finalize
-          REPO_OWNER:       ${{ github.repository_owner }}
-          REPO_NAME:        ${{ github.event.repository.name }}
-          ISSUE_NUMBER:     ${{ github.event.issue.number }}
+          REPO_OWNER:       ${{ inputs.repo-owner }}
+          REPO_NAME:        ${{ inputs.repo-name }}
+          ISSUE_NUMBER:     ${{ inputs.issue-number }}
           INVOKER_USERNAME: ${{ needs.parse-ready.outputs.invoker-username }}
           TEST_PASSED:      ${{ needs.test-token.outputs.test-passed }}
         with:

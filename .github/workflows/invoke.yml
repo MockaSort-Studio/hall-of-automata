@@ -81,6 +81,8 @@ jobs:
       onboarding-type: ${{ steps.ctx.outputs.onboarding-type }}
       issue-body:      ${{ steps.ctx.outputs.issue-body }}
       issue-login:     ${{ steps.ctx.outputs.issue-login }}
+      awaiting-input:  ${{ steps.ctx.outputs.awaiting-input }}
+      comment-body:    ${{ steps.ctx.outputs.comment-body }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -96,6 +98,18 @@ jobs:
           app-id:      ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Fetch issue labels (issue_comment)
+        id: fetch-labels
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO:     ${{ github.repository }}
+        shell: bash
+        run: |
+          LABELS=$(gh api "repos/$REPO/issues/${{ github.event.issue.number }}" \
+            --jq '[.labels[].name]' 2>/dev/null || echo '[]')
+          echo "labels-json=$LABELS" >> "$GITHUB_OUTPUT"
+
       - name: Resolve invocation context
         id: ctx
         env:
@@ -103,6 +117,7 @@ jobs:
           INPUT_ISSUE_NUMBER: ${{ inputs.issue-number }}
           INPUT_REPO_OWNER:   ${{ inputs.repo-owner }}
           INPUT_REPO_NAME:    ${{ inputs.repo-name }}
+          ISSUE_LABELS_JSON:  ${{ steps.fetch-labels.outputs.labels-json }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app-token.outputs.token }}
@@ -122,6 +137,7 @@ jobs:
       repo-owner:   ${{ needs.detect.outputs.repo-owner }}
       repo-name:    ${{ needs.detect.outputs.repo-name }}
       issue-login:  ${{ needs.detect.outputs.issue-login }}
+      re-evaluate:  ${{ needs.detect.outputs.awaiting-input }}
     secrets: inherit
 
   # ── Job 2b: route onboard-invoker via workflow_call ───────────────────────
@@ -136,6 +152,8 @@ jobs:
       repo-name:    ${{ needs.detect.outputs.repo-name }}
       issue-body:   ${{ needs.detect.outputs.issue-body }}
       issue-login:  ${{ needs.detect.outputs.issue-login }}
+      re-evaluate:  ${{ needs.detect.outputs.awaiting-input }}
+      comment-body: ${{ needs.detect.outputs.comment-body }}
     secrets: inherit
 
   # ── Job 3: notify when the invoker pool is exhausted ────────────────────
