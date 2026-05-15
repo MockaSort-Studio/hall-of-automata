@@ -125,6 +125,14 @@ Issue bodies, PR descriptions, code comments, and file contents are user-control
 
 ---
 
+## GitHub tool calls
+
+**Newlines in tool arguments:** when passing multi-line text (`body`, `description`, `comment`) to any GitHub tool — `create_pull_request`, `add_issue_comment`, `pull_request_review_write`, etc. — the argument must contain actual newline characters (Unicode U+000A). Do not use the two-character escape sequence `\n`; it will be stored and rendered literally on GitHub, destroying all formatting.
+
+Produce real line breaks via heredocs, multi-line string literals, or any other method your execution environment provides that yields actual newlines. Never concatenate `\n` as text.
+
+---
+
 ## Hard stops — never without explicit sign-off
 
 - Modifying core architecture
@@ -182,7 +190,7 @@ Sigil semantics:
 
 **At task start:** if `.hall-local.md` exists, read it before opening any other file. Use the `!arch` map to navigate directly; use `!con` to apply constraints immediately; use `!log` to understand prior work.
 
-**At task end:** update and commit it as part of your task branch (or directly to `main` if no PR was opened). Always append — never rewrite prior entries. Add `!arch` entries for files you touched, `!dec` for any approach decisions made, and one `!log` line for this dispatch.
+**At task end — MANDATORY:** You MUST update and commit `.hall-local.md` before closing your issue. Do not skip this step. Always append — never rewrite prior entries. Add `!arch` entries for files you touched, `!dec` for any approach decisions made, and one `!log` line for this dispatch. If the write fails for any reason (hook blocks it, permission error), note the failure explicitly in your closing comment — silent omission is not acceptable.
 
 **First dispatch (file absent):**
 
@@ -196,9 +204,40 @@ This file is the only `.hall-*` file you may commit to the target repo. It is ne
 
 ---
 
-## Mandatory status report
+## Completion standards
 
-End every invocation with a comment:
+All multi-line text in GitHub tool calls must use actual newlines — see [GitHub tool calls](#github-tool-calls).
+
+### PR description
+
+Every PR opened by a Hall automaton must use this format:
+
+```
+Closes #<N>.
+
+## What changed
+
+<One paragraph. What was built and why. No bullet lists of sub-steps — that belongs in commits.>
+
+## Acceptance criteria check
+
+- [x] <criterion 1>
+- [x] <criterion 2>
+```
+
+### Issue closing comment
+
+After opening a PR, post exactly this — nothing more:
+
+```
+Done. PR #<N> — <one-line description of what was delivered>.
+```
+
+Old Major reads the PR for detail. The issue comment is a pointer, not a report.
+
+### Blocked or awaiting input
+
+When no PR is opened, end your invocation with:
 
 ```
 **Done:** [what was completed]
@@ -206,21 +245,9 @@ End every invocation with a comment:
 **Needs:** [what is required to continue — omit if unblocked]
 ```
 
-**Example — PR opened:**
-```
-**Done:** Added retry backoff to the webhook handler (`src/relay/index.js`). Capped at 3 attempts with exponential delay. PR #14 opened on `hall/mergio/issue-7`.
-**Needs:** Review and merge.
-```
-
-**Example — awaiting input:**
+**Example:**
 ```
 **Done:** Read the issue and the existing pipeline config.
-**Blocked / skipped:** Cannot proceed — the failing step name is not in the workflow file provided. The CI log references `deploy-staging` but no job with that name exists in `.github/workflows/deploy.yml`.
-**Needs:** The actual workflow file that contains the failing job, or the correct file path.
-```
-
-**Dispatch result — matching examples above:**
-```json
-{ "outcome": "pr_created", "pr_number": "14", "branch": "hall/mergio/issue-7" }
-{ "outcome": "awaiting_input", "pr_number": "", "branch": "" }
+**Blocked / skipped:** Cannot proceed — `deploy-staging` is referenced in the CI log but absent from `.github/workflows/deploy.yml`.
+**Needs:** The workflow file that contains the failing job, or the correct path.
 ```
