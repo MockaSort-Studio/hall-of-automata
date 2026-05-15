@@ -22,7 +22,6 @@ agents:
     author: mksetaro
     teams: [automata-invokers]
     model: claude-haiku-4-5-20251001  # triage/routing — fast, cheap
-    max_turns: 20
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
     mcp:
       servers:
@@ -60,7 +59,6 @@ agents:
     author: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 30
     max_retries: 2
     mcp:
       servers:
@@ -99,7 +97,6 @@ agents:
     invoker: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 40
     max_retries: 2
     mcp:
       servers:
@@ -137,7 +134,6 @@ agents:
     author: fpetracci
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 40
     max_retries: 2
     mcp:
       servers:
@@ -174,7 +170,6 @@ agents:
     invoker: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 40
     max_retries: 2
     mcp:
       servers:
@@ -197,7 +192,6 @@ agents:
     author: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 30
     max_retries: 2
     mcp:
       servers:
@@ -225,7 +219,6 @@ agents:
     author: mksetaro
     teams: [automata-invokers]
     model: claude-opus-4-6
-    max_turns: 20
     max_retries: 2
     mcp:
       servers:
@@ -252,7 +245,6 @@ agents:
     author: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 30
     max_retries: 2
     mcp:
       servers:
@@ -280,7 +272,6 @@ agents:
     author: fpetracci
     teams: [automata-invokers]
     model: claude-sonnet-4-6
-    max_turns: 30
     max_retries: 2
     mcp:
       servers:
