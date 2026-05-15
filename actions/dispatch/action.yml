@@ -13,9 +13,9 @@ inputs:
     description: GitHub App installation token (used by the action for GitHub API calls)
     required: true
   max-turns:
-    description: Maximum number of agentic turns
+    description: Maximum number of agentic turns. Empty = no ceiling (run to natural completion).
     required: false
-    default: "40"
+    default: ""
   model:
     description: Claude model ID (e.g. claude-sonnet-4-6). Empty = action default.
     required: false
@@ -52,7 +52,10 @@ runs:
       id: build-args
       shell: bash
       run: |
-        ARGS="--max-turns ${{ inputs.max-turns }} --dangerously-skip-permissions"
+        ARGS="--dangerously-skip-permissions"
+        if [ -n "${{ inputs.max-turns }}" ]; then
+          ARGS="--max-turns ${{ inputs.max-turns }} $ARGS"
+        fi
         if [ -n "${{ inputs.model }}" ]; then
           ARGS="$ARGS --model ${{ inputs.model }}"
         fi
