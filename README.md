@@ -1,72 +1,91 @@
-# Hall of Automata
+# Hall of Automata — Claude Code Plugin
 
-> *A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through.*
+Local orchestrator for multi-task projects on a [Hall of Automata](https://github.com/MockaSort-Studio/hall-of-automata) instance. Plan decomposition, agent dispatch, and task coordination — all via a design conversation with Old Major.
 
----
+## Prerequisites
 
-You have a GitHub repo. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
+- [Claude Code](https://claude.ai/code) CLI (`claude` / `cc`)
+- [GitHub CLI](https://cli.github.com/) (`gh`) authenticated to the org that hosts your Hall instance
+- An org installed [Hall of Automata](https://github.com/marketplace/hall-of-automata) 
+- `GITHUB_PERSONAL_ACCESS_TOKEN` set in your environment (required for MCP connectivity)
 
-No server to run. No API key to manage. No external platform to pay for. GitHub is the entire backend.
+## Installation
 
----
+### Via MockaSort Marketplace (recommended)
 
-## What it is
+Inside any Claude Code session:
 
-Hall of Automata is an AI agent orchestration layer built on GitHub Actions. The primitives GitHub already provides — Actions, Environments, Labels, Issues, PRs, the App API — are exactly sufficient for a full agent dispatch system. Workflows are the runtime. Environments are the secrets store. Labels are the message bus.
+```
+/plugin marketplace add MockaSort-Studio/marketplace
+/plugin install hall-of-automata-cli@mockasort
+```
 
-**What the Hall adds:**
-- Named agents (automata) with distinct characters, domains, and rules of engagement
-- An orchestrator (Old Major) who reads incoming tasks, picks the right specialist, and dispatches
-- A lifecycle that handles authorization, queueing, review loops, and cleanup
+Works in the CLI, desktop app, and IDE extensions — no git or terminal required.
 
-Drop a label on any issue in the org, and the right agent shows up to do the work.
+### Manual (CLI only)
 
----
+```bash
+git clone https://github.com/MockaSort-Studio/hall-of-automata-cli
+claude --plugin-dir /path/to/hall-of-automata-cli
+```
 
-## Invoker model
+To load permanently without the flag, add to `~/.claude/settings.json` (Linux/macOS) or `%APPDATA%\Claude\settings.json` (Windows):
 
-There are no shared API keys and no billing account. Contributors register their personal Claude Pro/Max subscription as an **invoker** by storing their OAuth token in a GitHub Environment. The token stays theirs — GitHub's own secrets mechanism injects it at runtime.
+```json
+{
+  "plugins": [
+    { "path": "/path/to/hall-of-automata-cli" }
+  ]
+}
+```
 
-The pool is shared across the org. When an agent is dispatched, the Hall picks the least-used invoker whose weekly cap hasn't been hit. Caps reset every Monday. Tasks queue and retry automatically if all invokers are at capacity.
+## Quick Start
 
----
+Open a Claude Code session inside your project repo, then:
 
-## Agents
+```
+/hall:doctor          — verify prerequisites and Hall connectivity
+/hall:open            — start a session, load Old Major, pull advisory personas
+/hall:plan            — design the project with Old Major (outputs plan.json)
+/hall:dispatch        — create GitHub issues for ready tasks
+/hall:status          — see task states (BACKLOG → IN_PROGRESS → DONE)
+/hall:reconcile       — sync local plan.json with GitHub label changes
+/hall:close           — wrap up, clean .hall-cache/
+```
 
-| Agent | Role | Invoke with |
-|-------|------|-------------|
-| 🦉 **Old Major** | Hall Master — triage, route, onboard | `hall:dispatch-automaton` |
-| 🤘 **mergio** | CI/CD architect & pipeline enforcer | `hall:mergio` |
+On first `/hall:open`, Old Major asks whether you are a Hall invoker (a member of `automata-invokers` in your org). Invokers get full dispatch mode; non-invokers get local mode, where Old Major implements tasks inline without filing GitHub Issues. The result is cached — subsequent opens skip the question. To re-verify: `/hall:open --verify` or `/hall:prune --invoker` then re-open.
 
-Specialists are added through a structured onboarding process. Old Major reviews each proposal and provisions the persona.
+## Commands
 
----
+| Command | What it does |
+|---|---|
+| `/hall:doctor` | Checks gh auth, token, Hall App install, invoker/local mode status, MCP health |
+| `/hall:open [--refresh\|--verify]` | Pulls personas + methodology, assembles session stack, runs invoker detection gate, starts watcher daemon |
+| `/hall:plan` | Guided decomposition conversation with Old Major; writes `plan.json` |
+| `/hall:dispatch` | Files issues for READY tasks (15 s apart to avoid invoker-pool races) |
+| `/hall:status` | Renders task board from `plan.json` |
+| `/hall:reconcile` | Pulls GitHub label changes → updates `plan.json` statuses |
+| `/hall:consultations` | Routes a design question to the right specialist (Tier 1/2/3) |
+| `/hall:reply` | Attaches a message to an in-flight task's GitHub issue |
+| `/hall:prune [--invoker]` | Clears invoker cache (`--invoker`), removes old plans, or flushes persona cache |
+| `/hall:close` | Saves session notes, kills watcher, removes `.hall-cache/` |
 
-## How to invoke
+## Environment
 
-**Let Old Major decide:** Apply `hall:dispatch-automaton` to any issue. Old Major reads the task, picks the right specialist, and hands it off.
+The plugin writes all session state under `.hall-cache/` (gitignored). Nothing is committed to your project repo.
 
-**Direct dispatch:** Apply `hall:<agent>` to skip triage.
+```
+.hall-cache/
+  personas/          # pulled from Hall roster at /hall:open
+  methodology/       # pulled from Hall at /hall:open
+  session/
+    claude-agents/   # rendered subagent overlays (one per specialist)
+  plan.json          # task graph, updated by reconcile
+  CLAUDE-stack.md    # assembled session prompt stack
+  watcher.pid        # background sync daemon
+  watcher.log
+```
 
-**PR review:** Comment `@hall-of-automata` on a review. The bound agent picks up the feedback and iterates.
+## Security
 
-**Cross-repo:** Works on any repo in the org via the Hall relay. The agent works in the target repo; lifecycle is managed from this Hall.
-
----
-
-## Repository layout
-
-| Path | Contents |
-|------|----------|
-| [`agents/`](agents/) | Base behavioral contract all automata share |
-| [`roster/`](roster/) | Persona files for each active automaton |
-| [`actions/`](actions/) | Composite actions (authorize, dispatch, memory, cleanup…) |
-| [`scripts/`](scripts/) | JS/bash helpers called by workflows |
-| [`.github/workflows/`](.github/workflows/) | Dispatch, onboarding, CI loop, cleanup workflows |
-| [`agents.yml`](agents.yml) | Agent registry |
-
-Full documentation at [mockasort-studio.github.io/hall-codex](https://mockasort-studio.github.io/hall-codex/).
-
----
-
-*MockaSort Studio · [github.com/MockaSort-Studio](https://github.com/MockaSort-Studio)*
+The `guard-writes` hook enforces that subagents can only write inside `.hall-cache/` and `.gitignore`. Writes to your project source tree are blocked by default.
