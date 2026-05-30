@@ -89,10 +89,3 @@ body:
       placeholder: |
         - Do not refactor unrelated code
         - Do not add new dependencies
-
-  - type: checkboxes
-    id: sign-off-required
-    attributes:
-      label: Sign-off required before action
-      options:
-        - label: "This task requires human review before any code is pushed"
