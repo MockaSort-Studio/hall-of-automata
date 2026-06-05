@@ -87,14 +87,3 @@ body:
       placeholder: "Python data engineering and DevOps specialist for MockaSort pipelines."
     validations:
       required: true
-
-  - type: input
-    id: max_turns
-    attributes:
-      label: "Max turns (optional)"
-      description: |
-        Maximum agentic turns per dispatch. Leave blank to use the default (30).
-        Use fewer turns for narrow, well-scoped agents. Use more for agents that do deep multi-file work.
-      placeholder: "30"
-    validations:
-      required: false
