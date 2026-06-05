@@ -51,7 +51,7 @@ jobs:
   # ── Phase 1: provision environment ───────────────────────────────────────────
   setup:
     name: Provision invoker environment
-    if: github.event_name == 'workflow_call' && inputs.re-evaluate != 'true'
+    if: inputs.re-evaluate != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (scripts only)
@@ -98,7 +98,7 @@ jobs:
   # ── Phase 2a: parse "ready" reply, confirm secret slot exists ────────────────
   parse-ready:
     name: Parse ready signal
-    if: github.event_name == 'workflow_call' && inputs.re-evaluate == 'true'
+    if: inputs.re-evaluate == 'true'
     runs-on: ubuntu-latest
     outputs:
       is-ready:         ${{ steps.signal.outputs.is-ready }}
