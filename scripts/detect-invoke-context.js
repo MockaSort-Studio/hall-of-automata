@@ -86,6 +86,8 @@ module.exports = async ({ github, context, core }) => {
     }
 
   } else if (event === 'issue_comment') {
+    // Skip PR thread comments — REQUEST_CHANGES review is the sole PR trigger.
+    if (payload.issue?.pull_request) { core.setOutput('agent', ''); return; }
     // Never process bot comments — prevents rejection comment feedback loops
     const senderType = payload.sender?.type || '';
     core.info(`[detect] event=issue_comment sender=${payload.sender?.login} senderType=${senderType}`);
@@ -137,24 +139,19 @@ module.exports = async ({ github, context, core }) => {
     }
 
   } else if (event === 'pull_request_review') {
-    const body     = payload.review?.body || '';
+    // Only REQUEST_CHANGES triggers dispatch.
+    const state = payload.review?.state || '';
+    if (state.toUpperCase() !== 'CHANGES_REQUESTED') { core.setOutput('agent', ''); return; }
+    // Route to the agent bound to this PR via hall:<agent> label — no @mention required.
     const prLabels = (payload.pull_request?.labels || []).map(l => l.name);
     const bound    = prLabels.find(l => l.startsWith('hall:') && !SYSTEM_LABELS.includes(l));
-    if (bound) {
-      // Bound hall:<agent> label — dispatch on any review submission, no @-mention needed.
-      agent = bound.replace('hall:', '');
-    } else {
-      // No bound label — require @-mention with explicit agent slug.
-      // Require lowercase-kebab-case to reject natural language words.
-      const nameMatch = body.match(/@hall-of-automata(?:\[bot\])?\s+(?:agent:\s*)?([a-z][a-z0-9-]*)/);
-      if (!nameMatch) { core.setOutput('agent', ''); return; }
-      agent = nameMatch[1];
-    }
+    if (!bound) { core.setOutput('agent', ''); return; }
+    agent        = bound.replace('hall:', '');
     issueNumber  = String(payload.pull_request.number);
     actor        = payload.sender.login;
     triggerEvent = 'pr_review';
     core.setOutput('pr-number',   issueNumber);
-    core.setOutput('review-body', body);
+    core.setOutput('review-body', payload.review?.body || '');
 
   } else if (event === 'workflow_call' || event === 'workflow_dispatch') {
     triggerEvent = 'workflow_call';
