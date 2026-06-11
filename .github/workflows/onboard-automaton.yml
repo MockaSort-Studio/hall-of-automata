@@ -44,6 +44,7 @@ jobs:
   # ── Pool-select invoker (shared by both phases) ───────────────────────────────
   select-invoker:
     name: Select invoker from pool
+    if: github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     outputs:
       invoker:       ${{ steps.pool.outputs.invoker }}
@@ -79,7 +80,7 @@ jobs:
   analyze:
     name: "Old Major — analyze submission"
     needs: [select-invoker]
-    if: inputs.re-evaluate != 'true'
+    if: github.event_name == 'workflow_call' && inputs.re-evaluate != 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
@@ -170,7 +171,7 @@ jobs:
   re-analyze:
     name: "Old Major — re-evaluate after feedback"
     needs: [select-invoker]
-    if: inputs.re-evaluate == 'true'
+    if: github.event_name == 'workflow_call' && inputs.re-evaluate == 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
