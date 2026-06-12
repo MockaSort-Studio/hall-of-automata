@@ -97,7 +97,7 @@ agents:
     display_name: "Hamlet 🐗"
     # Persona: roster/hamlet.md
     # Token:  pool-selected invoker/<handle> at dispatch time.
-    invoker: mksetaro
+    author: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
     max_retries: 2
@@ -170,7 +170,7 @@ agents:
     display_name: "mergio 🤘"
     # Persona: roster/mergio.md
     # Token:  pool-selected invoker/<handle> at dispatch time.
-    invoker: mksetaro
+    author: mksetaro
     teams: [automata-invokers]
     model: claude-sonnet-4-6
     max_retries: 2

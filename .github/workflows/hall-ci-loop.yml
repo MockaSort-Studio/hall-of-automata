@@ -142,7 +142,7 @@ jobs:
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
           PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
-          KEEPER:       ${{ steps.agent-cfg.outputs.keeper }}
+          invoker:      ${{ needs.select-invoker.outputs.invoker }}
           RETRY_COUNT:  ${{ steps.retry.outputs.count }}
           CI_FAILURES:  ${{ needs.detect.outputs.ci-failures }}
         uses: actions/github-script@v7
