@@ -1,12 +1,11 @@
 name: Task Memory
 description: >
-  Saves or restores agent task memory from Actions Cache.
-  Format: sigil-based compact text (%hall-task v1 header, !field lines).
+  Saves or restores agent task memory from Actions Cache with a comment-based
+  fallback. Format: sigil-based compact text (%hall-task v1 header, !field lines).
   Cache key: hall-task-{repo}-{pr_number} when a PR exists,
   hall-task-{repo}-issue-{issue_number} when not.
-  Expires after 7 days of inactivity. On restore cache-miss, the caller should
-  pass the thread URL to the agent as fallback context so it can reconstruct
-  state from the issue/PR history.
+  Cache expires after 7 days of inactivity. On restore cache-miss, reads memory
+  from a hidden HTML comment on the issue (<!-- hall-task-memory ... -->).
 
 inputs:
   mode:
@@ -27,6 +26,10 @@ inputs:
     description: JSON string to save (required when mode=save)
     required: false
     default: ""
+  app-token:
+    description: GitHub App token for reading/writing issue comments (required for comment fallback)
+    required: false
+    default: ""
   scripts-dir:
     description: Path to the scripts/ directory (default assumes Hall repo checked out at .hall/)
     required: false
@@ -34,8 +37,8 @@ inputs:
 
 outputs:
   memory-json:
-    description: Restored memory JSON string (empty string on cache miss)
-    value: ${{ steps.run.outputs.memory-json }}
+    description: Restored memory string (empty on miss from both cache and comment)
+    value: ${{ steps.run.outputs.memory-json || steps.comment-fallback.outputs.memory-json }}
   cache-hit:
     description: "true if the cache was restored successfully, false on miss"
     value: ${{ steps.restore.outputs.cache-hit }}
@@ -71,9 +74,31 @@ runs:
         MEMORY_JSON: ${{ inputs.memory-json }}
       run: bash "${{ inputs.scripts-dir }}/save-restore-memory.sh"
 
+    - name: Restore memory from comment fallback
+      id: comment-fallback
+      if: inputs.mode == 'restore' && steps.restore.outputs.cache-hit != 'true' && inputs.issue-number != '' && inputs.app-token != ''
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN:     ${{ inputs.app-token }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        REPO:         ${{ inputs.repo }}
+      run: bash "${{ inputs.scripts-dir }}/read-memory-comment.sh"
+
     - name: Save memory cache
       if: inputs.mode == 'save'
       uses: actions/cache/save@v4
       with:
         path: .hall-memory.json
         key: ${{ steps.key.outputs.cache-key }}
+
+    - name: Upsert memory comment
+      if: inputs.mode == 'save' && inputs.issue-number != '' && inputs.app-token != ''
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN:     ${{ inputs.app-token }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        REPO:         ${{ inputs.repo }}
+        MEMORY_JSON:  ${{ inputs.memory-json }}
+      run: bash "${{ inputs.scripts-dir }}/upsert-memory-comment.sh"

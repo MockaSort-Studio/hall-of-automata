@@ -357,9 +357,11 @@ jobs:
         if: needs.detect.outputs.trigger-event == 'pr_review'
         uses: ./.hall/actions/memory
         with:
-          mode:      restore
-          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number: ${{ needs.detect.outputs.pr-number }}
+          mode:         restore
+          repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          app-token:    ${{ steps.app-token.outputs.token }}
 
       #[lore-keeper]: see above
       - name: Append review context to CLAUDE.md
@@ -418,6 +420,7 @@ jobs:
           repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
           pr-number:    ${{ steps.find-pr.outputs.pr-number }}
           issue-number: ${{ needs.detect.outputs.issue-number }}
+          app-token:    ${{ steps.app-token.outputs.token }}
           memory-json: |-
             %hall-task v1 | ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
             !agent ${{ needs.detect.outputs.agent }}

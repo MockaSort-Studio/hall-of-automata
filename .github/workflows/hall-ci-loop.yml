@@ -121,9 +121,11 @@ jobs:
         id: memory
         uses: ./.hall/actions/memory
         with:
-          mode:      restore
-          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number: ${{ needs.detect.outputs.pr-number }}
+          mode:         restore
+          repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          app-token:    ${{ steps.app-token.outputs.token }}
 
       - name: Resolve retry count
         id: retry
@@ -142,7 +144,7 @@ jobs:
           REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
           REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
           PR_NUMBER:    ${{ needs.detect.outputs.pr-number }}
-          invoker:      ${{ needs.select-invoker.outputs.invoker }}
+          KEEPER:       ${{ steps.agent-cfg.outputs.keeper }}
           RETRY_COUNT:  ${{ steps.retry.outputs.count }}
           CI_FAILURES:  ${{ needs.detect.outputs.ci-failures }}
         uses: actions/github-script@v7
@@ -208,9 +210,11 @@ jobs:
         if: always() && steps.retry.outputs.escalate != 'true'
         uses: ./.hall/actions/memory
         with:
-          mode:        save
-          repo:        ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
-          pr-number:   ${{ needs.detect.outputs.pr-number }}
+          mode:         save
+          repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:    ${{ needs.detect.outputs.pr-number }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          app-token:    ${{ steps.app-token.outputs.token }}
           memory-json: |-
             %hall-task v1 | ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
             !agent ${{ needs.detect.outputs.agent }}
