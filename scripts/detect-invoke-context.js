@@ -86,6 +86,9 @@ module.exports = async ({ github, context, core }) => {
     }
 
   } else if (event === 'issue_comment') {
+    // Skip comments on PR threads — only issue comments should re-dispatch agents
+    if (payload.issue?.pull_request) { core.setOutput('agent', ''); return; }
+
     // Never process bot comments — prevents rejection comment feedback loops
     const senderType = payload.sender?.type || '';
     core.info(`[detect] event=issue_comment sender=${payload.sender?.login} senderType=${senderType}`);
@@ -137,6 +140,10 @@ module.exports = async ({ github, context, core }) => {
     }
 
   } else if (event === 'pull_request_review') {
+    // Only CHANGES_REQUESTED warrants a re-dispatch; skip APPROVED and COMMENTED
+    const state = (payload.review?.state || '').toUpperCase();
+    if (state !== 'CHANGES_REQUESTED') { core.setOutput('agent', ''); return; }
+
     const body     = payload.review?.body || '';
     const prLabels = (payload.pull_request?.labels || []).map(l => l.name);
     const bound    = prLabels.find(l => l.startsWith('hall:') && !SYSTEM_LABELS.includes(l));
