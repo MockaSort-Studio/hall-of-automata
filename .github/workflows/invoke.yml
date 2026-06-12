@@ -371,19 +371,6 @@ jobs:
         shell: bash
         run: bash .hall/scripts/context-injection.sh
 
-      - name: Inject post-mortem context into CLAUDE.md
-        if: needs.detect.outputs.trigger-reason == 'post-mortem'
-        env:
-          MODE:          post-mortem
-          ISSUE_NUMBER:  ${{ needs.detect.outputs.issue-number }}
-          REPO_OWNER:    ${{ needs.detect.outputs.repo-owner }}
-          REPO_NAME:     ${{ needs.detect.outputs.repo-name }}
-          FAILED_RUN_ID: ${{ inputs.failed-run-id }}
-          SERVER_URL:    ${{ github.server_url }}
-          HALL_REPO:     ${{ github.repository }}
-        shell: bash
-        run: bash .hall/scripts/context-injection.sh
-
       #[lore-keeper]: when feeding the informations to the agent we should also ask him to synthetise the context
       #we can list the important things to keep and let it consolidate it's knowledge
       #this implies refactoring of Persona.md and creation of guidelines so we can be clear and analytical and easy to digest for a model
@@ -393,7 +380,6 @@ jobs:
         with:
           oauth-token:   ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:     ${{ steps.app-token.outputs.token }}
-          max-turns:     ${{ steps.agent-cfg.outputs.max-turns }}
           model:         ${{ steps.agent-cfg.outputs.model }}
           mcp-config:    ${{ steps.mcp.outputs.mcp-config-path }}
           allowed-tools: ${{ steps.mcp.outputs.allowed-tools }}
@@ -498,20 +484,6 @@ jobs:
             const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
-      - name: Apply post-mortem label on failure
-        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.agent != 'old-major' && steps.final.outputs.stage == 'failed' && needs.detect.outputs.issue-number != ''
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ steps.app-token.outputs.token }}
-          script: |
-            await github.rest.issues.addLabels({
-              owner:        '${{ needs.detect.outputs.repo-owner }}',
-              repo:         '${{ needs.detect.outputs.repo-name }}',
-              issue_number: ${{ needs.detect.outputs.issue-number }},
-              labels:       ['hall:post-mortem']
-            })
-            core.info('[invoke] applied hall:post-mortem — old-major will be triggered')
-
       - name: Post-dispatch audit
         if: always() && steps.auth.outcome == 'success'
         uses: ./.hall/actions/post-dispatch
@@ -526,7 +498,6 @@ jobs:
           invoker:            ${{ needs.detect.outputs.invoker }}
           team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
           turns-used:         ${{ steps.agent.outputs.turns-used }}
-          turns-max:          ${{ steps.agent-cfg.outputs.max-turns }}
           outcome:            ${{ steps.final.outputs.stage }}
           weekly-count-after: ${{ steps.increment.outputs.count }}
           model:              ${{ steps.agent-cfg.outputs.model }}
