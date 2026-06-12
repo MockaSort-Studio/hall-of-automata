@@ -44,7 +44,6 @@ jobs:
   # ── Pool-select invoker (shared by both phases) ───────────────────────────────
   select-invoker:
     name: Select invoker from pool
-    if: github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     outputs:
       invoker:       ${{ steps.pool.outputs.invoker }}
@@ -80,7 +79,7 @@ jobs:
   analyze:
     name: "Old Major — analyze submission"
     needs: [select-invoker]
-    if: github.event_name == 'workflow_call' && inputs.re-evaluate != 'true'
+    if: inputs.re-evaluate != 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
@@ -113,11 +112,12 @@ jobs:
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   30
           prompt: >-
             You are handling automaton onboarding for issue #${{ inputs.issue-number }}
             in ${{ inputs.repo-owner }}/${{ inputs.repo-name }}, submitted by
-            @${{ inputs.issue-login || 'the requester' }}.
+            @${{ inputs.issue-login || 'the requester' }}. You are the implementing
+            agent for this task — your routing procedure does not apply here. Do not
+            apply hall: labels. Evaluate and provision directly.
 
             Reference files (read before evaluating):
             - agents/automaton_template.md — expected character sheet format
@@ -128,21 +128,16 @@ jobs:
             character (tone/voice/rules/signature — behavioural contract not biography),
             domains (named capability bundles, routing signals not tool lists),
             scope (right-for / not-right-for / ambiguity-gate all present),
-            scope_summary (one sentence, optimised for routing decisions),
-            max_turns (optional integer — use 30 if blank or absent; record in catalog entry).
+            scope_summary (one sentence, optimised for routing decisions).
 
             If any required field is missing or unusable: post a comment listing exactly what
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
             If the sheet passes: create a new branch (hall/old-major/issue-<N>),
-            then in a single commit: (1) add the new agent entry to agents.yml,
-            (2) write the persona character sheet to roster/<slug>.md, and
-            (3) append a new section to codex/roster.md following the exact format
-            of the existing agent entries there — h2 heading with the display name,
-            bold role summary, tone, domains table, right-call/not-right-call lines,
-            and signature. Push the branch, open a pull request targeting main with
-            a concise title and body, post a provisioning summary comment on the
-            issue linking to the PR, then close the issue.
+            then in a single commit: (1) add the new agent entry to agents.yml and
+            (2) write the persona character sheet to roster/<slug>.md. Push the branch,
+            open a pull request targeting main with a concise title and body, post a
+            provisioning summary comment on the issue linking to the PR, then close the issue.
 
       - name: Post quota-queued comment and label
         if: always() && hashFiles('.hall/dispatch-result.json') != ''
@@ -171,7 +166,7 @@ jobs:
   re-analyze:
     name: "Old Major — re-evaluate after feedback"
     needs: [select-invoker]
-    if: github.event_name == 'workflow_call' && inputs.re-evaluate == 'true'
+    if: inputs.re-evaluate == 'true'
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.select-invoker.outputs.invoker }}
     steps:
@@ -204,10 +199,11 @@ jobs:
         with:
           oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           app-token:   ${{ steps.app-token.outputs.token }}
-          max-turns:   30
           prompt: >-
             The invoker has updated the automaton onboarding request on
             issue #${{ inputs.issue-number }} in ${{ inputs.repo-owner }}/${{ inputs.repo-name }}.
+            You are the implementing agent for this task — your routing procedure does not
+            apply here. Do not apply hall: labels. Evaluate and provision directly.
 
             Reference files (read before evaluating):
             - agents/automaton_template.md — expected character sheet format
@@ -217,11 +213,8 @@ jobs:
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
             (create branch hall/old-major/issue-<N>, commit agents.yml + roster/<slug>.md
-            + the new codex/roster.md entry in one commit, push, open a PR targeting
-            main, post a summary comment on the issue linking to the PR, close the
-            issue). The codex/roster.md entry must follow the format of existing entries:
-            h2 heading, bold role summary, tone, domains table, right-call/not-right-call,
-            signature.
+            in one commit, push, open a PR targeting main, post a summary comment on the
+            issue linking to the PR, close the issue).
             If gaps remain, post updated feedback. Do not provision until the sheet is complete.
 
       - name: Post quota-queued comment and label
