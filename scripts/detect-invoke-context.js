@@ -212,13 +212,12 @@ module.exports = async ({ github, context, core }) => {
       const res = await github.request('GET /repos/{owner}/{repo}/environments', {
         owner: hallOwner, repo: hallRepo, per_page: 100, page
       });
-      // TODO: remove keeper/ filter once all keeper/* envs are migrated to invoker/*
-      const batch = (res.data.environments || []).filter(e => e.name.startsWith('invoker/') || e.name.startsWith('keeper/'));
+      const batch = (res.data.environments || []).filter(e => e.name.startsWith('invoker/'));
       envs = envs.concat(batch);
       if ((res.data.environments || []).length < 100) break;
       page++;
     }
-    core.info(`[detect] found ${envs.length} invoker/keeper environment(s) (keeper/* is legacy, pending migration to invoker/*)`);
+    core.info(`[detect] found ${envs.length} invoker/* environment(s)`);
 
     const candidates = [];
     for (const env of envs) {
@@ -240,8 +239,7 @@ module.exports = async ({ github, context, core }) => {
       } catch (_) { /* not set yet — default 25 */ }
       core.info(`[detect] ${env.name}: count=${count} cap=${cap}`);
       if (count < cap) {
-        // Strip either prefix to get the bare handle
-        const handle = env.name.replace(/^(?:invoker|keeper)\//, '');
+        const handle = env.name.replace(/^invoker\//, '');
         candidates.push({ handle, count });
       }
     }
