@@ -15,7 +15,7 @@
 - Workspace root: `/github/workspace`. This is the **target repository** — your work happens here. Never access parent directories.
 - `.hall/`: Hall infrastructure checked out alongside the target repo. Read persona files and scripts from here. **Never write, modify, or commit anything inside `.hall/`.**
 - `CLAUDE.md` (this file + persona) is managed by the Hall. Never commit it.
-- `.hall-local.md`: Hall persistent memory for this repo — architectural map, constraints, and dispatch log. Read before anything else; update and commit at task end. See the [`.hall-local.md` contract](#hall-localmd-contract) section below.
+- `.hall-local.md`: Hall persistent memory for this repo — architectural map and constraints. Read before anything else; update and commit at task end. See the [`.hall-local.md` contract](#hall-localmd-contract) section below.
 - `.hall-original-claude.md`: present only on first dispatch to a repo that has its own `CLAUDE.md`. Ephemeral — use it to seed `!con` entries in `.hall-local.md`, then leave it (do not commit).
 
 ---
@@ -178,7 +178,7 @@ MockaSort voice: brutalist, honest, sharp where it fits. Never performative.
 
 ## `.hall-local.md` contract
 
-This file lives in the target repo root. It is the Hall's persistent memory for this repo — an architectural map and dispatch journal that grows across invocations. It is **not** a copy of the repo's `CLAUDE.md`; it is Hall-native and optimized for agent consumption.
+This file lives in the target repo root. It is the Hall's persistent memory for this repo — an architectural map and constraints record that grows across invocations. It is **not** a copy of the repo's `CLAUDE.md`; it is Hall-native and optimized for agent consumption.
 
 **Format:** compact, token-efficient. Each record type is prefixed with a sigil. Keep values terse — one clause per entry, no prose.
 
@@ -188,11 +188,6 @@ This file lives in the target repo root. It is the Hall's persistent memory for 
 !arch path/to/file: one-line role summary
 !con constraint in one clause; another constraint
 !dec YYYY-MM-DD #N agent: decision in one clause
-
-## Dispatch log
-
-## YYYY-MM-DD
-!log #N agent → outcome: what was done
 ```
 
 Sigil semantics:
@@ -202,21 +197,17 @@ Sigil semantics:
 | `!arch` | Key file and its role | Add when you touch a new file area; revise if role changes |
 | `!con` | Hard constraint (from repo rules or discovered) | Append only; never remove |
 | `!dec` | Dated architectural decision | Append only |
-| `!log` | Dispatch log entry | Append one per invocation under today's `## YYYY-MM-DD` header in `## Dispatch log` |
 
-**Dispatch log format:** the `## Dispatch log` section of `.hall-local.md` organises `!log` entries by date. Each date gets a `## YYYY-MM-DD` header; entries under it drop the date prefix. When adding a new entry: if today's `## YYYY-MM-DD` section exists, append to it; if not, create a new section at the bottom.
+**At task start:** if `.hall-local.md` exists, read it before opening any other file. Use the `!arch` map to navigate directly; use `!con` to apply constraints immediately.
 
-**At task start:** if `.hall-local.md` exists, read it before opening any other file. Use the `!arch` map to navigate directly; use `!con` to apply constraints immediately; use `!log` entries to understand prior work.
-
-**At task end — MANDATORY:** You MUST update and commit `.hall-local.md` before closing your issue. Do not skip this step. Always append — never rewrite prior entries. Add `!arch` entries for files you touched, `!dec` for any approach decisions made, and one `!log` entry under today's `## YYYY-MM-DD` header. If the write fails for any reason (hook blocks it, permission error), note the failure explicitly in your closing comment — silent omission is not acceptable.
+**At task end — MANDATORY:** You MUST update and commit `.hall-local.md` before closing your issue. Do not skip this step. Always append — never rewrite prior entries. Add `!arch` entries for files you touched and `!dec` for any approach decisions made. If the write fails for any reason (hook blocks it, permission error), note the failure explicitly in your closing comment — silent omission is not acceptable.
 
 **First dispatch (file absent):**
 
 1. Create `.hall-local.md` from scratch using the format above.
 2. If `.hall-original-claude.md` exists in the workspace root, read it — the dispatch step placed it there as a reference for the repo's own project instructions. Extract hard constraints into `!con` entries. Do not copy prose verbatim; distil to one-clause facts. Do not commit `.hall-original-claude.md`.
 3. Populate `!arch` entries from your exploration of the repo during this task.
-4. Add a `## Dispatch log` section with today's `## YYYY-MM-DD` header and one `!log` entry.
-5. Commit `.hall-local.md`.
+4. Commit `.hall-local.md`.
 
 This file is the only `.hall-*` file you may commit to the target repo. It is never committed to the Hall repo itself.
 
