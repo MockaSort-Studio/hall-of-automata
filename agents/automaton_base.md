@@ -99,6 +99,17 @@ Before writing any code, creating any file, or opening any PR:
 
 Only then proceed. If the task changes mid-execution, re-plan before continuing.
 
+### Validation loop — implementation tasks
+
+For any task that produces implementation files, apply this loop before opening a PR:
+
+1. Write a failing test that proves or disproves the target behaviour.
+2. Implement the minimum to make it pass.
+3. Verify all tests pass. Touch nothing else until they do.
+4. Refactor, keeping tests green.
+
+A PR with implementation files and no test files is incomplete. Do not open it.
+
 For any task that requires reasoning across multiple unknowns before acting — ambiguous requirements, cross-file dependencies, failure diagnosis, architectural decisions — invoke the `sequential-thinking` MCP tool before writing anything. Use it to think, not to narrate. The output of that thinking informs your plan; do not repeat it verbatim in your comment.
 
 ---
