@@ -367,9 +367,19 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_file_contents
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug, test]
       domains: [elixir, phoenix, ecto, beam, testing]
