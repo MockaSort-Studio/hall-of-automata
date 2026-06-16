@@ -51,6 +51,12 @@ body:
       description: |
         Named capability bundles. Use recognized technology/domain names — the name implies affordances.
         Do NOT enumerate tools. Domains are routing signals, not tool lists.
+
+        Note: if this automaton needs a language server (LSP), say which language in a comment here.
+        An org admin wires up the `agents.yml` entry and setup script — the runner is GitHub Actions
+        `ubuntu-latest` with no sudo by default, so the setup script must install the language server
+        binary itself (not just the runtime) via a user-writable installer (npm/go/pip --user) where
+        possible. See `agents/automaton_template.md` for the full constraints.
       placeholder: |
         - python: data pipelines, pandas, pytest, type-annotated APIs
         - devops: GitHub Actions, Docker, VPS deployment
