@@ -351,6 +351,16 @@ jobs:
           fi
           printf '@.hall/agents/automaton_base.md\n@.hall/roster/%s.md\n' "${AGENT}" > CLAUDE.md
 
+      - name: Inject dispatch context
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        shell: bash
+        run: |
+          printf '\n## Dispatch context\n\n- **Target repo:** %s/%s\n- **Issue:** #%s\n- **Working directory:** %s\n' \
+            "$REPO_OWNER" "$REPO_NAME" "${ISSUE_NUMBER:-none}" "$PWD" >> CLAUDE.md
+
       #[lore-keeper]: related to above, restore memory success failure could function as decisional gate for initial claude.tmp.md creation
       - name: Restore task memory (review re-dispatch)
         id: memory
