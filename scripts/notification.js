@@ -1,5 +1,5 @@
 // Capacity and queue notification utilities.
-// Env vars: ACTION (cap | pool-exhausted | quota-queued | escalate)
+// Env vars: ACTION (cap | pool-exhausted | quota-queued | dispatch-failed | escalate)
 //
 // cap: REPO_OWNER, REPO_NAME, ISSUE_NUMBER, AGENT, CAP
 //   Posts a cap-exceeded comment on the triggering issue.
@@ -9,6 +9,10 @@
 //
 // quota-queued: REPO_OWNER, REPO_NAME, ISSUE_NUMBER, AGENT
 //   Posts a "quota hit — queuing task" comment and applies the hall:queued label.
+//
+// dispatch-failed: REPO_OWNER, REPO_NAME, ISSUE_NUMBER, AGENT, JOB_NAME, RUN_ATTEMPT
+//   Posts a comment naming the failed step and linking to the run. Used as the
+//   dispatch job's catch-all for any non-quota step failure.
 //
 // escalate: REPO_OWNER, REPO_NAME, PR_NUMBER, invoker, RETRY_COUNT, CI_FAILURES
 //   Posts an escalation comment on the PR mentioning the invoker.
@@ -60,6 +64,38 @@ const quotaQueued = async ({ github, core }) => {
   core.info(`[notification] quota-queued comment posted on ${owner}/${repo}#${number}`);
 };
 
+const dispatchFailed = async ({ github, context, core }) => {
+  const owner      = process.env.REPO_OWNER;
+  const repo       = process.env.REPO_NAME;
+  const number     = Number(process.env.ISSUE_NUMBER);
+  const agent      = process.env.AGENT;
+  const jobName    = process.env.JOB_NAME;
+  const runAttempt = Number(process.env.RUN_ATTEMPT || '1');
+  const runUrl     = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+  let stepName = 'an unknown step';
+  try {
+    const { data } = await github.rest.actions.listJobsForWorkflowRunAttempt({
+      owner: context.repo.owner,
+      repo:  context.repo.repo,
+      run_id: context.runId,
+      attempt_number: runAttempt,
+    });
+    const job = data.jobs.find(j => j.name === jobName);
+    const failedStep = job?.steps?.find(s => s.conclusion === 'failure');
+    if (failedStep) stepName = failedStep.name;
+  } catch (err) {
+    core.warning(`[notification] could not resolve failed step name: ${err.message}`);
+  }
+
+  await github.rest.issues.createComment({
+    owner, repo, issue_number: number,
+    body: `**${agent}** dispatch failed at step **${stepName}**. See [run #${context.runId}](${runUrl}) for details.`,
+  });
+
+  core.info(`[notification] dispatch-failed comment posted on ${owner}/${repo}#${number} (step: ${stepName})`);
+};
+
 const escalate = async ({ github }) => {
   await github.rest.issues.createComment({
     owner:        process.env.REPO_OWNER,
@@ -74,11 +110,12 @@ const escalate = async ({ github }) => {
   });
 };
 
-module.exports = async ({ github, core }) => {
+module.exports = async ({ github, context, core }) => {
   const action = process.env.ACTION;
-  if (action === 'cap')            return await cap({ github });
-  if (action === 'pool-exhausted') return await poolExhausted({ github, core });
-  if (action === 'quota-queued')   return await quotaQueued({ github, core });
-  if (action === 'escalate')       return await escalate({ github });
+  if (action === 'cap')             return await cap({ github });
+  if (action === 'pool-exhausted')  return await poolExhausted({ github, core });
+  if (action === 'quota-queued')    return await quotaQueued({ github, core });
+  if (action === 'dispatch-failed') return await dispatchFailed({ github, context, core });
+  if (action === 'escalate')        return await escalate({ github });
   throw new Error(`notification: unknown ACTION=${action}`);
 };
