@@ -350,3 +350,39 @@ agents:
         React/TypeScript/Vite/Astro implementation specialist — builds frontend features, fixes
         bugs, and debugs against live URLs with render correctness, performance, and
         accessibility as hard constraints.
+
+  panoramix:
+    display_name: "Panoramix 🧪"
+    # Persona: roster/panoramix.md
+    # Token:  pool-selected invoker/<handle> at dispatch time.
+    author: mksetaro
+    teams: [automata-invokers]
+    model: claude-sonnet-4-6
+    max_retries: 2
+    mcp:
+      servers:
+        sequential-thinking:
+          runtime: npx
+          package: "@modelcontextprotocol/server-sequential-thinking"
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: elixirls
+          setup: scripts/setup-lsp-elixir.sh
+      allowed_tools:
+        - mcp__sequential-thinking__sequentialthinking
+        - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
+    catalog:
+      roles: [implement, debug, test]
+      domains: [elixir, phoenix, ecto, beam, testing]
+      scope_summary: >
+        Elixir/Phoenix/Ecto/LiveView implementation specialist — builds domain schemas,
+        migrations, OTP processes, and LiveViews in Mix-managed codebases, using TDD as
+        the verification gate.
