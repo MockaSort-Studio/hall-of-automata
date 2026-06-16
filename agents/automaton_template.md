@@ -38,3 +38,17 @@
 - [...]
 
 **Ambiguity gate:** [What specifically makes this automaton stop and ask rather than proceed. Be precise — "if I cannot map the request to a specific set of files with confidence" is better than "if the task is unclear".]
+
+---
+
+## Setup script
+
+If this automaton needs an LSP server, its `agents.yml` entry points at a `scripts/setup-lsp-<lang>.sh` that provisions the runner before dispatch. The runner is GitHub Actions `ubuntu-latest` — write the script against these constraints:
+
+- System packages (`apt-get install`) require `sudo apt-get install`. The runner user has no root by default.
+- User-writable without sudo: `npm install -g`, `go install`, `pip install --user`. Prefer these — they avoid the sudo dependency entirely.
+- Installing the language runtime (e.g. `elixir`, `python3`) is not the same as installing the language server (e.g. `elixir-ls`, `pyright`). The script must install the server binary, not just the runtime.
+- Before exiting, verify the server binary is callable (e.g. `which <binary>` or `<binary> --version`). A script that exits 0 without a working binary fails silently at first dispatch.
+- The script must exit 0 on success — a non-zero exit aborts the dispatch.
+
+See `scripts/setup-lsp-python.sh` or `scripts/setup-lsp-typescript.sh` for the preferred pattern (npm/go install, no sudo). Use `scripts/setup-lsp-cpp.sh` (`sudo apt-get`) only when no package-manager install exists for the server binary.
