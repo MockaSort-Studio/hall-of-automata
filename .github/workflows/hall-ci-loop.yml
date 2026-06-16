@@ -190,6 +190,14 @@ jobs:
         shell: bash
         run: bash .hall/scripts/context-injection.sh
       #[lore-keeper]: inject temp claude.md of invoke.yml;
+
+      - name: Set target repo context for claude-code-action
+        if: steps.retry.outputs.escalate != 'true'
+        shell: bash
+        run: |
+          echo "GITHUB_REPOSITORY=${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}" >> "$GITHUB_ENV"
+          echo "GITHUB_REF=refs/heads/main" >> "$GITHUB_ENV"
+
       - name: Run agent
         id: agent
         if: steps.retry.outputs.escalate != 'true'

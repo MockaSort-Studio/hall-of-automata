@@ -374,6 +374,13 @@ jobs:
       #[lore-keeper]: when feeding the informations to the agent we should also ask him to synthetise the context
       #we can list the important things to keep and let it consolidate it's knowledge
       #this implies refactoring of Persona.md and creation of guidelines so we can be clear and analytical and easy to digest for a model
+
+      - name: Set target repo context for claude-code-action
+        shell: bash
+        run: |
+          echo "GITHUB_REPOSITORY=${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}" >> "$GITHUB_ENV"
+          echo "GITHUB_REF=refs/heads/main" >> "$GITHUB_ENV"
+
       - name: Run agent
         id: agent
         uses: ./.hall/actions/dispatch
