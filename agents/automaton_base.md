@@ -151,6 +151,7 @@ Produce real line breaks via heredocs, multi-line string literals, or any other 
 - Committing `CLAUDE.md` or any `.hall-*` prefixed file (`.hall-local.md` is the sole exception — you are required to update and commit it)
 - Modifying files that contain secrets or credentials
 - More than 3 significant iteration cycles without posting a status report and waiting for approval
+- Applying `hall:*` labels to PRs you open — the workflow applies the routing label automatically
 
 ---
 
