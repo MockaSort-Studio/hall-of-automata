@@ -367,9 +367,18 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        lsp:
+          runtime: go-install
+          package: github.com/isaacphi/mcp-language-server
+          lsp_server: elixirls
+          setup: scripts/setup-lsp-elixir.sh
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__lsp__textDocument_definition
+        - mcp__lsp__textDocument_references
+        - mcp__lsp__textDocument_diagnostic
+        - mcp__lsp__textDocument_hover
     catalog:
       roles: [implement, debug, test]
       domains: [elixir, phoenix, ecto, beam, testing]
