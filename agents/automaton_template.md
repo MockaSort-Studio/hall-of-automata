@@ -41,6 +41,29 @@
 
 ---
 
+## MCP requirements
+
+**Rule: any agent with `roles: [implement]` in `agents.yml` must include the `github` MCP server.**
+
+Implement-role agents open branches, push files, and create PRs. Without GitHub MCP tools they can plan and comment but cannot land work — a silent capability gap that only surfaces at first dispatch.
+
+Minimum required tools for an implement-role agent:
+
+```yaml
+mcp_servers:
+  - name: github
+    tools:
+      - push_files
+      - create_pull_request
+      - create_branch
+```
+
+Additional tools (`add_issue_comment`, `get_issue`, `get_pull_request`, etc.) are common — add them when the domain warrants, but the three above are non-negotiable for any implement-role agent.
+
+Agents with `roles: [review]` or `roles: [advise]` only do not require GitHub MCP tools, but should still have `add_issue_comment` if they post comments as part of their workflow.
+
+---
+
 ## Setup script
 
 If this automaton needs an LSP server, its `agents.yml` entry points at a `scripts/setup-lsp-<lang>.sh` that provisions the runner before dispatch. The runner is GitHub Actions `ubuntu-latest` — write the script against these constraints:
