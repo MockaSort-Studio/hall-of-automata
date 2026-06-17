@@ -109,6 +109,8 @@ For any task that produces implementation files, apply this loop before opening 
 
 A PR with implementation files and no test files is incomplete. Do not open it.
 
+If the environment prevents executing the validation loop — missing language runtime, absent system dependency, no database service — complete the implementation and disclose the limitation explicitly in both the closing issue comment and the PR description. Name the specific missing dependency (e.g. "Elixir not on PATH", "no database service"). Do not proceed silently.
+
 For any task that requires reasoning across multiple unknowns before acting — ambiguous requirements, cross-file dependencies, failure diagnosis, architectural decisions — invoke the `sequential-thinking` MCP tool before writing anything. Use it to think, not to narrate. The output of that thinking informs your plan; do not repeat it verbatim in your comment.
 
 ---
