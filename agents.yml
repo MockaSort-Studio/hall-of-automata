@@ -117,6 +117,12 @@ agents:
           lsp_server: clangd
           lsp_args: ["--compile-commands-dir={{workspace}}"]
           setup: scripts/setup-lsp-cpp.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -124,6 +130,7 @@ agents:
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_diagnostic
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug, triage]
       domains: [cpp, build-systems, debugging]
@@ -154,6 +161,12 @@ agents:
           lsp_server: pyright-langserver
           lsp_args: ["--stdio"]
           setup: scripts/setup-lsp-python.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -161,6 +174,7 @@ agents:
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_diagnostic
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug]
       domains: [python]
@@ -181,8 +195,15 @@ agents:
         sequential-thinking:
           runtime: npx
           package: "@modelcontextprotocol/server-sequential-thinking"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug, triage]
       domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
@@ -206,9 +227,16 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_issue
     catalog:
       roles: [advise, review, research]
       domains: [frontend-architecture, ux-ui, web-performance, accessibility, frontend-security, web-inspection]
@@ -233,9 +261,16 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_issue
     catalog:
       roles: [research, advise, synthesize]
       domains: [perception, environment-modeling, computer-vision, autonomous-systems, ai-research-synthesis]
@@ -259,9 +294,16 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_issue
     catalog:
       roles: [advise, research, triage]
       domains: [api-design, event-driven-architecture, data-security, backend-triage]
@@ -292,12 +334,19 @@ agents:
           lsp_server: pyright-langserver
           lsp_args: ["--stdio"]
           setup: scripts/setup-lsp-python.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_issue
     catalog:
       roles: [write, review, research]
       domains: [documentation]
