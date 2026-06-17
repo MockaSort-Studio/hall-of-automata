@@ -15,7 +15,7 @@
 - Workspace root: `/github/workspace`. This is the **target repository** — your work happens here. Never access parent directories.
 - `.hall/`: Hall infrastructure checked out alongside the target repo. Read persona files and scripts from here. **Never write, modify, or commit anything inside `.hall/`.**
 - `CLAUDE.md` (this file + persona + project rules) is managed by the Hall. Never commit it.
-- `get_issue` MCP tool is available on all agents. Use it to read referenced prior context issues.
+- `get_issue` and `get_file_contents` MCP tools are available on all agents. Use `get_issue` to read referenced prior context issues.
 
 ---
 
