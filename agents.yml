@@ -47,6 +47,7 @@ agents:
         - mcp__github__list_labels_for_repo
         - mcp__github__list_workflow_run_artifacts
         - mcp__github__download_workflow_run_artifact
+        - mcp__github__get_issue
     catalog:
       roles: [triage, route, onboard, synthesize]
       domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
@@ -75,7 +76,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -84,6 +85,7 @@ agents:
         - mcp__github__push_files
         - mcp__github__create_pull_request
         - mcp__github__create_branch
+        - mcp__github__get_issue
     catalog:
       roles: [implement, review]
       domains: [hall-infrastructure, persona-engineering]
@@ -330,7 +332,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -343,6 +345,7 @@ agents:
         - mcp__github__push_files
         - mcp__github__create_pull_request
         - mcp__github__create_branch
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug]
       domains: [react, typescript, vite, astro, css, web-performance, frontend-debugging]
@@ -372,7 +375,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -380,6 +383,7 @@ agents:
         - mcp__github__push_files
         - mcp__github__create_pull_request
         - mcp__github__create_branch
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug, test]
       domains: [elixir, phoenix, ecto, beam, testing]

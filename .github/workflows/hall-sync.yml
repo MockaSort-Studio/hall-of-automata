@@ -46,7 +46,7 @@ jobs:
         run: |
           # Wipe operator-managed directories so deletions propagate, then re-apply from upstream.
           # Never touches org-specific files:
-          #   agents.yml, routing.yml, roster/<custom>.md, .hall-local.md, CLAUDE.md
+          #   agents.yml, routing.yml, roster/<custom>.md, CLAUDE.md
           git rm -r --ignore-unmatch \
             .github/ \
             actions/ \
