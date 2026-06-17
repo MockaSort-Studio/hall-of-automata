@@ -36,7 +36,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "issues,labels,pull_requests,actions"
+            GITHUB_TOOLSETS: "issues,labels,pull_requests,actions,repos,contents"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -47,6 +47,8 @@ agents:
         - mcp__github__list_labels_for_repo
         - mcp__github__list_workflow_run_artifacts
         - mcp__github__download_workflow_run_artifact
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
     catalog:
       roles: [triage, route, onboard, synthesize]
       domains: [roster-management, task-triage, resource-stewardship, context-synthesis, onboarding, invoker-management, automata-management]
@@ -75,11 +77,12 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
+        - mcp__github__get_issue
         - mcp__github__create_or_update_file
         - mcp__github__push_files
         - mcp__github__create_pull_request
@@ -115,6 +118,12 @@ agents:
           lsp_server: clangd
           lsp_args: ["--compile-commands-dir={{workspace}}"]
           setup: scripts/setup-lsp-cpp.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -122,6 +131,11 @@ agents:
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_diagnostic
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug, triage]
       domains: [cpp, build-systems, debugging]
@@ -152,6 +166,12 @@ agents:
           lsp_server: pyright-langserver
           lsp_args: ["--stdio"]
           setup: scripts/setup-lsp-python.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -159,6 +179,11 @@ agents:
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_diagnostic
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug]
       domains: [python]
@@ -179,8 +204,19 @@ agents:
         sequential-thinking:
           runtime: npx
           package: "@modelcontextprotocol/server-sequential-thinking"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug, triage]
       domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
@@ -204,9 +240,17 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
     catalog:
       roles: [advise, review, research]
       domains: [frontend-architecture, ux-ui, web-performance, accessibility, frontend-security, web-inspection]
@@ -231,9 +275,17 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
     catalog:
       roles: [research, advise, synthesize]
       domains: [perception, environment-modeling, computer-vision, autonomous-systems, ai-research-synthesis]
@@ -257,9 +309,17 @@ agents:
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
     catalog:
       roles: [advise, research, triage]
       domains: [api-design, event-driven-architecture, data-security, backend-triage]
@@ -290,12 +350,23 @@ agents:
           lsp_server: pyright-langserver
           lsp_args: ["--stdio"]
           setup: scripts/setup-lsp-python.sh
+        github:
+          runtime: npx
+          package: "@github/github-mcp-server"
+          env:
+            GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
         - mcp__lsp__textDocument_hover
+        - mcp__github__get_file_contents
+        - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [write, review, research]
       domains: [documentation]
@@ -330,7 +401,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -343,6 +414,7 @@ agents:
         - mcp__github__push_files
         - mcp__github__create_pull_request
         - mcp__github__create_branch
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug]
       domains: [react, typescript, vite, astro, css, web-performance, frontend-debugging]
@@ -372,7 +444,7 @@ agents:
           package: "@github/github-mcp-server"
           env:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
-            GITHUB_TOOLSETS: "repos,contents,pull_requests"
+            GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
@@ -380,6 +452,7 @@ agents:
         - mcp__github__push_files
         - mcp__github__create_pull_request
         - mcp__github__create_branch
+        - mcp__github__get_issue
     catalog:
       roles: [implement, debug, test]
       domains: [elixir, phoenix, ecto, beam, testing]

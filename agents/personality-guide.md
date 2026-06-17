@@ -8,7 +8,7 @@ Every automaton shares the behavioral contract in [`automaton_base.md`](automato
 
 ```
 ┌─────────────────────────────┐
-│     Repo context            │  ← .hall-local.md: read at start, updated and committed at end
+│     Project rules           │  ← @-imported from target repo's CLAUDE.md at dispatch time
 ├─────────────────────────────┤
 │        Personality          │  ← defined per automaton in roster/<slug>.md
 ├─────────────────────────────┤
@@ -60,7 +60,7 @@ base contract (agents/automaton_base.md)
 → written to CLAUDE.md in the runner workspace (never committed)
 ```
 
-The target repository's `CLAUDE.md` is never renamed or copied into `.hall-local.md`. On first dispatch to a repo, the step stashes it as `.hall-original-claude.md` (ephemeral, never committed) so the agent can read it once and distil its constraints into `.hall-local.md`. `.hall-local.md` is a Hall-native compact memory file — architectural map, constraints, dispatch log — maintained and committed by the agent at every invocation. See the `.hall-local.md` contract in `automaton_base.md`.
+The target repository's `CLAUDE.md` is saved as `.hall-project-rules.md` and `@`-imported first in the assembled `CLAUDE.md`. Claude Code loads it (and any recursive `@`-imports within it) automatically before the first prompt token is processed. Prior context comes from GitHub issue history, queried via MCP tools — not from a persistent memory file.
 
 All persona files live in this repo. Old Major is not a special case — his persona is at `roster/old-major.md`, same as every other automaton.
 

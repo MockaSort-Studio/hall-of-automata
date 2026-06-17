@@ -340,16 +340,13 @@ jobs:
           AGENT: ${{ needs.detect.outputs.agent }}
         shell: bash
         run: |
-          # On first dispatch to this repo (.hall-local.md absent): if the repo has its own
-          # CLAUDE.md, stash it as .hall-original-claude.md so the agent can read it during
-          # this run and synthesize its constraints into .hall-local.md.
-          # .hall-original-claude.md is ephemeral — never committed. On all subsequent
-          # dispatches .hall-local.md already exists, stashing is skipped, and the agent
-          # reads the accumulated Hall memory directly.
-          if [ -f "CLAUDE.md" ] && [ ! -f ".hall-local.md" ]; then
-            cp CLAUDE.md .hall-original-claude.md
-          fi
-          printf '@.hall/agents/automaton_base.md\n@.hall/roster/%s.md\n' "${AGENT}" > CLAUDE.md
+          # Save project rules before overwriting (every dispatch — fresh checkout guarantees this is current)
+          [ -f "CLAUDE.md" ] && cp CLAUDE.md .hall-project-rules.md
+          # Build automaton contract: project rules first, then Hall contract
+          {
+            [ -f ".hall-project-rules.md" ] && printf '@.hall-project-rules.md\n'
+            printf '@.hall/agents/automaton_base.md\n@.hall/roster/%s.md\n' "${AGENT}"
+          } > CLAUDE.md
 
       - name: Inject dispatch context
         env:
