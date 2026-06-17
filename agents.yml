@@ -133,6 +133,9 @@ agents:
         - mcp__lsp__textDocument_hover
         - mcp__github__get_file_contents
         - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug, triage]
       domains: [cpp, build-systems, debugging]
@@ -178,6 +181,9 @@ agents:
         - mcp__lsp__textDocument_hover
         - mcp__github__get_file_contents
         - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug]
       domains: [python]
@@ -208,6 +214,9 @@ agents:
         - mcp__sequential-thinking__sequentialthinking
         - mcp__github__get_file_contents
         - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [implement, debug, triage]
       domains: [ci-cd, git-ops, build-systems, infrastructure, deployment, pipeline-triage]
@@ -355,6 +364,9 @@ agents:
         - mcp__lsp__textDocument_hover
         - mcp__github__get_file_contents
         - mcp__github__get_issue
+        - mcp__github__push_files
+        - mcp__github__create_pull_request
+        - mcp__github__create_branch
     catalog:
       roles: [write, review, research]
       domains: [documentation]
