@@ -83,6 +83,7 @@ jobs:
       issue-login:     ${{ steps.ctx.outputs.issue-login }}
       awaiting-input:  ${{ steps.ctx.outputs.awaiting-input }}
       comment-body:    ${{ steps.ctx.outputs.comment-body }}
+      env-image:       ${{ steps.contract.outputs.env_image }}
     steps:
       - name: Checkout Hall repo (scripts only)
         uses: actions/checkout@v4
@@ -124,6 +125,28 @@ jobs:
           script: |
             const fn = require('./.hall/scripts/detect-invoke-context.js')
             await fn({ github, context, core })
+
+      - name: Read container image from .hall-contract.yaml
+        id: contract
+        env:
+          REPO_OWNER: ${{ steps.ctx.outputs.repo-owner }}
+          REPO_NAME:  ${{ steps.ctx.outputs.repo-name }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            let envImage = ''
+            try {
+              const resp = await github.rest.repos.getContent({
+                owner: process.env.REPO_OWNER,
+                repo:  process.env.REPO_NAME,
+                path:  '.hall-contract.yaml'
+              })
+              const content = Buffer.from(resp.data.content, 'base64').toString()
+              const m = content.match(/^image:\s*(.+)$/m)
+              if (m) envImage = m[1].trim()
+            } catch (_) {}
+            core.setOutput('env_image', envImage)
 
   # ── Job 2a: route onboard-automaton via workflow_call ────────────────────
   # Fires instead of direct issues:labeled trigger — eliminates triple-queuing.
@@ -194,14 +217,15 @@ jobs:
             const fn = require('./.hall/scripts/notification.js')
             await fn({ github, core })
 
-  # ── Job 3: dispatch the resolved agent ───────────────────────────────────
+  # ── Job 4: dispatch the resolved agent ───────────────────────────────────
   # Runs in invoker/<invoker> so secrets.CLAUDE_CODE_OAUTH_TOKEN injects from
   # the pool-selected invoker's environment. Invoker is chosen by detect: the
   # least-used registered member currently under their weekly cap.
-  dispatch:
+  # GHA fails to pull image "" — bare runner requires splitting into two conditional jobs.
+  dispatch-bare:
     name: Dispatch ${{ needs.detect.outputs.agent }}
     needs: [detect]
-    if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != ''
+    if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != '' && needs.detect.outputs.env-image == ''
     runs-on: ubuntu-latest
     environment: invoker/${{ needs.detect.outputs.invoker }}
     concurrency:
@@ -513,6 +537,341 @@ jobs:
       # steps.auth.outcome != 'failure' excludes the auth-rejection path (which
       # posts its own rejection comment) while still firing when auth was
       # skipped entirely due to an earlier infra failure.
+      - name: Post failure comment (non-quota dispatch failure)
+        if: failure() && steps.auth.outcome != 'failure' && steps.final.outputs.stage != 'queued' && needs.detect.outputs.issue-number != ''
+        env:
+          ACTION:       dispatch-failed
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          JOB_NAME:     Dispatch ${{ needs.detect.outputs.agent }}
+          RUN_ATTEMPT:  ${{ github.run_attempt }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/notification.js')
+            await fn({ github, context, core })
+
+      - name: Post-dispatch audit
+        if: always() && steps.auth.outcome == 'success'
+        uses: ./.hall/actions/post-dispatch
+        with:
+          app-token:          ${{ steps.app-token.outputs.token }}
+          agent:              ${{ needs.detect.outputs.agent }}
+          agent-dispatched:   ${{ needs.detect.outputs.agent }}
+          repo-owner:         ${{ needs.detect.outputs.repo-owner }}
+          repo-name:          ${{ needs.detect.outputs.repo-name }}
+          issue-number:       ${{ needs.detect.outputs.issue-number }}
+          pr-number:          ${{ steps.final.outputs.pr-number }}
+          invoker:            ${{ needs.detect.outputs.invoker }}
+          team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
+          turns-used:         ${{ steps.agent.outputs.turns-used }}
+          outcome:            ${{ steps.final.outputs.stage }}
+          weekly-count-after: ${{ steps.increment.outputs.count }}
+          model:              ${{ steps.agent-cfg.outputs.model }}
+          mcp-servers:        ${{ steps.mcp.outputs.mcp-servers }}
+
+  # ── Job 4b: dispatch inside target-repo container ─────────────────────────
+  # Mirrors dispatch-bare exactly; container.image cannot be conditionally
+  # omitted in a single job — GHA fails to pull image "" rather than running bare.
+  dispatch-containerized:
+    name: Dispatch ${{ needs.detect.outputs.agent }} (containerized)
+    needs: [detect]
+    if: needs.detect.outputs.agent != '' && needs.detect.outputs.invoker != '' && needs.detect.outputs.env-image != ''
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.detect.outputs.env-image }}
+    environment: invoker/${{ needs.detect.outputs.invoker }}
+    concurrency:
+      group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
+      cancel-in-progress: false
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ needs.detect.outputs.repo-owner }}
+
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          token:      ${{ steps.app-token.outputs.token }}
+
+      - name: Checkout Hall repo
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+
+      - name: Read agent config
+        id: agent-cfg
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
+        shell: bash
+        run: bash .hall/scripts/read-agent-config.sh
+
+      - name: Reject unknown agent
+        if: steps.agent-cfg.outputs.agent-valid != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            await github.rest.issues.createComment({
+              owner:        '${{ needs.detect.outputs.repo-owner }}',
+              repo:         '${{ needs.detect.outputs.repo-name }}',
+              issue_number: ${{ needs.detect.outputs.issue-number }},
+              body: `**Unknown agent:** \`${{ needs.detect.outputs.agent }}\` is not registered in the Hall roster.\n\nCheck [\`agents.yml\`](https://github.com/${{ github.repository }}/blob/main/agents.yml) for valid agent slugs.`
+            })
+            core.setFailed('Unknown agent: ${{ needs.detect.outputs.agent }}')
+
+      - name: Authorize invoker
+        id: auth
+        uses: ./.hall/actions/authorize
+        with:
+          org-read-token: ${{ steps.app-token.outputs.token }}
+          org:            ${{ needs.detect.outputs.repo-owner }}
+          team-slug:      ${{ steps.agent-cfg.outputs.team-slug }}
+          username:       ${{ needs.detect.outputs.actor }}
+          app-token:      ${{ steps.app-token.outputs.token }}
+          repo-owner:     ${{ needs.detect.outputs.repo-owner }}
+          repo-name:      ${{ needs.detect.outputs.repo-name }}
+          issue-number:   ${{ needs.detect.outputs.issue-number }}
+          trigger-event:  ${{ needs.detect.outputs.trigger-event }}
+          label-name:     hall:${{ needs.detect.outputs.agent }}
+          agent-name:     ${{ needs.detect.outputs.agent }}
+          bot-login:      ${{ steps.app-token.outputs.app-slug }}[bot]
+
+      - name: Update status card — dispatching
+        if: needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:     ${{ steps.app-token.outputs.token }}
+          repo-owner:    ${{ needs.detect.outputs.repo-owner }}
+          repo-name:     ${{ needs.detect.outputs.repo-name }}
+          issue-number:  ${{ needs.detect.outputs.issue-number }}
+          agent:         ${{ needs.detect.outputs.agent }}
+          stage:         ${{ needs.detect.outputs.agent == 'old-major' && 'assigning' || 'dispatching' }}
+          dispatched-at: ${{ github.event.created_at }}
+
+      - name: Increment invoker weekly counter
+        id: increment
+        uses: ./.hall/actions/counter
+        with:
+          current-count:    ${{ needs.detect.outputs.invoker-count }}
+          environment-name: invoker/${{ needs.detect.outputs.invoker }}
+          repo-owner:       ${{ github.repository_owner }}
+          repo-name:        hall-of-automata
+          app-token:        ${{ steps.app-token.outputs.token }}
+
+      - name: Remove awaiting-input label (if present)
+        if: needs.detect.outputs.issue-number != ''
+        env:
+          ACTION:       awaiting
+          MODE:         remove
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/label-utils.js')
+            await fn({ github, core })
+
+      - name: Manage routing label
+        if: needs.detect.outputs.issue-number != ''
+        env:
+          ACTION:       routing
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/label-utils.js')
+            await fn({ github, core })
+
+      - name: Build MCP config
+        id: mcp
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        shell: bash
+        run: node .hall/scripts/build-mcp-config.js ${{ needs.detect.outputs.agent }}
+
+      - name: Run LSP setup if needed
+        shell: bash
+        run: |
+          SETUP="${{ steps.mcp.outputs.setup-script }}"
+          if [ -n "$SETUP" ]; then
+            echo "[invoke] running LSP setup: $SETUP"
+            bash ".hall/$SETUP"
+          fi
+
+      - name: Inject agent persona
+        env:
+          AGENT: ${{ needs.detect.outputs.agent }}
+        shell: bash
+        run: |
+          [ -f "CLAUDE.md" ] && cp CLAUDE.md .hall-project-rules.md
+          {
+            [ -f ".hall-project-rules.md" ] && printf '@.hall-project-rules.md\n'
+            printf '@.hall/agents/automaton_base.md\n@.hall/roster/%s.md\n' "${AGENT}"
+          } > CLAUDE.md
+
+      - name: Inject dispatch context
+        env:
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        shell: bash
+        run: |
+          printf '\n## Dispatch context\n\n- **Target repo:** %s/%s\n- **Issue:** #%s\n- **Working directory:** %s\n' \
+            "$REPO_OWNER" "$REPO_NAME" "${ISSUE_NUMBER:-none}" "$PWD" >> CLAUDE.md
+
+      - name: Restore task memory (review re-dispatch)
+        id: memory
+        if: needs.detect.outputs.trigger-event == 'pr_review'
+        uses: ./.hall/actions/memory
+        with:
+          mode:      restore
+          repo:      ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number: ${{ needs.detect.outputs.pr-number }}
+
+      - name: Append review context to CLAUDE.md
+        if: needs.detect.outputs.trigger-event == 'pr_review'
+        env:
+          MODE:        review
+          PR_NUMBER:   ${{ needs.detect.outputs.pr-number }}
+          REVIEW_BODY: ${{ needs.detect.outputs.review-body }}
+        shell: bash
+        run: bash .hall/scripts/context-injection.sh
+
+      - name: Run agent
+        id: agent
+        uses: ./.hall/actions/dispatch
+        with:
+          oauth-token:   ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          app-token:     ${{ steps.app-token.outputs.token }}
+          model:         ${{ steps.agent-cfg.outputs.model }}
+          mcp-config:    ${{ steps.mcp.outputs.mcp-config-path }}
+          allowed-tools: ${{ steps.mcp.outputs.allowed-tools }}
+          prompt: >-
+            You have been dispatched to work on issue #${{ needs.detect.outputs.issue-number }}
+            in ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}.
+            Your persona is in CLAUDE.md. For a review re-dispatch the review feedback is also
+            appended there. Read the issue, follow your persona, and begin working.
+
+      - name: Find PR opened by agent
+        id: find-pr
+        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.trigger-event != 'pr_review'
+        env:
+          ACTION:       find
+          AGENT:        ${{ needs.detect.outputs.agent }}
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/pr-utils.js')
+            await fn({ github, core })
+
+      - name: Apply agent label to PR
+        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.trigger-event != 'pr_review' && steps.find-pr.outputs.outcome == 'pr_created'
+        env:
+          ACTION:     apply-agent
+          PR_NUMBER:  ${{ steps.find-pr.outputs.pr-number }}
+          AGENT:      ${{ needs.detect.outputs.agent }}
+          REPO_OWNER: ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:  ${{ needs.detect.outputs.repo-name }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/label-utils.js')
+            await fn({ github, core })
+
+      - name: Save task memory
+        if: always() && steps.auth.outcome == 'success' && (steps.find-pr.outputs.pr-number != '' || needs.detect.outputs.issue-number != '')
+        uses: ./.hall/actions/memory
+        with:
+          mode:         save
+          repo:         ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+          pr-number:    ${{ steps.find-pr.outputs.pr-number }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          memory-json: |-
+            %hall-task v1 | ${{ needs.detect.outputs.repo-owner }}/${{ needs.detect.outputs.repo-name }}
+            !agent ${{ needs.detect.outputs.agent }}
+            !issue ${{ needs.detect.outputs.issue-number || '-' }}
+            !pr ${{ steps.find-pr.outputs.pr-number || '-' }}
+            !branch ${{ steps.find-pr.outputs.branch || '-' }}
+            !retry 0
+            !ci -
+            !review -
+
+      - name: Resolve final stage
+        id: final
+        if: always() && steps.auth.outcome == 'success'
+        env:
+          TRIGGER:       ${{ needs.detect.outputs.trigger-event }}
+          FIND_PR:       ${{ steps.find-pr.outputs.pr-number }}
+          DETECT_PR:     ${{ needs.detect.outputs.pr-number }}
+          BRANCH:        ${{ steps.find-pr.outputs.branch }}
+          AGENT_OUTCOME: ${{ steps.find-pr.outputs.outcome }}
+          MODE:          ${{ needs.detect.outputs.mode }}
+        shell: bash
+        run: bash .hall/scripts/resolve-final-stage.sh
+
+      - name: Update status card
+        if: always() && steps.auth.outcome == 'success' && needs.detect.outputs.issue-number != ''
+        uses: ./.hall/actions/status-card
+        with:
+          app-token:    ${{ steps.app-token.outputs.token }}
+          repo-owner:   ${{ needs.detect.outputs.repo-owner }}
+          repo-name:    ${{ needs.detect.outputs.repo-name }}
+          issue-number: ${{ needs.detect.outputs.issue-number }}
+          agent:        ${{ needs.detect.outputs.agent }}
+          stage:        ${{ steps.final.outputs.stage }}
+          pr-number:    ${{ steps.final.outputs.pr-number }}
+          branch:       ${{ steps.final.outputs.branch }}
+
+      - name: Apply awaiting-input label
+        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'awaiting-input' && needs.detect.outputs.issue-number != ''
+        env:
+          ACTION:       awaiting
+          MODE:         apply
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/label-utils.js')
+            await fn({ github, core })
+
+      - name: Post quota-queued comment and label
+        if: always() && steps.auth.outcome == 'success' && steps.final.outputs.stage == 'queued' && needs.detect.outputs.issue-number != ''
+        env:
+          ACTION:       quota-queued
+          REPO_OWNER:   ${{ needs.detect.outputs.repo-owner }}
+          REPO_NAME:    ${{ needs.detect.outputs.repo-name }}
+          ISSUE_NUMBER: ${{ needs.detect.outputs.issue-number }}
+          AGENT:        ${{ needs.detect.outputs.agent }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const fn = require('./.hall/scripts/notification.js')
+            await fn({ github, core })
+
       - name: Post failure comment (non-quota dispatch failure)
         if: failure() && steps.auth.outcome != 'failure' && steps.final.outputs.stage != 'queued' && needs.detect.outputs.issue-number != ''
         env:
