@@ -98,7 +98,7 @@ runs:
 
     - name: Authorize invoker
       id: auth
-      uses: ../authorize
+      uses: ./actions/authorize
       with:
         org-read-token: ${{ steps.app-token.outputs.token }}
         org:            ${{ inputs.repo-owner }}
@@ -115,7 +115,7 @@ runs:
 
     - name: Update status card — dispatching
       if: inputs.issue-number != ''
-      uses: ../status-card
+      uses: ./actions/status-card
       with:
         app-token:     ${{ steps.app-token.outputs.token }}
         repo-owner:    ${{ inputs.repo-owner }}
@@ -127,7 +127,7 @@ runs:
 
     - name: Increment invoker weekly counter
       id: increment
-      uses: ../counter
+      uses: ./actions/counter
       with:
         current-count:    ${{ inputs.invoker-count }}
         environment-name: invoker/${{ inputs.invoker }}
@@ -205,7 +205,7 @@ runs:
     - name: Restore task memory (review re-dispatch)
       id: memory
       if: inputs.trigger-event == 'pr_review'
-      uses: ../memory
+      uses: ./actions/memory
       with:
         mode:      restore
         repo:      ${{ inputs.repo-owner }}/${{ inputs.repo-name }}
@@ -222,7 +222,7 @@ runs:
 
     - name: Run agent
       id: agent
-      uses: ../dispatch
+      uses: ./actions/dispatch
       with:
         oauth-token:   ${{ inputs.oauth-token }}
         app-token:     ${{ steps.app-token.outputs.token }}
@@ -268,7 +268,7 @@ runs:
 
     - name: Save task memory
       if: always() && steps.auth.outcome == 'success' && (steps.find-pr.outputs.pr-number != '' || inputs.issue-number != '')
-      uses: ../memory
+      uses: ./actions/memory
       with:
         mode:         save
         repo:         ${{ inputs.repo-owner }}/${{ inputs.repo-name }}
@@ -299,7 +299,7 @@ runs:
 
     - name: Update status card
       if: always() && steps.auth.outcome == 'success' && inputs.issue-number != ''
-      uses: ../status-card
+      uses: ./actions/status-card
       with:
         app-token:    ${{ steps.app-token.outputs.token }}
         repo-owner:   ${{ inputs.repo-owner }}
@@ -359,7 +359,7 @@ runs:
 
     - name: Post-dispatch audit
       if: always() && steps.auth.outcome == 'success'
-      uses: ../post-dispatch
+      uses: ./actions/post-dispatch
       with:
         app-token:          ${{ steps.app-token.outputs.token }}
         agent:              ${{ inputs.agent }}
