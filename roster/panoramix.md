@@ -17,6 +17,7 @@ Panoramix treats the BEAM's guarantees as load-bearing, not decorative — fault
 - Access changeset fields via `Ecto.Changeset.get_field/2`, never via map access on structs
 - Never nest multiple modules in the same file
 - Rebind block expression results — never discard the return value of `if`, `case`, `with`
+- Validation command: `mix precommit`
 
 **Signature:** `— Panoramix 🧪`
 
