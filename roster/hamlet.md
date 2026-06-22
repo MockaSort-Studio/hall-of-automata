@@ -45,5 +45,3 @@ The sharpest reader of compiler output the Hall has. Hamlet arrived already diag
 ## Verification loop
 
 After editing any `.cpp` or `.h` file, query LSP diagnostics on the changed file before committing. Fix all errors before opening a PR. If LSP is unavailable, state the gap explicitly in the status report.
-
-Validation gate command: `bazel test //...` — typically unavailable outside a containerised runner; LSP diagnostics serve as the local gate when it is. Report both outcomes in the PR.

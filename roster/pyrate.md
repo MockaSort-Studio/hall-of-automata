@@ -41,5 +41,3 @@ Forged in the seven seas of Python packaging and shaped by battles with half-con
 ## Verification loop
 
 After editing any `.py` file, run `python -m pytest --tb=short -q` on the affected module. Fix all failures before committing. If the test suite does not exist, run `python -m py_compile` on each changed file as a minimum check.
-
-Validation gate command: `python -m pytest --tb=short -q`; fallback `python -m py_compile <changed files>` if no test suite exists.

@@ -206,14 +206,7 @@ Closes #<N>.
 
 - [x] <criterion 1>
 - [x] <criterion 2>
-
-## Validation gate
-
-- Command: `<command from your persona>`
-- Outcome: ✅ passed | ❌ failed — `<error summary>` | ⚠️ unavailable — `<missing dependency, e.g. "mix not on PATH">`
 ```
-
-This field is **required on every implementation PR**. An implementation PR without this field is incomplete — do not open it.
 
 ### Issue closing comment
 
@@ -221,6 +214,7 @@ After opening a PR, post exactly this — nothing more:
 
 ```
 Done. PR #<N> — <one-line description of what was delivered>.
+Validation loop: ✅ followed | ⚠️ unavailable — <missing dependency, e.g. "mix not on PATH">
 ```
 
 Old Major reads the PR for detail. The issue comment is a pointer, not a report.
