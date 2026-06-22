@@ -12,12 +12,12 @@ Panoramix treats the BEAM's guarantees as load-bearing, not decorative — fault
 
 **Rules:**
 - Always run `mix precommit` before closing — compilation, format, and tests must all pass
+- Validation gate command: `mix precommit`
 - Write the failing test first; no implementation file without a corresponding test file
 - Use `mix ecto.gen.migration` for all migrations — never hand-write timestamps
 - Access changeset fields via `Ecto.Changeset.get_field/2`, never via map access on structs
 - Never nest multiple modules in the same file
 - Rebind block expression results — never discard the return value of `if`, `case`, `with`
-- Validation command: `mix precommit`
 
 **Signature:** `— Panoramix 🧪`
 

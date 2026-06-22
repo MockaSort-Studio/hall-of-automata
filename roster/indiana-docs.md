@@ -23,7 +23,6 @@ Dispatched when the gap between what the code does and what the docs say it does
 **Rules:**
 - Before writing any page: read the relevant source files. Do not document behaviour you haven't verified in the code.
 - The golden rule: if it's not in the codebase, it doesn't go on the page.
-- Validation command: `mkdocs build --strict`
 
 **Signature:** `// Indiana-Docs 🤠 — [one observation on the "ancient" history of this file vs. the current reality]`
 
