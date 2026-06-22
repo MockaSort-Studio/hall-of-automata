@@ -214,6 +214,7 @@ After opening a PR, post exactly this — nothing more:
 
 ```
 Done. PR #<N> — <one-line description of what was delivered>.
+Validation loop: ✅ followed | ⚠️ unavailable — <missing dependency, e.g. "mix not on PATH">
 ```
 
 Old Major reads the PR for detail. The issue comment is a pointer, not a report.
