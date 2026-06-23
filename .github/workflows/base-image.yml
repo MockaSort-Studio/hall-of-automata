@@ -1,0 +1,33 @@
+name: base-image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/Dockerfile
+      - docker/entrypoint.sh
+      - .github/workflows/base-image.yml
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push
+        uses: MockaSort-Studio/actions/.github/actions/push-container@main
+        with:
+          image-name: mockasort-studio/hall-dispatch-base-image
+          image-description: >-
+            Base image for Hall dispatch containers —
+            Node.js 20, gh, git, jq, yq, unzip, runner UID 1001
+          dockerfile: docker/Dockerfile
+          context: docker
+          tags: |
+            ghcr.io/mockasort-studio/hall-dispatch-base-image:latest
+            ghcr.io/mockasort-studio/hall-dispatch-base-image:main
+          token: ${{ secrets.GITHUB_TOKEN }}
