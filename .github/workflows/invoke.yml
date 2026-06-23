@@ -264,6 +264,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.detect.outputs.env-image }}
+      options: --user 1001
     environment: invoker/${{ needs.detect.outputs.invoker }}
     concurrency:
       group: hall-${{ needs.detect.outputs.agent }}-${{ needs.detect.outputs.issue-number || github.run_id }}
