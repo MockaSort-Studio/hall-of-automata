@@ -1,0 +1,37 @@
+name: "🎯 OKR"
+description: "Define a product objective"
+labels:
+  - "type/okr"
+title: "[OKR] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: "Objective"
+      description: "What outcome do we want to achieve?"
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: "Reference"
+      description: "Design doc URL — Drive or repo file"
+      placeholder: "https://..."
+    validations:
+      required: false
+  - type: input
+    id: owner
+    attributes:
+      label: "Owner"
+      description: "Invoker handle"
+      placeholder: "@handle"
+    validations:
+      required: true
+  - type: textarea
+    id: key-results
+    attributes:
+      label: "Key Results"
+      description: "Add KR issue references once created"
+      placeholder: "- [ ] #N [KR] ..."
+    validations:
+      required: false
