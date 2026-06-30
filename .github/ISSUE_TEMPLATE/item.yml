@@ -1,0 +1,36 @@
+name: "🔨 Item"
+description: "Unit of work within a Key Result"
+labels:
+  - "type/item"
+title: "[Item] "
+body:
+  - type: input
+    id: parent-kr
+    attributes:
+      label: "Parent KR"
+      description: "Issue number of the parent Key Result"
+      placeholder: "#N"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Scope"
+      description: "What is being built or investigated?"
+    validations:
+      required: true
+  - type: textarea
+    id: design-notes
+    attributes:
+      label: "Design Notes"
+      description: "Decisions, constraints, relevant context discussed with Old Major"
+    validations:
+      required: false
+  - type: textarea
+    id: dispatched-issues
+    attributes:
+      label: "Dispatched Issues"
+      description: "Populated by hall-dispatch — do not edit manually"
+      placeholder: "- [ ] #N [automaton] ..."
+    validations:
+      required: false
