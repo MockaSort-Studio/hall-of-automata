@@ -1,0 +1,31 @@
+name: "📊 Key Result"
+description: "Measurable outcome within an OKR"
+labels:
+  - "type/kr"
+title: "[KR] "
+body:
+  - type: input
+    id: parent-okr
+    attributes:
+      label: "Parent OKR"
+      description: "Issue number of the parent OKR"
+      placeholder: "#N"
+    validations:
+      required: true
+
+  - type: textarea
+    id: key-result
+    attributes:
+      label: "Key Result"
+      description: "Measurable outcome — how will we know this is done?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: items
+    attributes:
+      label: "Items"
+      description: "Add Item issue references once created"
+      placeholder: "- [ ] #N [Item] ..."
+    validations:
+      required: false
