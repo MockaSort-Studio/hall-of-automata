@@ -185,6 +185,9 @@ agents:
     max_retries: 2
     mcp:
       servers:
+        fetch:
+          runtime: npx
+          package: "@modelcontextprotocol/server-fetch"
         github:
           runtime: npx
           package: "@github/github-mcp-server"
@@ -192,6 +195,7 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
+        - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__get_issue
         - mcp__github__push_files
