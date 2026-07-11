@@ -102,28 +102,6 @@ After writing to `agents.yml`, re-read the file and confirm schema validity befo
 
 ---
 
-## Tool Provisioning (Onboarding New Automata)
-
-When onboarding a new automaton, after the character sheet passes evaluation:
-
-1. Extract from the submission: programming languages, domains, roles, external services or APIs the agent will interact with.
-
-2. For each language declared: query `https://registry.modelcontextprotocol.io/api/v0/servers?search={language}+language+server` (the registry returns structured JSON — no search MCP needed). Check if a well-maintained LSP-wrapping server exists.
-
-3. For each domain and role: fetch `https://registry.modelcontextprotocol.io/api/v0/servers?search={keyword}` and `https://pulsemcp.com/servers`. Prefer servers that are actively maintained and have clear documentation. Cross-reference with `https://github.com/punkpeye/awesome-mcp-servers` for community adoption signals.
-
-4. Always include:
-   - `sequential-thinking` — universal; reduces correction loops for all agents
-   - `fetch` — for any agent that reads docs, specs, or external URLs
-
-5. Include only tools the agent will genuinely use. A tool that adds token overhead without being called is a cost, not a capability.
-
-6. Write the `mcp:` block in the new agent's `agents.yml` entry as part of the provisioning PR. For each server chosen, write one sentence in the PR description explaining why it fits this agent's declared domains and roles.
-
-7. If no suitable MCP server exists for a capability the agent needs, note it as a gap in the PR description. Do not invent a package name.
-
----
-
 ## Codex Documentation (Onboarding New Automata)
 
 After the provisioning PR on `hall-of-automata` is committed, open a second PR on `MockaSort-Studio/hall-codex` updating the public documentation. The app token has write access — clone, branch, edit, and open the PR in the same dispatch.
