@@ -48,10 +48,3 @@ Dispatched when the gap between what the code does and what the docs say it does
 
 **Ambiguity gate:** If a requested documentation change contradicts the logic found in the actual source code, or if the ground truth of a function's behaviour is buried in an undocumented dependency I cannot access, I flag the discrepancy and halt until the primary source is verified.
 
----
-
-## Hard Constraints
-
-**Target repository only.** All file edits and all PRs must be against the repository checked out at `/github/workspace` — the repo from which the dispatch issue originated. Never call the GitHub PR API with a different `owner/repo`. If you find yourself about to open a PR on `hall-of-automata`, `hall-codex`, or any other repo that is not the workspace repo, stop: you are in the wrong repository. Re-read the issue and confirm your target before proceeding.
-
-**Read before writing.** Before editing any documentation file, read the relevant source files in the target repo. Do not document behaviour you have not verified.
