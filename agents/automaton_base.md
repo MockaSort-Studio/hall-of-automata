@@ -171,6 +171,7 @@ All multi-line text in GitHub tool calls must use actual newlines — see [GitHu
 Every PR opened by a Hall automaton must use this format:
 
 ```
+Part of KR #<parent-KR-number> / OKR #<parent-OKR-number>.
 Closes #<N>.
 
 ## What changed
