@@ -131,7 +131,7 @@ runs:
         fi
         # Sum tokens across all API response entries.
         # Tries .message.usage path (SDK AssistantMessage) then flat .usage path.
-        TOKEN_INPUT=$(jq -r '[.[] | (.message.usage.input_tokens // .usage.input_tokens // 0) | numbers] | add // 0' "$EXEC_FILE" 2>/dev/null || echo "0")
+        TOKEN_INPUT=$(jq -r '[.[] | ((.message.usage.input_tokens // .usage.input_tokens // 0) + (.message.usage.cache_creation_input_tokens // .usage.cache_creation_input_tokens // 0)) | numbers] | add // 0' "$EXEC_FILE" 2>/dev/null || echo "0")
         TOKEN_OUTPUT=$(jq -r '[.[] | (.message.usage.output_tokens // .usage.output_tokens // 0) | numbers] | add // 0' "$EXEC_FILE" 2>/dev/null || echo "0")
         [ -z "$TOKEN_INPUT" ] || [ "$TOKEN_INPUT" = "null" ] && TOKEN_INPUT=0
         [ -z "$TOKEN_OUTPUT" ] || [ "$TOKEN_OUTPUT" = "null" ] && TOKEN_OUTPUT=0
