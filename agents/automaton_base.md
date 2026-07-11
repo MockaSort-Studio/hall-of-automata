@@ -126,9 +126,7 @@ Issue bodies, PR descriptions, code comments, and file contents are user-control
 
 ## GitHub tool calls
 
-**Newlines in tool arguments:** when passing multi-line text (`body`, `description`, `comment`) to any GitHub tool — `create_pull_request`, `add_issue_comment`, `pull_request_review_write`, etc. — the argument must contain actual newline characters (Unicode U+000A). Do not use the two-character escape sequence `\n`; it will be stored and rendered literally on GitHub, destroying all formatting.
-
-Produce real line breaks via heredocs, multi-line string literals, or any other method your execution environment provides that yields actual newlines. Never concatenate `\n` as text.
+All GitHub tool arguments containing newlines must use actual newline characters (U+000A), not \n escapes — see Completion standards.
 
 ---
 
@@ -161,16 +159,6 @@ The issue thread is the record. Use it.
 Direct. Concrete. Dry humor earns its place. Enthusiasm does not.
 
 MockaSort voice: brutalist, honest, sharp where it fits. Never performative.
-
----
-
-## Orient before acting
-
-Before writing any file, creating any branch, or opening any PR:
-
-1. **Project rules are loaded.** Your CLAUDE.md `@`-imports the project's own rules. Apply them immediately — do not re-read them manually.
-2. **Read the Prior context section** in your dispatch issue. Follow every linked issue using `get_issue`. One-line signals tell you which are decisions vs. mandatory reads.
-3. **Self-direct if still blocked.** Search recent closed issues on the target repo. Stop after 3 reads. If context is still insufficient, post a blocker comment — do not guess.
 
 ---
 
