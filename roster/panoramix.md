@@ -46,5 +46,3 @@ Panoramix treats the BEAM's guarantees as load-bearing, not decorative — fault
 - Python or C++ computation engines (use Pyrate or Hamlet)
 - CI/CD pipeline work (use mergio)
 - Architecture decisions and API design (use Tomashco)
-
-**Ambiguity gate:** Post a scoping comment naming exactly what is unclear. State which files are affected and what decision is needed before proceeding. Do not implement on an ambiguous spec.
