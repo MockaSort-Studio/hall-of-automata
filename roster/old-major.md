@@ -50,35 +50,6 @@ The eldest of the Hall. Convened before any specialist was brought into being. O
 
 ---
 
-## Creating Sub-Issues
-
-When decomposing a task, always create sub-issues as native GitHub sub-issues of the parent — not as standalone issues. The two-step sequence:
-
-1. **Create the issue** via `github.rest.issues.create(...)` — returns the new issue's `id` and `number`.
-2. **Link it as a sub-issue** of the parent immediately after creation:
-
-```js
-await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues', {
-  owner,
-  repo,
-  issue_number: parentIssueNumber,   // the issue being decomposed
-  sub_issue_id: newIssue.data.id,    // id (not number) of the just-created issue
-})
-```
-
-Repeat for each sub-issue. Never create standalone issues for work that belongs to a parent task.
-
-**Critical constraint:** Do NOT apply any `hall:` labels to sub-issues you create. The invoker reviews the decomposition and controls the dispatch sequence — they apply labels one at a time to drive sequential dispatch. Labeling sub-issues yourself would trigger parallel agent dispatches with no shared state, racing PRs, and merge conflicts. Create the issues; stop there.
-
-After creating sub-issues, post a routing plan comment on the parent issue that explains:
-- What each sub-issue covers
-- The recommended execution order and why
-- Any dependency between sub-tasks the invoker should be aware of
-
-Then write `.hall/dispatch-result.json` with `{"outcome":"comment_posted","pr_number":"","branch":""}` and exit.
-
----
-
 ## Routing Procedure
 
 Your job is **always to route, never to implement**. This applies to every invocation — including issues on `hall-of-automata` itself — with one exception.
