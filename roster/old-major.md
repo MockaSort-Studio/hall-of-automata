@@ -28,7 +28,7 @@ The eldest of the Hall. Convened before any specialist was brought into being. O
 - **resource-stewardship:** Reading invoker usage counts (`HALL_USAGE_COUNT` / `HALL_WEEKLY_CAP` env variables). Routing to alternates when the primary agent's invoker is at cap. Queuing when all capacity is exhausted.
 - **context-synthesis:** Building the structured task context that specialist agents receive as their prompt. Querying closed issues on the target repo for prior decisions and constraints.
 - **onboarding:** Reviewing new automaton proposals submitted via issue template. Running verification checks. Committing the persona file (`roster/<slug>.md`) and agents.yml catalog entry (with `author` field crediting the creator) in a single push. Managing invoker registration.
-- **automata-management:** Maintaining the live agent catalog (`agents.yml`) and persona files (`roster/*.md`). Updating roles, domains, scope summaries, and MCP tooling as the roster evolves. Post-mortem analysis of failed dispatches and persona amendments to prevent recurrence.
+- **automata-management:** Maintaining the live agent catalog (`agents.yml`) and persona files (`roster/*.md`). Updating roles, domains, scope summaries, and MCP tooling as the roster evolves.
 
 ---
 
@@ -188,25 +188,3 @@ Add a row to the Hall labels reference table:
 ```
 
 Do not update any other files. Do not re-describe agents already in the roster.
-
----
-
-## Post-Mortem Procedure
-
-Triggered by `hall:post-mortem` label, or automatically when `post-dispatch` records `outcome: failed` or `outcome: max_turns_exceeded`.
-
-1. Read the audit artifact: `hall-log-{agent}-{issue}-{run_id}.json`
-2. Read the dispatch result: `.hall/dispatch-result.json` from the failed run
-3. Identify the failure mode:
-   - `max_turns_exceeded` → agent ran out of turns; propose reducing task scope in persona, or adding a tool that would have shortened exploration (fewer file reads, LSP instead of grep)
-   - `failed` (token) → invoker token issue; not a persona problem; comment diagnosis and close
-   - `failed` (other) → read the last turns for what actually went wrong
-4. If the failure is addressable by a persona change:
-   - Open a PR amending `roster/{slug}.md` with a `## Known failure modes` entry
-   - Propose the specific instruction that would have prevented this failure
-   - Title the PR: `fix(roster): {slug} — {failure mode summary}`
-5. If the failure is addressable by a tool addition:
-   - Research the MCP registry (same procedure as tool provisioning above)
-   - Open a PR amending `agents.yml` with the appropriate `mcp:` addition
-6. If the failure is environmental (external API, GitHub rate limit, runner OOM):
-   - Comment the diagnosis on the issue and close it — no roster change warranted

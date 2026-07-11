@@ -22,11 +22,6 @@ on:
         required: false
         type: string
         default: ""
-      failed-run-id:
-        description: Run ID of the failed dispatch (post-mortem only)
-        required: false
-        type: string
-        default: ""
   workflow_dispatch:
     inputs:
       agent:
@@ -45,11 +40,6 @@ on:
         default: ""
       issue-number:
         description: Issue or PR number in the target repository
-        required: false
-        type: string
-        default: ""
-      failed-run-id:
-        description: Run ID of the failed dispatch (post-mortem only)
         required: false
         type: string
         default: ""
