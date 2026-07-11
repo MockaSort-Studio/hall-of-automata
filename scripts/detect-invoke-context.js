@@ -63,8 +63,7 @@ module.exports = async ({ github, context, core }) => {
     }
     // Ignore system labels — they are applied by the Hall itself, not invokers
     if (SYSTEM_LABELS.includes(label)) { core.setOutput('agent', ''); return; }
-    // hall:dispatch-automaton routes to Old Major; other pseudo-agent aliases
-    // are resolved by the unified AGENT_ALIASES map below (e.g. hall:post-mortem).
+    // hall:dispatch-automaton routes to Old Major.
     if (label === 'hall:dispatch-automaton') {
       agent = 'old-major';
     } else {
@@ -172,11 +171,7 @@ module.exports = async ({ github, context, core }) => {
     return;
   }
 
-  // ── Normalize pseudo-agent aliases to canonical handlers ─────────────────
-  // Applied after all event-parsing branches so every trigger path is covered.
-  const AGENT_ALIASES = { 'post-mortem': 'old-major' };
-  let triggerReason = '';
-  if (AGENT_ALIASES[agent]) { triggerReason = agent; agent = AGENT_ALIASES[agent]; }
+  const triggerReason = '';
 
   // ── Pool-select the least-used invoker under cap ──────────────────────────
   // Query all invoker/* environments in the Hall repo, read usage vars via

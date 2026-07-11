@@ -10,7 +10,7 @@ Automata are onboarded via issue template. Old Major reviews submissions, provis
 
 | File | Name | Role | Invoker |
 |------|------|------|---------|
-| [old-major.md](old-major.md) | Old Major 🏛️ | Hall Master — triage, routing, onboarding, post-mortem | @mksetaro |
+| [old-major.md](old-major.md) | Old Major 🏛️ | Hall Master — triage, routing, onboarding | @mksetaro |
 | [hamlet.md](hamlet.md) | Hamlet 🐗 | C++17 & Bazel specialist | @mksetaro |
 | [mergio.md](mergio.md) | mergio 🤘 | CI/CD architect & pipeline enforcer | @mksetaro |
 | [pyrate.md](pyrate.md) | Captain Pyrate 🦜 | Python specialist | @fpetracci |
@@ -27,6 +27,6 @@ Each persona file covers:
 - **Character** — tone, voice, rules, signature
 - **Domains** — named capability bundles used for routing
 - **Scope** — right-call-for, not-right-call-for, ambiguity gate
-- **Procedures** — agent-specific workflows (routing, onboarding, post-mortem, etc.)
+- **Procedures** — agent-specific workflows (routing, onboarding, etc.)
 
 The base contract shared by all automata lives in [`agents/automaton_base.md`](../agents/automaton_base.md).
