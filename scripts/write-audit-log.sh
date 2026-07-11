@@ -2,7 +2,7 @@
 # Writes the invocation audit log to hall-invocation-log.json.
 # Required env: AGENT, AGENT_DISPATCHED, REROUTED, REPO_OWNER, REPO_NAME,
 #               ISSUE_NUMBER, PR_NUMBER, INVOKER, TEAM_VALIDATED,
-#               TIMESTAMP_START, TURNS_USED, TURNS_MAX, RETRY_COUNT,
+#               TIMESTAMP_START, TOKEN_INPUT, TOKEN_OUTPUT, RETRY_COUNT,
 #               OUTCOME, WEEKLY_COUNT_AFTER
 # Optional env: MODEL, MCP_SERVERS (comma-separated)
 set -euo pipefail
@@ -22,19 +22,11 @@ if [[ -n "${TIMESTAMP_START:-}" ]]; then
   fi
 fi
 
-# Turns efficiency (0.00–1.00); null when turns_max is 0
-TURNS_USED="${TURNS_USED:-0}"
-TURNS_MAX="${TURNS_MAX:-0}"
-TURNS_EFFICIENCY="null"
-if [[ "${TURNS_MAX}" -gt 0 ]]; then
-  TURNS_EFFICIENCY=$(awk "BEGIN {printf \"%.2f\", ${TURNS_USED}/${TURNS_MAX}}")
-fi
-
 # MCP servers as JSON array
 MCP_SERVERS_JSON="[]"
 if [[ -n "${MCP_SERVERS:-}" ]]; then
   MCP_SERVERS_JSON=$(printf '%s' "${MCP_SERVERS}" \
-    | awk -F',' '{printf "["; for(i=1;i<=NF;i++){if(i>1)printf ","; printf "\"%s\"",$i}; printf "]"}')
+    | awk -F',' '{printf "["; for(i=1;i<=NF;i++){if(i>1)printf ","; printf "\"%s\"", $i}; printf "]"}')
 fi
 
 cat > hall-invocation-log.json << EOF
@@ -52,9 +44,8 @@ cat > hall-invocation-log.json << EOF
   "timestamp_start":    "${TIMESTAMP_START}",
   "timestamp_end":      "${TIMESTAMP_END}",
   "duration_seconds":   ${DURATION_SECONDS},
-  "turns_used":         ${TURNS_USED:-0},
-  "turns_max":          ${TURNS_MAX:-0},
-  "turns_efficiency":   ${TURNS_EFFICIENCY},
+  "token_input":        ${TOKEN_INPUT:-0},
+  "token_output":       ${TOKEN_OUTPUT:-0},
   "retry_count":        ${RETRY_COUNT},
   "outcome":            "${OUTCOME}",
   "weekly_count_after": ${WEEKLY_COUNT_AFTER}

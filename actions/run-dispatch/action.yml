@@ -370,7 +370,8 @@ runs:
         pr-number:          ${{ steps.final.outputs.pr-number }}
         invoker:            ${{ inputs.invoker }}
         team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
-        turns-used:         ${{ steps.agent.outputs.turns-used }}
+        token-input:        ${{ steps.agent.outputs.token-input }}
+        token-output:       ${{ steps.agent.outputs.token-output }}
         outcome:            ${{ steps.final.outputs.stage }}
         weekly-count-after: ${{ steps.increment.outputs.count }}
         model:              ${{ steps.agent-cfg.outputs.model }}

@@ -37,9 +37,12 @@ outputs:
   token-status:
     description: Categorized API result — ok | unauthorized | rate_limited | error
     value: ${{ steps.categorize.outputs.token-status }}
-  turns-used:
-    description: Number of agentic turns consumed by this dispatch
-    value: ${{ steps.turns.outputs.count }}
+  token-input:
+    description: Total input tokens consumed by this dispatch
+    value: ${{ steps.tokens.outputs.token-input }}
+  token-output:
+    description: Total output tokens consumed by this dispatch
+    value: ${{ steps.tokens.outputs.token-output }}
 
 runs:
   using: composite
@@ -114,19 +117,26 @@ runs:
         else
           echo "token-status=error" >> "${GITHUB_OUTPUT}"
         fi
-    - name: Extract turns used
-      id: turns
+
+    - name: Extract token usage
+      id: tokens
       if: always()
       shell: bash
       run: |
         EXEC_FILE="${{ steps.run-claude.outputs.execution_file }}"
         if [ -z "$EXEC_FILE" ] || [ ! -f "$EXEC_FILE" ]; then
-          echo "count=0" >> "$GITHUB_OUTPUT"
+          echo "token-input=0" >> "$GITHUB_OUTPUT"
+          echo "token-output=0" >> "$GITHUB_OUTPUT"
           exit 0
         fi
-        COUNT=$(jq -r '[.[] | select(.type == "result")] | last | .num_turns // 0' "$EXEC_FILE" 2>/dev/null)
-        [ -z "$COUNT" ] || [ "$COUNT" = "null" ] && COUNT=0
-        echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+        # Sum tokens across all API response entries.
+        # Tries .message.usage path (SDK AssistantMessage) then flat .usage path.
+        TOKEN_INPUT=$(jq -r '[.[] | (.message.usage.input_tokens // .usage.input_tokens // 0) | numbers] | add // 0' "$EXEC_FILE" 2>/dev/null || echo "0")
+        TOKEN_OUTPUT=$(jq -r '[.[] | (.message.usage.output_tokens // .usage.output_tokens // 0) | numbers] | add // 0' "$EXEC_FILE" 2>/dev/null || echo "0")
+        [ -z "$TOKEN_INPUT" ] || [ "$TOKEN_INPUT" = "null" ] && TOKEN_INPUT=0
+        [ -z "$TOKEN_OUTPUT" ] || [ "$TOKEN_OUTPUT" = "null" ] && TOKEN_OUTPUT=0
+        echo "token-input=$TOKEN_INPUT" >> "$GITHUB_OUTPUT"
+        echo "token-output=$TOKEN_OUTPUT" >> "$GITHUB_OUTPUT"
 
     # When the SDK exits before the agent writes dispatch-result.json, write it here so
     # post-dispatch steps can route correctly. Three distinct failure modes:

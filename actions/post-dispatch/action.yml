@@ -37,14 +37,14 @@ inputs:
   team-validated:
     description: Team slug that validated the invoker
     required: true
-  turns-used:
-    description: Number of agentic turns consumed
+  token-input:
+    description: Total input tokens consumed by this dispatch
     required: false
     default: "0"
-  turns-max:
-    description: Max turns configured for this agent
+  token-output:
+    description: Total output tokens consumed by this dispatch
     required: false
-    default: "40"
+    default: "0"
   retry-count:
     description: Retry attempt number (0 for initial dispatch)
     required: false
@@ -100,8 +100,8 @@ runs:
         INVOKER:             ${{ inputs.invoker }}
         TEAM_VALIDATED:      ${{ inputs.team-validated }}
         TIMESTAMP_START:     ${{ github.event.created_at }}
-        TURNS_USED:          ${{ inputs.turns-used }}
-        TURNS_MAX:           ${{ inputs.turns-max }}
+        TOKEN_INPUT:         ${{ inputs.token-input }}
+        TOKEN_OUTPUT:        ${{ inputs.token-output }}
         RETRY_COUNT:         ${{ inputs.retry-count }}
         OUTCOME:             ${{ inputs.outcome }}
         WEEKLY_COUNT_AFTER:  ${{ inputs.weekly-count-after }}

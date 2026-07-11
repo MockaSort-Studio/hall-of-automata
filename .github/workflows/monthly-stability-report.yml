@@ -1,0 +1,36 @@
+name: "[Hall] Monthly Stability Report"
+
+# Fires on the first of every month at 00:00 UTC.
+# Samples the last 50 dispatch audit artifacts, computes failure/quota/REFINE rates,
+# and posts findings as a GitHub issue.
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  report:
+    name: Generate stability report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Hall repo (scripts only)
+        uses: actions/checkout@v4
+        with:
+          path: .hall
+          sparse-checkout: scripts/
+          sparse-checkout-cone-mode: true
+
+      - name: Create App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id:      ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Generate and post stability report
+        env:
+          GH_TOKEN:    ${{ steps.app-token.outputs.token }}
+          REPO:        ${{ github.repository }}
+          SAMPLE_SIZE: "50"
+        run: node .hall/scripts/stability-report.js

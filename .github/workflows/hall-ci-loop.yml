@@ -242,7 +242,8 @@ jobs:
           pr-number:          ${{ needs.detect.outputs.pr-number }}
           invoker:            ${{ needs.select-invoker.outputs.invoker }}
           team-validated:     ${{ steps.agent-cfg.outputs.team-slug }}
-          turns-used:         ${{ steps.agent.outputs.turns-used }}
+          token-input:        ${{ steps.agent.outputs.token-input }}
+          token-output:       ${{ steps.agent.outputs.token-output }}
           retry-count:        ${{ steps.retry.outputs.new-count }}
           outcome:            ${{ steps.ci-outcome.outputs.outcome }}
           weekly-count-after: ${{ steps.increment.outputs.count }}
