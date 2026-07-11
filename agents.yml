@@ -25,9 +25,6 @@ agents:
     max_retries: 1                    # Triage agent. Routes correctly or asks — no retry loop.
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -38,7 +35,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,labels,pull_requests,actions,repos,contents"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__search_issues
         - mcp__github__create_label
@@ -66,9 +62,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -79,7 +72,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__get_issue
@@ -106,9 +98,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -125,7 +114,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
@@ -154,9 +142,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -173,7 +158,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
@@ -201,9 +185,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         github:
           runtime: npx
           package: "@github/github-mcp-server"
@@ -211,7 +192,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__github__get_file_contents
         - mcp__github__get_issue
         - mcp__github__push_files
@@ -234,9 +214,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -247,7 +224,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__get_issue
@@ -269,9 +245,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -282,7 +255,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__get_issue
@@ -303,9 +275,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -316,7 +285,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__get_issue
@@ -338,9 +306,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -357,7 +322,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
@@ -384,9 +348,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -403,7 +364,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__lsp__textDocument_definition
         - mcp__lsp__textDocument_references
@@ -433,9 +393,6 @@ agents:
     max_retries: 2
     mcp:
       servers:
-        sequential-thinking:
-          runtime: npx
-          package: "@modelcontextprotocol/server-sequential-thinking"
         fetch:
           runtime: npx
           package: "@modelcontextprotocol/server-fetch"
@@ -446,7 +403,6 @@ agents:
             GITHUB_PERSONAL_ACCESS_TOKEN: "{{env.GITHUB_TOKEN}}"
             GITHUB_TOOLSETS: "issues,repos,contents,pull_requests"
       allowed_tools:
-        - mcp__sequential-thinking__sequentialthinking
         - mcp__fetch__fetch
         - mcp__github__get_file_contents
         - mcp__github__push_files
