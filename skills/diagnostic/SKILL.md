@@ -96,7 +96,7 @@ This closes the traceability chain: issue ← PR ← wiki diagnostic report. A P
 An open point exists only when resolution requires invoker input or external information genuinely unavailable in this dispatch.
 
 - If you can read a file, search closed issues, or make a technical decision — decide and proceed. State your decision and rationale; do not convert resolvable unknowns into open points.
-- **Maximum one execution-blocking open point per dispatch.** If blocked: post the question, apply the `hall:awaiting-input` label to the issue, and set `outcome: awaiting_input`.
+- **Maximum one execution-blocking open point per dispatch.** If blocked: post the question and apply the `hall:awaiting_input` label to the issue.
 - All resolvable unknowns must be resolved before writing the diagnostic report.
 
 ---
