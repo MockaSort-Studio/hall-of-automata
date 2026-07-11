@@ -7,7 +7,7 @@ description: Write a rigorous design document — interrogates first, writes sec
 
 ## Trigger
 
-User asks to write, start, or draft a design document for any system, feature, or migration.
+Any new feature, implementation, revision, or refactoring task that is not a bug fix. A design document is required before implementation begins — this skill activates at the start of every such dispatch.
 
 ## Mode
 
@@ -15,27 +15,27 @@ This skill covers features and new behaviour only. For bug fixes and investigati
 
 ## Discipline
 
-This skill does not write first. It interrogates first. The output quality depends entirely on the quality of the input — a design document written without sufficient context produces false confidence. Every section must be earned through questions.
+This skill does not write first. It derives context first. The output quality depends entirely on the quality of the input — a design document written without sufficient context produces false confidence. Every section must be grounded in evidence extracted from the dispatch context.
 
 **Core principles distilled from strong design documents:**
 
 - **Problem before solution.** The first third of a strong design doc contains no solution language. It earns the right to propose by fully establishing what is broken, who is affected, and why it matters now.
-- **Scope as a contract.** Out-of-scope is as important as in-scope. Name both explicitly and make the user commit to them before writing begins. Scope that drifts mid-document invalidates decisions already made.
+- **Scope as a contract.** Out-of-scope is as important as in-scope. Name both explicitly before writing begins. Scope that drifts mid-document invalidates decisions already made.
 - **Use cases as tests.** Each use case is a concrete scenario with a named actor, a concrete action, and a measurable success criterion. Vague use cases ("user can view data") are rejected — they cannot be tested and they do not force real design decisions.
-- **Data model coverage before architecture.** Before proposing an architecture, establish what data the system must serve, what it already has, and what it must acquire. A coverage table (what can be served today vs. what requires new data) exposes the hard decisions early.
-- **Architecture justifies its own tradeoffs.** The architecture section must explain why this approach over alternatives — and name alternatives that were rejected and why. A diagram without a justification paragraph is decorative. Any decision between two or more viable approaches requires a named options comparison (see template §5).
+- **Data model coverage before architecture** _(if the design involves data)_. Before proposing an architecture, establish what data the system must serve, what it already has, and what it must acquire. A coverage table (what can be served today vs. what requires new data) exposes the hard decisions early.
+- **Architecture justifies its own tradeoffs.** The architecture section must explain why this approach over alternatives — and name alternatives that were rejected and why. A diagram without a justification paragraph is decorative. All diagrams must use Mermaid fenced code blocks — no ASCII art. Any decision between two or more viable approaches requires a named options comparison (see template §5).
 - **Open points are contextual, not terminal.** An open point belongs inline, adjacent to the design decision that depends on its resolution, and also in the summary table at the end. A reader who encounters a decision before knowing it is unresolved cannot evaluate it. Aspirational notes, nice-to-haves, and TODOs do not belong in the open points table.
 - **No floating assumptions.** Any claim that cannot be verified against a source (repo, official docs, explicit user confirmation) must be marked as an assumption. Unverified claims presented as facts corrupt the document and erode trust.
 - **Quantitative grounding.** Any claim about volume, latency, resource consumption, or behavior at scale must be backed by estimates. Use best/mid/worst case when applicable and name the dominant constraint at each level. A design that does not consider scale is only half a design.
 - **Designs must prove they are buildable.** Whenever the design modifies or builds on existing code, include a feasibility appendix: the existing implementation, its specific limitations, and how each element of the proposed design is directly supported by what already exists — with code-level evidence. Feasibility claims without evidence are assumptions.
 
-**Open points discipline (Hall):** An open point exists only when resolution requires invoker input or external information genuinely unavailable in this dispatch. If resolvable — read a file, search closed issues, make a technical decision — decide and proceed; state your rationale. Maximum one execution-blocking open point per dispatch. If blocked: post the question, set `outcome: awaiting_input`.
+**Open points discipline (Hall):** An open point exists only when resolution requires invoker input or external information genuinely unavailable in this dispatch. If resolvable — read a file, search closed issues, make a technical decision — decide and proceed; state your rationale. Maximum one execution-blocking open point per dispatch. If blocked: post the question and apply the `hall:awaiting-input` label to the issue.
 
 ---
 
 ## Phase 1 — Intake
 
-Ask the following before writing anything. Do not batch all questions at once — group by theme, wait for answers, ask follow-ups.
+Extract answers to the following from the dispatch context — the issue body, linked issues, and repo — before writing anything. Each question is a self-check: if the answer is derivable, derive it and state it; if it requires a judgment call, make it and record your rationale; if it is genuinely unavailable and execution-blocking, raise it as an open point (see Open points discipline above).
 
 **Problem space**
 - What problem does this solve? What breaks or is missing today?
@@ -44,7 +44,7 @@ Ask the following before writing anything. Do not batch all questions at once �
 
 **Scope**
 - What is explicitly in scope?
-- What is explicitly out of scope? (If the user hasn't thought about this, ask them to.)
+- What is explicitly out of scope?
 - Are there adjacent systems that could be in scope but shouldn't be — and why?
 
 **Constraints**
@@ -53,24 +53,22 @@ Ask the following before writing anything. Do not batch all questions at once �
 - Are there compliance, security, or regulatory constraints?
 
 **Known unknowns**
-- What does the user not know yet that they know they don't know?
+- What is genuinely unknown and relevant to the design?
 - What external dependencies are unresolved?
 
-If any answer is vague, underspecified, or contradicts a previous answer — push back before moving on.
+If any answer is vague or contradicts available evidence — name the conflict and resolve it from context. Do not carry a contradiction forward into the document.
 
 ---
 
 ## Phase 2 — Validation
 
-Before writing, read back a one-paragraph summary of the problem and proposed direction. Ask: _"Is this an accurate framing?"_ Do not proceed until confirmed.
-
-If the user's framing conflicts with known context (from memory or repo), surface the conflict explicitly.
+Before writing, state a one-paragraph summary of the problem and proposed direction as the opening section of the design document. Check it against available context — linked issues, repo state, prior decisions. If the framing conflicts with available evidence, name the conflict and resolve it before proceeding. A framing that cannot be validated against any available source is itself an open point.
 
 ---
 
 ## Phase 3 — Document Construction
 
-Write the document section by section. After each section, pause and ask: _"Does this look right, or should we adjust before moving on?"_
+Write the document section by section in a single dispatch. Each section must be complete and internally consistent before moving to the next.
 
 **Standard template — in order:**
 
@@ -95,7 +93,7 @@ Write the document section by section. After each section, pause and ask: _"Does
 
 5. **System Design**
    - Approach paragraph: why this design, what tradeoffs it makes, what alternatives were rejected and why
-   - Mermaid diagram for any component or flow that is hard to follow in prose alone
+   - Mermaid fenced code block diagram for any component or flow that is hard to follow in prose alone — no ASCII art
    - Key subsections as needed: data flow, API design, authentication, failure modes
    - No implementation file paths — conceptual level only
    - **Options comparison** (when a non-trivial choice exists): named dimensions as rows, options as columns, followed by a Decision paragraph with numbered rationale. Can be inline or in appendix.
@@ -148,7 +146,7 @@ A PR without a linked wiki page is incomplete.
 
 ## Output Standards
 
-- Author line: `_Author: <User Name> & Patchani_`
+- Author line: `_Author: <Automaton Name>_`
 - Date: actual date of creation
 - No implementation file paths, repo names, or org-specific identifiers in the main body — appendix only if needed
 - Mermaid diagrams for all architecture sections
