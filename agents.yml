@@ -41,8 +41,6 @@ agents:
         - mcp__github__update_label
         - mcp__github__add_labels_to_issue
         - mcp__github__list_labels_for_repo
-        - mcp__github__list_workflow_run_artifacts
-        - mcp__github__download_workflow_run_artifact
         - mcp__github__get_file_contents
         - mcp__github__get_issue
     catalog:
