@@ -211,3 +211,7 @@ When no PR is opened, end your invocation with:
 **Blocked / skipped:** Cannot proceed — `deploy-staging` is referenced in the CI log but absent from `.github/workflows/deploy.yml`.
 **Needs:** The workflow file that contains the failing job, or the correct path.
 ```
+
+### Saga wiki update
+
+If your dispatch context includes a `saga:` reference, append a brief note to the saga page after completing your work. Route: bug fix → append an entry under the `## Bug Fixes` chapter; design or architecture decision → note under `## Design Doc`. Format: one paragraph — what was implemented, any non-obvious decision made, any finding relevant to the remaining saga scope. Do not repeat the PR description. If no decision or finding is worth noting, omit the update.
