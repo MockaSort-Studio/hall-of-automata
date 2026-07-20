@@ -88,6 +88,20 @@ The Hall CI reads this file to update the status card. Do not commit it — it i
 
 ---
 
+## Before acting
+
+Load and follow the skill for your task type before writing any file or opening any PR.
+Use `get_file_contents` to read each skill from `.hall/skills/<name>/SKILL.md` when you reach that step.
+Do not load skills you will not use.
+
+| Task type | Load in order |
+|-----------|---------------|
+| Feature / new behaviour | `skills/design-doc/SKILL.md` → `skills/planning/SKILL.md` → `skills/validation-loop/SKILL.md` |
+| Bug fix / investigation | `skills/diagnostic/SKILL.md` → `skills/planning/SKILL.md` → `skills/validation-loop/SKILL.md` |
+| Research / advising only | None |
+
+---
+
 ## CI verification
 
 When the issue contains a **CI checks** section, follow those instructions exactly after opening your PR — before writing the status report. Common patterns:
@@ -200,4 +214,4 @@ When no PR is opened, end your invocation with:
 
 ### Saga wiki update
 
-If your dispatch context includes a `saga_wiki` reference, append a brief note to the saga page after completing your work. Route: bug fix → append an entry under the `## Bug Fixes` chapter; design or architecture decision → note under `## Design Doc`. Format: one paragraph — what was implemented, any non-obvious decision made, any finding relevant to the remaining saga scope. Do not repeat the PR description. If no decision or finding is worth noting, omit the update.
+If your dispatch context includes a `saga:` reference, append a brief note to the saga page after completing your work. Route: bug fix → append an entry under the `## Bug Fixes` chapter; design or architecture decision → note under `## Design Doc`. Format: one paragraph — what was implemented, any non-obvious decision made, any finding relevant to the remaining saga scope. Do not repeat the PR description. If no decision or finding is worth noting, omit the update.
