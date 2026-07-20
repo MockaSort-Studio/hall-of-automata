@@ -1,72 +1,108 @@
 # Hall of Automata
 
-> *A place on another plane. Constructed beings, stationed and waiting. You open the door — they come through.*
+> *A place on another plane...*
+
+Hall of Automata is a GitHub-native AI agent orchestration system. It runs entirely on GitHub Actions — no server, no billing account, no external runtime. Labels are the message bus. Actions are the execution layer. Environments hold your secrets.
+
+Specialists are dispatched by label, work inside a GitHub Actions runner, and close their own issues by opening reviewed PRs. You never leave GitHub.
 
 ---
 
-You have a GitHub repo. You open an issue. A named AI agent reads it, opens a PR, survives code review, and merges — without you writing a line.
+## How it works
 
-No server to run. No API key to manage. No external platform to pay for. GitHub is the entire backend.
+1. **Label an issue** with a specialist label (e.g., `hall:snowball`, `hall:pyrate`).
+2. `invoke.yml` fires on `issues.labeled`, reads the label, and selects a live invoker token from the pool.
+3. The specialist runs as Claude Code inside a GitHub Actions runner — bare (standard runner) or containerized (your dev environment via `.hall-contract.yaml`).
+4. The specialist opens a PR. If a reviewer requests changes, `REQUEST_CHANGES` re-invokes the same specialist on the PR.
+5. CI failure re-triggers the specialist automatically via `hall-ci-loop.yml` until the build is green or the loop cap is hit.
 
----
+### Invoker pool
 
-## What it is
-
-Hall of Automata is an AI agent orchestration layer built on GitHub Actions. The primitives GitHub already provides — Actions, Environments, Labels, Issues, PRs, the App API — are exactly sufficient for a full agent dispatch system. Workflows are the runtime. Environments are the secrets store. Labels are the message bus.
-
-**What the Hall adds:**
-- Named agents (automata) with distinct characters, domains, and rules of engagement
-- An orchestrator (Old Major) who reads incoming tasks, picks the right specialist, and dispatches
-- A lifecycle that handles authorization, queueing, review loops, and cleanup
-
-Drop a label on any issue in the org, and the right agent shows up to do the work.
+A pool of personal Claude OAuth tokens lives in GitHub Environment secrets (`hall-invoker-1`, `hall-invoker-2`, …). On each dispatch, a least-used invoker is selected and its weekly cap is tracked. Tokens are rotated by you — Hall tracks usage, not credentials.
 
 ---
 
-## Invoker model
+## Main features
 
-There are no shared API keys and no billing account. Contributors register their personal Claude Pro/Max subscription as an **invoker** by storing their OAuth token in a GitHub Environment. The token stays theirs — GitHub's own secrets mechanism injects it at runtime.
+| Feature | Description |
+|---|---|
+| Specialist roster | 10 domain specialists + Old Major session orchestrator |
+| Review loop | `REQUEST_CHANGES` on a specialist's PR re-invokes and addresses feedback |
+| CI re-dispatch | `hall-ci-loop.yml` re-triggers the specialist on CI failure until green |
+| Containerized dispatch | `.hall-contract.yaml` opts a repo into running specialists inside its own dev container — enables TDD |
+| Sync | `hall-sync.yml` propagates Hall updates from MockaSort-Studio to all installed org repos |
+| Cross-repo dispatch | Issues in any repo in your org can invoke Hall specialists |
 
-The pool is shared across the org. When an agent is dispatched, the Hall picks the least-used invoker whose weekly cap hasn't been hit. Caps reset every Monday. Tasks queue and retry automatically if all invokers are at capacity.
+---
+
+## Containerized dispatch and TDD
+
+By default, specialists run in a standard GitHub Actions runner. If your repo ships a `Dockerfile` that extends the Hall base image, you can opt into containerized dispatch:
+
+```yaml
+# .hall-contract.yaml  (place in repo root)
+image: ghcr.io/your-org/your-repo-dev:latest
+```
+
+When `invoke.yml` finds `.hall-contract.yaml` with an `image:` field, it switches to `dispatch-containerized`. The specialist runs inside your dev container — with your toolchain, test runner, and local build cache available. This enables true TDD: write a failing test in the issue, the specialist runs it inside your environment, and doesn't open a PR until the test passes.
+
+The Hall base image (`ghcr.io/mockasort-studio/hall-dispatch-base-image:latest`) ships Node.js 20, `gh`, `git`, `jq`, and `yq`. Extend it in your own `Dockerfile` to add your language runtime and tools.
 
 ---
 
 ## Agents
 
-| Agent | Role | Invoke with |
-|-------|------|-------------|
-| 🦉 **Old Major** | Hall Master — triage, route, onboard | `hall:dispatch-automaton` |
-| 🤘 **mergio** | CI/CD architect & pipeline enforcer | `hall:mergio` |
-
-Specialists are added through a structured onboarding process. Old Major reviews each proposal and provisions the persona.
+| Agent | Emoji | Domains | Roles |
+|---|---|---|---|
+| **Old Major** | | Session orchestrator — plans, dispatches, reconciles. Use [hall-of-automata-cli](https://github.com/MockaSort-Studio/hall-of-automata-cli) to work with Old Major interactively. | plan, dispatch, reconcile |
+| **Snowball** | 🐷 | Hall infrastructure, persona engineering | implement, review |
+| **Hamlet** | 🐗 | C++17, build systems, debugging | implement, debug, triage |
+| **Captain Pyrate** | 🦜 | Python | implement, debug |
+| **mergio** | 🤘 | CI/CD, GitOps, build systems, infrastructure, deployment | implement, debug, triage |
+| **Frontenzo** | 🎨 | Frontend architecture, UX/UI, web performance, accessibility | advise, review, research |
+| **AEEEEEIII** | 🐑 | AI perception, environment modeling, computer vision, autonomous systems | research, advise, synthesize |
+| **Tomashco** | 🛹 | API design, event-driven architecture, data security, backend triage | advise, research, triage |
+| **Indiana Docs** | 🤠 | Documentation | write, review, research |
+| **Frontenzio** | 🛠️ | React, TypeScript, Vite, Astro, CSS, frontend debugging | implement, debug |
+| **Panoramix** | 🧪 | Elixir, Phoenix, Ecto, BEAM, testing | implement, debug, test |
 
 ---
 
-## How to invoke
+## Invoking
 
-**Let Old Major decide:** Apply `hall:dispatch-automaton` to any issue. Old Major reads the task, picks the right specialist, and hands it off.
+**Dispatch a specialist:**
+Label any issue in your org with `hall:<slug>` (e.g., `hall:pyrate`, `hall:snowball`).
 
-**Direct dispatch:** Apply `hall:<agent>` to skip triage.
+**Request changes:**
+On a specialist's open PR, submit a review with `REQUEST_CHANGES`. The same specialist is re-invoked and addresses the feedback.
 
-**PR review:** Comment `@hall-of-automata` on a review. The bound agent picks up the feedback and iterates.
+**Cross-repo dispatch:**
+Issues in any repo in your org can use Hall labels — dispatch is not limited to the `hall-of-automata` repo itself.
 
-**Cross-repo:** Works on any repo in the org via the Hall relay. The agent works in the target repo; lifecycle is managed from this Hall.
+**Planning with Old Major:**
+Use [hall-of-automata-cli](https://github.com/MockaSort-Studio/hall-of-automata-cli) to open an interactive Old Major session in your terminal. Old Major reads your project board, drafts plans, writes OKRs, and dispatches work from a structured session — no manual labeling required.
 
 ---
 
 ## Repository layout
 
-| Path | Contents |
-|------|----------|
-| [`agents/`](agents/) | Base behavioral contract all automata share |
-| [`roster/`](roster/) | Persona files for each active automaton |
-| [`actions/`](actions/) | Composite actions (authorize, dispatch, memory, cleanup…) |
-| [`scripts/`](scripts/) | JS/bash helpers called by workflows |
-| [`.github/workflows/`](.github/workflows/) | Dispatch, onboarding, CI loop, cleanup workflows |
-| [`agents.yml`](agents.yml) | Agent registry |
-
-Full documentation at [mockasort-studio.github.io/hall-codex](https://mockasort-studio.github.io/hall-codex/).
+| Path | Purpose |
+|---|---|
+| `.github/workflows/invoke.yml` | Entry point — fires on `issues.labeled`; selects invoker; routes to bare or containerized dispatch |
+| `.github/workflows/dispatch-bare.yml` | Runs specialist in standard GHA runner |
+| `.github/workflows/dispatch-containerized.yml` | Runs specialist inside repo-supplied dev container |
+| `.github/workflows/hall-ci-loop.yml` | Re-triggers specialist on CI failure |
+| `.github/workflows/hall-sync.yml` | Syncs Hall updates from MockaSort-Studio to installed org repos |
+| `.github/workflows/base-image.yml` | Builds the Hall dispatch base Docker image (MockaSort-Studio only) |
+| `agents/agents.yml` | Full agent catalog with personas, models, labels, and routing |
+| `agents/automaton_base.md` | Mandatory base contract every specialist must follow |
+| `agents/old-major.md` | Old Major persona and dispatch methodology |
+| `docker/` | Dockerfile for the Hall dispatch base image |
+| `scripts/` | Runtime scripts used by dispatch workflows |
+| `actions/` | Composite actions (invoker selection, token rotation, etc.) |
 
 ---
 
-*MockaSort Studio · [github.com/MockaSort-Studio](https://github.com/MockaSort-Studio)*
+## Codex
+
+Full reference documentation lives in the [Hall Codex](https://github.com/MockaSort-Studio/hall-codex).
