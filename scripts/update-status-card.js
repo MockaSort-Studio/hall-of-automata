@@ -2,22 +2,18 @@
 // The card is identified by the <!-- hall-status --> HTML marker. If no card exists,
 // one is created. If one exists, it is edited in-place.
 // Env vars: REPO_OWNER, REPO_NAME, ISSUE_NUMBER, AGENT, STAGE,
-//           BRANCH, PR_NUMBER, EXTRA, DISPATCHED_AT, AGENTS_YML
+//           BRANCH, PR_NUMBER, EXTRA, DISPATCHED_AT, AGENTS_JSON
 
 const fs   = require('fs');
 const path = require('path');
 
 function resolveDisplayName(slug) {
   try {
-    const agentsYmlPath = process.env.AGENTS_YML
-      || path.join(__dirname, '../agents.yml');
-    const content = fs.readFileSync(agentsYmlPath, 'utf8');
-    // Split on top-level agent blocks (two-space-indented keys under `agents:`)
-    const blocks = content.split(/\n(?=  \w)/);
-    const block = blocks.find(b => b.startsWith(`  ${slug}:`));
-    if (block) {
-      const m = block.match(/display_name:\s*"([^"]+)"/);
-      if (m) return m[1];
+    const agentsJsonPath = process.env.AGENTS_JSON
+      || path.join(__dirname, '../agents.json');
+    const data = JSON.parse(fs.readFileSync(agentsJsonPath, 'utf8'));
+    if (data.agents && data.agents[slug]) {
+      return data.agents[slug].display_name || slug;
     }
   } catch (_) {
     // Fall back to slug if file is unreadable or parse fails
@@ -57,7 +53,7 @@ module.exports = async ({ github, context, core }) => {
 
   const body = [
     '<!-- hall-status -->',
-    `### Hall \u2014 ${displayName}`,
+    `### Hall — ${displayName}`,
     '',
     '| Quest Tracker| |',
     '|---|---|',

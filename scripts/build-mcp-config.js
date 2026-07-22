@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build-mcp-config.js — reads agents.yml for a given agent slug and:
+// build-mcp-config.js — reads agents.json for a given agent slug and:
 //   1. Writes /tmp/mcp.json with the mcpServers block
 //   2. Appends to GITHUB_OUTPUT: mcp-config-path, allowed-tools, setup-script
 //
@@ -12,23 +12,8 @@
 
 'use strict'
 
-const { execSync }    = require('child_process')
-const { writeFileSync, appendFileSync } = require('fs')
-
-function yq(expr) {
-  try {
-    const out = execSync(`yq '${expr}' .hall/agents.yml`, { encoding: 'utf8' }).trim()
-    return out === 'null' || out === '' ? null : out
-  } catch {
-    return null
-  }
-}
-
-function yqArray(expr) {
-  const raw = yq(expr)
-  if (!raw) return []
-  return raw.split('\n').map(s => s.trim()).filter(Boolean)
-}
+const { execSync }                       = require('child_process')
+const { readFileSync, writeFileSync, appendFileSync } = require('fs')
 
 function resolvePlaceholder(value) {
   if (typeof value !== 'string') return value
@@ -60,7 +45,17 @@ function main() {
     process.exit(1)
   }
 
-  const serverNames = yqArray(`.agents.${agentSlug}.mcp.servers | keys | .[]`)
+  const registry = JSON.parse(readFileSync('.hall/agents.json', 'utf8'))
+  const agentCfg = registry.agents[agentSlug]
+
+  if (!agentCfg || !agentCfg.mcp || !agentCfg.mcp.servers) {
+    console.log(`[mcp] no MCP servers configured for ${agentSlug}`)
+    appendToGithubOutput('mcp-config-path=\nallowed-tools=\nmcp-servers=\nsetup-script=')
+    return
+  }
+
+  const servers     = agentCfg.mcp.servers
+  const serverNames = Object.keys(servers)
 
   if (!serverNames.length) {
     console.log(`[mcp] no MCP servers configured for ${agentSlug}`)
@@ -73,16 +68,14 @@ function main() {
   let setupScript  = ''
 
   for (const name of serverNames) {
-    const base    = `.agents.${agentSlug}.mcp.servers.${name}`
-    const runtime = yq(`${base}.runtime`) || 'npx'
-    const pkg     = yq(`${base}.package`) || ''
+    const cfg     = servers[name]
+    const runtime = cfg.runtime || 'npx'
+    const pkg     = cfg.package || ''
 
     let command, args = [], env = {}
 
     // Resolve env block
-    const envKeys = yqArray(`${base}.env | keys | .[]`)
-    for (const k of envKeys) {
-      const v = yq(`${base}.env.["${k}"]`) || yq(`${base}.env.${k}`) || ''
+    for (const [k, v] of Object.entries(cfg.env || {})) {
       env[k] = resolvePlaceholder(v)
     }
 
@@ -94,15 +87,13 @@ function main() {
       command   = `${gp}/bin/${bin}`
       args      = []
 
-      const lspServer = yq(`${base}.lsp_server`)
-      if (lspServer) {
-        args.push('--workspace', '/github/workspace', '--lsp', lspServer)
-        const lspArgs = yqArray(`${base}.lsp_args[]`)
+      if (cfg.lsp_server) {
+        args.push('--workspace', '/github/workspace', '--lsp', cfg.lsp_server)
+        const lspArgs = cfg.lsp_args || []
         if (lspArgs.length) env['LSP_ARGS'] = lspArgs.map(resolvePlaceholder).join(' ')
       }
 
-      const setup = yq(`${base}.setup`)
-      if (setup && !setupScript) setupScript = setup
+      if (cfg.setup && !setupScript) setupScript = cfg.setup
     } else {
       console.warn(`[mcp] unknown runtime '${runtime}' for '${name}' — skipping`)
       continue
@@ -121,7 +112,7 @@ function main() {
   const serverList = Object.keys(mcpServers).join(',')
   console.log(`[mcp] wrote /tmp/mcp.json for ${agentSlug}:`, serverList)
 
-  const allowedTools = yqArray(`.agents.${agentSlug}.mcp.allowed_tools[]`).join(',')
+  const allowedTools = (agentCfg.mcp.allowed_tools || []).join(',')
 
   appendToGithubOutput(
     `mcp-config-path=/tmp/mcp.json\nallowed-tools=${allowedTools}\nmcp-servers=${serverList}\nsetup-script=${setupScript}`
