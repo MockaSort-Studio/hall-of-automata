@@ -92,7 +92,7 @@ runs:
             owner:        '${{ inputs.repo-owner }}',
             repo:         '${{ inputs.repo-name }}',
             issue_number: ${{ inputs.issue-number }},
-            body: `**Unknown agent:** \`${{ inputs.agent }}\` is not registered in the Hall roster.\n\nCheck [\`agents.yml\`](https://github.com/${{ github.repository }}/blob/main/agents.yml) for valid agent slugs.`
+            body: `**Unknown agent:** \`${{ inputs.agent }}\` is not registered in the Hall roster.\n\nCheck [\`agents.json\`](https://github.com/${{ github.repository }}/blob/main/agents.json) for valid agent slugs.`
           })
           core.setFailed('Unknown agent: ${{ inputs.agent }}')
 

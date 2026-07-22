@@ -41,7 +41,7 @@ on:
         default: ''
 
 jobs:
-  # ── Pool-select invoker (shared by both phases) ───────────────────────────────
+  # ── Pool-select invoker (shared by both phases) ─────────────────────────────────────────────────────
   select-invoker:
     name: Select invoker from pool
     runs-on: ubuntu-latest
@@ -75,7 +75,7 @@ jobs:
             const fn = require('./.hall/scripts/select-invoker.js')
             await fn({ github, context, core })
 
-  # ── Phase 1: analyze submission and provision if it passes ────────────────────
+  # ── Phase 1: analyze submission and provision if it passes ────────────────────────────────────────────
   analyze:
     name: "Old Major — analyze submission"
     needs: [select-invoker]
@@ -121,10 +121,10 @@ jobs:
 
             Reference files (read before evaluating):
             - agents/automaton_template.md — expected character sheet format
-            - agents.yml — existing slugs (check uniqueness)
+            - agents.json — existing slugs (check uniqueness)
 
             Evaluate the character sheet in the issue body against these criteria:
-            slug (lowercase-kebab, unique in agents.yml), display_name,
+            slug (lowercase-kebab, unique in agents.json), display_name,
             character (tone/voice/rules/signature — behavioural contract not biography),
             domains (named capability bundles, routing signals not tool lists),
             scope (right-for / not-right-for / ambiguity-gate all present),
@@ -134,7 +134,7 @@ jobs:
             needs fixing, apply label hall:awaiting-input, and stop — do not provision anything.
 
             If the sheet passes: create a new branch (hall/old-major/issue-<N>),
-            then in a single commit: (1) add the new agent entry to agents.yml and
+            then in a single commit: (1) add the new agent entry to agents.json and
             (2) write the persona character sheet to roster/<slug>.md. Push the branch,
             open a pull request targeting main with a concise title and body, post a
             provisioning summary comment on the issue linking to the PR, then close the issue.
@@ -162,7 +162,7 @@ jobs:
             const fn = require('./scripts/notification.js')
             await fn({ github, core })
 
-  # ── Phase 2: re-evaluate after invoker addresses feedback ─────────────────────
+  # ── Phase 2: re-evaluate after invoker addresses feedback ─────────────────────────────────────────
   re-analyze:
     name: "Old Major — re-evaluate after feedback"
     needs: [select-invoker]
@@ -207,12 +207,12 @@ jobs:
 
             Reference files (read before evaluating):
             - agents/automaton_template.md — expected character sheet format
-            - agents.yml — existing slugs (check uniqueness)
+            - agents.json — existing slugs (check uniqueness)
 
             Re-read the issue body (character sheet) and all comments.
             If all outstanding issues from your previous review are resolved:
             remove the hall:awaiting-input label, then proceed with full provisioning
-            (create branch hall/old-major/issue-<N>, commit agents.yml + roster/<slug>.md
+            (create branch hall/old-major/issue-<N>, commit agents.json + roster/<slug>.md
             in one commit, push, open a PR targeting main, post a summary comment on the
             issue linking to the PR, close the issue).
             If gaps remain, post updated feedback. Do not provision until the sheet is complete.
