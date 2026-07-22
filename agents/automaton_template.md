@@ -43,7 +43,7 @@
 
 ## MCP requirements
 
-**Rule: any agent with `roles: [implement]` in `agents.yml` must include the `github` MCP server.**
+**Rule: any agent with `roles: [implement]` in `agents.json` must include the `github` MCP server.**
 
 Implement-role agents open branches, push files, and create PRs. Without GitHub MCP tools they can plan and comment but cannot land work — a silent capability gap that only surfaces at first dispatch.
 
@@ -66,7 +66,7 @@ Agents with `roles: [review]` or `roles: [advise]` only do not require GitHub MC
 
 ## Setup script
 
-If this automaton needs an LSP server, its `agents.yml` entry points at a `scripts/setup-lsp-<lang>.sh` that provisions the runner before dispatch. The runner is GitHub Actions `ubuntu-latest` — write the script against these constraints:
+If this automaton needs an LSP server, its `agents.json` entry points at a `scripts/setup-lsp-<lang>.sh` that provisions the runner before dispatch. The runner is GitHub Actions `ubuntu-latest` — write the script against these constraints:
 
 - System packages (`apt-get install`) require `sudo apt-get install`. The runner user has no root by default.
 - User-writable without sudo: `npm install -g`, `go install`, `pip install --user`. Prefer these — they avoid the sudo dependency entirely.

@@ -2,7 +2,7 @@
 
 Active automata of the Hall of Automata. Each file is a persona character sheet — behavioral contract, domains, scope, and signature. These files are read at dispatch time and never committed to target repositories.
 
-Automata are onboarded via issue template. Old Major reviews submissions, provisions `agents.yml` entries and persona files, and opens the provisioning PR. See the [onboarding process](https://mockasort-studio.github.io/hall-codex/automaton-onboarding/).
+Automata are onboarded via issue template. Old Major reviews submissions, provisions `agents.json` entries and persona files, and opens the provisioning PR. See the [onboarding process](https://mockasort-studio.github.io/hall-codex/automaton-onboarding/).
 
 ---
 

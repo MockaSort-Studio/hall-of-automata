@@ -46,7 +46,7 @@ jobs:
         run: |
           # Wipe operator-managed directories so deletions propagate, then re-apply from upstream.
           # Never touches org-specific files:
-          #   agents.yml, routing.yml, roster/<custom>.md, CLAUDE.md
+          #   agents.json, routing.yml, roster/<custom>.md, CLAUDE.md
           git rm -r --ignore-unmatch \
             .github/ \
             actions/ \
@@ -64,22 +64,32 @@ jobs:
           # Sync roster files present in upstream without wiping org-custom roster entries.
           git ls-tree --name-only upstream/main roster/ | xargs git checkout upstream/main --
 
-      - name: Merge agents.yml
+      - name: Merge agents.json
         run: |
-          # Get upstream agents.yml (not staged — just read it)
-          git show upstream/main:agents.yml > /tmp/upstream-agents.yml
-          # Merge: upstream is authoritative for all existing agent entries.
-          # Org-specific agents (keys absent from upstream) are preserved.
-          if [ -f agents.yml ]; then
-            yq '. as $up |
-              .agents += (load("agents.yml").agents
-                | with_entries(select(.key as $k | ($up.agents | has($k)) | not)))
-            ' /tmp/upstream-agents.yml > /tmp/merged-agents.yml
-          else
-            cp /tmp/upstream-agents.yml /tmp/merged-agents.yml
+          git show upstream/main:agents.json > /tmp/upstream-agents.json
+
+          # Determine local org agents. Migrate from agents.yml on first sync if agents.json absent.
+          if [ -f agents.json ]; then
+            LOCAL_JSON=agents.json
+          elif [ -f agents.yml ]; then
+            yq -o=json agents.yml > /tmp/migrated-agents.json
+            LOCAL_JSON=/tmp/migrated-agents.json
           fi
-          mv /tmp/merged-agents.yml agents.yml
-          git add agents.yml
+
+          if [ -n "${LOCAL_JSON:-}" ]; then
+            # Merge: upstream is authoritative for all existing agent entries.
+            # Org-specific agents (keys absent from upstream) are preserved.
+            jq -s '
+              .[0] as $up | .[1] as $local |
+              $up | .agents += ($local.agents | with_entries(select(.key as $k | ($up.agents | has($k)) | not)))
+            ' /tmp/upstream-agents.json "$LOCAL_JSON" > /tmp/merged-agents.json
+          else
+            cp /tmp/upstream-agents.json /tmp/merged-agents.json
+          fi
+
+          mv /tmp/merged-agents.json agents.json
+          git rm --ignore-unmatch agents.yml 2>/dev/null || true
+          git add agents.json
 
       - name: Push if changed
         run: |

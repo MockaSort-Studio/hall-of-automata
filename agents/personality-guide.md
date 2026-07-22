@@ -68,16 +68,17 @@ All persona files live in this repo. Old Major is not a special case — his per
 
 ## The catalog entry — what Old Major reads
 
-Old Major reads the compact catalog from `agents.yml` when routing. Each entry contains:
+Old Major reads the compact catalog from `agents.json` when routing. Each entry contains:
 
-```yaml
-slug: hamlet
-display_name: "Hamlet 🐗"
-author: mksetaro
-catalog:
-  domains: [cpp, build-systems, debugging]
-  scope_summary: "Deep implementation in C++ and build systems. Not for UI, docs, or non-C++ work."
-max_turns: 40
+```json
+{
+  "display_name": "Hamlet 🐗",
+  "author": "mksetaro",
+  "catalog": {
+    "domains": ["cpp", "build-systems", "debugging"],
+    "scope_summary": "Deep implementation in C++ and build systems. Not for UI, docs, or non-C++ work."
+  }
+}
 ```
 
 The catalog entry and the full persona character sheet must stay in sync. When a persona is updated, the catalog entry's `scope_summary` must be reviewed.

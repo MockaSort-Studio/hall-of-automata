@@ -61,7 +61,7 @@ The Hall base image (`ghcr.io/mockasort-studio/hall-dispatch-base-image:latest`)
 | **mergio** | 🤘 | CI/CD, GitOps, build systems, infrastructure, deployment | implement, debug, triage |
 | **Frontenzo** | 🎨 | Frontend architecture, UX/UI, web performance, accessibility | advise, review, research |
 | **AEEEEEIII** | 🐑 | AI perception, environment modeling, computer vision, autonomous systems | research, advise, synthesize |
-| **Tomashco** | 🛹 | API design, event-driven architecture, data security, backend triage | advise, research, triage |
+| **Tomashco** | 😹 | API design, event-driven architecture, data security, backend triage | advise, research, triage |
 | **Indiana Docs** | 🤠 | Documentation | write, review, research |
 | **Frontenzio** | 🛠️ | React, TypeScript, Vite, Astro, CSS, frontend debugging | implement, debug |
 | **Panoramix** | 🧪 | Elixir, Phoenix, Ecto, BEAM, testing | implement, debug, test |
@@ -94,7 +94,7 @@ Use [hall-of-automata-cli](https://github.com/MockaSort-Studio/hall-of-automata-
 | `.github/workflows/hall-ci-loop.yml` | Re-triggers specialist on CI failure |
 | `.github/workflows/hall-sync.yml` | Syncs Hall updates from MockaSort-Studio to installed org repos |
 | `.github/workflows/base-image.yml` | Builds the Hall dispatch base Docker image (MockaSort-Studio only) |
-| `agents/agents.yml` | Full agent catalog with personas, models, labels, and routing |
+| `agents.json` | Full agent catalog with personas, models, labels, and routing |
 | `agents/automaton_base.md` | Mandatory base contract every specialist must follow |
 | `agents/old-major.md` | Old Major persona and dispatch methodology |
 | `docker/` | Dockerfile for the Hall dispatch base image |

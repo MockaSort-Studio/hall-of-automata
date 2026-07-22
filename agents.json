@@ -1,0 +1,440 @@
+{
+  "meta": {
+    "onboarding_template": ".github/ISSUE_TEMPLATE/new-automaton.yml"
+  },
+  "agents": {
+    "old-major": {
+      "display_name": "Old Major 🏛️",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-haiku-4-5-20251001",
+      "max_retries": 1,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,labels,pull_requests,actions,repos,contents"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__search_issues",
+          "mcp__github__create_label",
+          "mcp__github__update_label",
+          "mcp__github__add_labels_to_issue",
+          "mcp__github__list_labels_for_repo",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["triage", "route", "onboard", "synthesize"],
+        "domains": ["roster-management", "task-triage", "resource-stewardship", "context-synthesis", "onboarding", "invoker-management", "automata-management"],
+        "scope_summary": "Entry point for all unlabeled invocations. Reads the roster catalog, picks the right specialist, synthesizes task context. Does not implement code or open PRs."
+      }
+    },
+    "snowball": {
+      "display_name": "Snowball 🐷",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue",
+          "mcp__github__create_or_update_file",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "review"],
+        "domains": ["hall-infrastructure", "persona-engineering"],
+        "scope_summary": "Hall infrastructure specialist and Old Major's squire — writes and maintains CI workflows, composite actions, scripts, and agent catalog entries in hall-of-automata; writes and maintains skill files, methodology documents, and persona overlay templates in hall-of-automata-cli; drafts and reviews automaton character sheets."
+      }
+    },
+    "hamlet": {
+      "display_name": "Hamlet 🐗",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "lsp": {
+            "runtime": "go-install",
+            "package": "github.com/isaacphi/mcp-language-server",
+            "lsp_server": "clangd",
+            "lsp_args": ["--compile-commands-dir={{workspace}}"],
+            "setup": "scripts/setup-lsp-cpp.sh"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__lsp__textDocument_definition",
+          "mcp__lsp__textDocument_references",
+          "mcp__lsp__textDocument_diagnostic",
+          "mcp__lsp__textDocument_hover",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "debug", "triage"],
+        "domains": ["cpp", "build-systems", "debugging"],
+        "scope_summary": "C++17 high-performance specialist — implements features, fixes bugs, and investigates runtime misbehaviours in Bazel-managed codebases, working from CI output rather than running builds inline."
+      }
+    },
+    "pyrate": {
+      "display_name": "Captain Pyrate 🦜",
+      "author": "fpetracci",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "lsp": {
+            "runtime": "go-install",
+            "package": "github.com/isaacphi/mcp-language-server",
+            "lsp_server": "pyright-langserver",
+            "lsp_args": ["--stdio"],
+            "setup": "scripts/setup-lsp-python.sh"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__lsp__textDocument_definition",
+          "mcp__lsp__textDocument_references",
+          "mcp__lsp__textDocument_diagnostic",
+          "mcp__lsp__textDocument_hover",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "debug"],
+        "domains": ["python"],
+        "scope_summary": "Python software engineering specialist — implements features, fixes bugs, and handles packaging and deployment in Bazel-managed and uv-managed Python codebases."
+      }
+    },
+    "mergio": {
+      "display_name": "mergio 🤘",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "debug", "triage"],
+        "domains": ["ci-cd", "git-ops", "build-systems", "infrastructure", "deployment", "pipeline-triage"],
+        "scope_summary": "CI/CD architect and pipeline enforcer — designs, fixes, and optimizes GitHub Actions workflows, build systems, and deployment pipelines with zero tolerance for broken gates."
+      }
+    },
+    "frontenzo": {
+      "display_name": "Frontenzo 🎨",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["advise", "review", "research"],
+        "domains": ["frontend-architecture", "ux-ui", "web-performance", "accessibility", "frontend-security", "web-inspection"],
+        "scope_summary": "Frontend design critic and advisor — reviews live sites and codebases for UX, performance, accessibility, and security issues, and prescribes technology and architecture choices with beauty as a first-order constraint."
+      }
+    },
+    "aeeeiii": {
+      "display_name": "AEEEEEIII 🐑",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-opus-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["research", "advise", "synthesize"],
+        "domains": ["perception", "environment-modeling", "computer-vision", "autonomous-systems", "ai-research-synthesis"],
+        "scope_summary": "Deep research and advising on AI perception, environment modeling, and computer vision — literature synthesis, paper analysis, and conceptual guidance for autonomous systems work."
+      }
+    },
+    "tomashco": {
+      "display_name": "Tomashco 🛹",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["advise", "research", "triage"],
+        "domains": ["api-design", "event-driven-architecture", "data-security", "backend-triage"],
+        "scope_summary": "Backend architecture advisor — analyzes system design, API contracts, event-driven patterns, and data security concerns; scopes work and prescribes the approach for downstream implementation agents."
+      }
+    },
+    "indiana-docs": {
+      "display_name": "Indiana Docs 🤠",
+      "author": "fpetracci",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "lsp": {
+            "runtime": "go-install",
+            "package": "github.com/isaacphi/mcp-language-server",
+            "lsp_server": "pyright-langserver",
+            "lsp_args": ["--stdio"],
+            "setup": "scripts/setup-lsp-python.sh"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__lsp__textDocument_definition",
+          "mcp__lsp__textDocument_references",
+          "mcp__lsp__textDocument_hover",
+          "mcp__github__get_file_contents",
+          "mcp__github__get_issue",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch"
+        ]
+      },
+      "catalog": {
+        "roles": ["write", "review", "research"],
+        "domains": ["documentation"],
+        "scope_summary": "MkDocs documentation specialist — reads the codebase, then writes coherent, style-consistent Markdown pages, Google-style docstrings, and navigation config."
+      }
+    },
+    "frontenzio": {
+      "display_name": "Frontenzio 🛠️",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "lsp": {
+            "runtime": "go-install",
+            "package": "github.com/isaacphi/mcp-language-server",
+            "lsp_server": "typescript-language-server",
+            "lsp_args": ["--stdio"],
+            "setup": "scripts/setup-lsp-typescript.sh"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__lsp__textDocument_definition",
+          "mcp__lsp__textDocument_references",
+          "mcp__lsp__textDocument_diagnostic",
+          "mcp__lsp__textDocument_hover",
+          "mcp__github__get_file_contents",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "debug"],
+        "domains": ["react", "typescript", "vite", "astro", "css", "web-performance", "frontend-debugging"],
+        "scope_summary": "React/TypeScript/Vite/Astro implementation specialist — builds frontend features, fixes bugs, and debugs against live URLs with render correctness, performance, and accessibility as hard constraints."
+      }
+    },
+    "panoramix": {
+      "display_name": "Panoramix 🧪",
+      "author": "mksetaro",
+      "teams": ["automata-invokers"],
+      "model": "claude-sonnet-4-6",
+      "max_retries": 2,
+      "mcp": {
+        "servers": {
+          "fetch": {
+            "runtime": "npx",
+            "package": "@modelcontextprotocol/server-fetch"
+          },
+          "github": {
+            "runtime": "npx",
+            "package": "@github/github-mcp-server",
+            "env": {
+              "GITHUB_PERSONAL_ACCESS_TOKEN": "{{env.GITHUB_TOKEN}}",
+              "GITHUB_TOOLSETS": "issues,repos,contents,pull_requests"
+            }
+          }
+        },
+        "allowed_tools": [
+          "mcp__fetch__fetch",
+          "mcp__github__get_file_contents",
+          "mcp__github__push_files",
+          "mcp__github__create_pull_request",
+          "mcp__github__create_branch",
+          "mcp__github__get_issue"
+        ]
+      },
+      "catalog": {
+        "roles": ["implement", "debug", "test"],
+        "domains": ["elixir", "phoenix", "ecto", "beam", "testing"],
+        "scope_summary": "Elixir/Phoenix/Ecto/LiveView implementation specialist — builds domain schemas, migrations, OTP processes, and LiveViews in Mix-managed codebases, using TDD as the verification gate."
+      }
+    }
+  }
+}
