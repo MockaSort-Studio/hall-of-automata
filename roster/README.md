@@ -9,13 +9,13 @@ Automata are onboarded via issue template. Old Major reviews submissions, provis
 ## Active automata
 
 | File | Name | Role | Invoker |
-|------|------|------|-------|
-| [old-major.md](old-major.md) | Old Major 🏗️ | Hall Master — triage, routing, onboarding | @mksetaro |
+|------|------|------|---------|
+| [old-major.md](old-major.md) | Old Major 🏛️ | Hall Master — triage, routing, onboarding | @mksetaro |
 | [hamlet.md](hamlet.md) | Hamlet 🐗 | C++17 & Bazel specialist | @mksetaro |
 | [mergio.md](mergio.md) | mergio 🤘 | CI/CD architect & pipeline enforcer | @mksetaro |
 | [pyrate.md](pyrate.md) | Captain Pyrate 🦜 | Python specialist | @fpetracci |
 | [aeeeiii.md](aeeeiii.md) | AEEEEEIII 🐑 | Deep research — AI perception & autonomous systems | @mksetaro |
-| [tomashco.md](tomashco.md) | Tomashco 😹 | Backend architecture advisor | @mksetaro |
+| [tomashco.md](tomashco.md) | Tomashco 🛹 | Backend architecture advisor | @mksetaro |
 | [frontenzo.md](tomashco.md) | Frontenzo 🎨 | frontend design critic & advisor | @mksetaro |
 
 ---
