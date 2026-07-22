@@ -4,7 +4,7 @@
   },
   "agents": {
     "old-major": {
-      "display_name": "Old Major 🏗️",
+      "display_name": "Old Major 🏛️",
       "author": "mksetaro",
       "teams": ["automata-invokers"],
       "model": "claude-haiku-4-5-20251001",
@@ -275,7 +275,7 @@
       }
     },
     "tomashco": {
-      "display_name": "Tomashco \ud83d\udeน9",
+      "display_name": "Tomashco 🛹",
       "author": "mksetaro",
       "teams": ["automata-invokers"],
       "model": "claude-sonnet-4-6",
