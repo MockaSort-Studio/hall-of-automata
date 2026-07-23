@@ -212,6 +212,18 @@ When no PR is opened, end your invocation with:
 **Needs:** The workflow file that contains the failing job, or the correct path.
 ```
 
-### Saga wiki update
+### Saga updates
 
-If your dispatch context includes a `saga:` reference, append a brief note to the saga page after completing your work. Route: bug fix → append an entry under the `## Bug Fixes` chapter; design or architecture decision → note under `## Design Doc`. Format: one paragraph — what was implemented, any non-obvious decision made, any finding relevant to the remaining saga scope. Do not repeat the PR description. If no decision or finding is worth noting, omit the update.
+**Rule 1 — Issue resolution stays on the issue.**
+All incident narrative — what was broken, root cause, fix applied, risk or verification details, diagnostic findings — must be posted as a comment on the source issue. Never written to the wiki. Never a new wiki page.
+
+**Rule 2 — Saga-relevant design findings go under `### Appendix`.**
+If your dispatch context includes a `saga:` reference and your work produced an implementation detail genuinely relevant to the *remaining scope of the Saga*, record it on the wiki. It goes under the `### Appendix` subsection of the relevant Saga's `## Design Doc` chapter — never a new section, never a new page.
+
+**Mechanics:**
+1. Fetch the existing `Saga-<N>-...md` wiki page content.
+2. Append your note under `### Appendix`.
+3. Commit the updated content back to the same page.
+Never create a new wiki page under any circumstance.
+
+If no finding is genuinely relevant to the remaining Saga scope, omit the update entirely.
