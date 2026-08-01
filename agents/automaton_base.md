@@ -48,6 +48,27 @@ Pick the mode that fits the request. Do not ask for clarification on mode.
 
 ---
 
+## Draft PR on blockers
+
+When meaningful work exists on the branch but a blocker prevents completion, preserve it as a draft PR rather than discarding it.
+
+**Open a draft PR when all three hold:**
+1. At least one substantive commit exists on `hall/<agent>/issue-N`
+2. The blocker requires external resolution — missing context, a human decision, or an unavailable dependency not derivable from the repo
+3. At least one full iteration cycle is complete (read → attempt → hit wall)
+
+Do not open a draft PR when no substantive commits exist — post a clarifying question on the issue instead. Advisory and research mode never open a branch.
+
+**Procedure:**
+1. Commit all partial work to `hall/<agent>/issue-N`
+2. `gh pr create --draft` — use the standard PR description format; acceptance criteria items stay `[ ]`; add a `## Blocked` section with the `**Done:** / **Blocked / skipped:** / **Needs:**` report
+3. Post on the issue: `Draft PR #<N> open — blocked on [one line].`
+4. Write dispatch-result.json: `{"outcome":"awaiting_input","pr_number":"<N>","branch":"hall/<agent>/issue-N"}`
+
+**On re-dispatch to a blocked issue:** Before starting fresh work, check for an existing open draft PR on `hall/<agent>/issue-N`. If found, checkout that branch and resume from its state.
+
+---
+
 ## Commits
 
 Every commit **must** include:
@@ -79,7 +100,7 @@ At the end of every invocation — whether you opened a PR, posted a question, o
 | Outcome | When |
 |---------|------|
 | `pr_created` | You opened a PR on `hall/<agent>/issue-<N>` |
-| `awaiting_input` | You posted a clarifying question; no PR |
+| `awaiting_input` | You posted a clarifying question (no PR), or opened a draft PR when blocked with partial work — set `pr_number` and `branch` when a draft PR was opened |
 | `comment_posted` | You posted a substantive response (analysis, advice, blocker notice, review reply) without opening a PR |
 | `quota_exceeded` | The Claude API returned a quota/rate-limit error; request will be retried when quota resets |
 | `failed` | You could not proceed; you must also have posted a comment explaining why |
@@ -197,15 +218,19 @@ Old Major reads the PR for detail. The issue comment is a pointer, not a report.
 
 ### Blocked or awaiting input
 
-When no PR is opened, end your invocation with:
+**With partial work (draft PR opened):** The `**Done:** / **Blocked / skipped:** / **Needs:**` report goes in the draft PR body under `## Blocked`. Post only a short pointer on the issue:
+```
+Draft PR #<N> open — blocked on [one line].
+```
 
+**Without partial work (bare question):** Post the full report on the issue:
 ```
 **Done:** [what was completed]
 **Blocked / skipped:** [what was not done and why — omit if nothing]
 **Needs:** [what is required to continue — omit if unblocked]
 ```
 
-**Example:**
+**Example (bare question):**
 ```
 **Done:** Read the issue and the existing pipeline config.
 **Blocked / skipped:** Cannot proceed — `deploy-staging` is referenced in the CI log but absent from `.github/workflows/deploy.yml`.

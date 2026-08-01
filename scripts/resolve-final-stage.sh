@@ -13,6 +13,12 @@ if [ "$TRIGGER" = "pr_review" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$DETECT_PR"    >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
+elif [ "${AGENT_OUTCOME:-}" = "awaiting_input" ]; then
+  # Blocked with partial work: draft PR may exist. Surface pr-number and branch so the
+  # status card can link the draft PR, but keep stage=awaiting-input (not pr-opened).
+  echo "stage=awaiting-input"    >> "$GITHUB_OUTPUT"
+  echo "pr-number=${FIND_PR:-}"  >> "$GITHUB_OUTPUT"
+  echo "branch=${BRANCH:-}"      >> "$GITHUB_OUTPUT"
 elif [ -n "$FIND_PR" ]; then
   echo "stage=pr-opened"         >> "$GITHUB_OUTPUT"
   echo "pr-number=$FIND_PR"      >> "$GITHUB_OUTPUT"

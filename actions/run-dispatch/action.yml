@@ -252,7 +252,7 @@ runs:
           await fn({ github, core })
 
     - name: Apply agent label to PR
-      if: always() && steps.auth.outcome == 'success' && inputs.trigger-event != 'pr_review' && steps.find-pr.outputs.outcome == 'pr_created'
+      if: always() && steps.auth.outcome == 'success' && inputs.trigger-event != 'pr_review' && steps.find-pr.outputs.pr-number != '' && (steps.find-pr.outputs.outcome == 'pr_created' || steps.find-pr.outputs.outcome == 'awaiting_input')
       env:
         ACTION:     apply-agent
         PR_NUMBER:  ${{ steps.find-pr.outputs.pr-number }}
