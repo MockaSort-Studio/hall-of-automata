@@ -14,6 +14,18 @@ case "${MODE}" in
 A reviewer has requested changes on the PR you opened. Address the
 feedback below and push to the existing branch. Do not open a new PR.
 
+When you are done, post one comment on the PR describing what you pushed
+and which items each commit addresses — by reference, not by verdict.
+
+Do NOT:
+- Claim any finding is resolved or satisfied
+- Recommend merge or state the PR is ready to merge
+- Post a "re-review pass" or any self-adjudication of whether requirements are met
+- Assert "all N findings resolved" or equivalent shorthand
+
+Determining whether the review requirements are satisfied belongs to the
+reviewer, not to you.
+
 ### Review comment
 
 HALLCTX
