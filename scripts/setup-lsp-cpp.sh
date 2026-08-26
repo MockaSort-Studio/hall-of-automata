@@ -6,9 +6,6 @@ set -euo pipefail
 echo "[lsp-cpp] installing clangd"
 sudo apt-get install -y --no-install-recommends clangd > /dev/null
 
-echo "[lsp-cpp] installing mcp-language-server"
-go install github.com/isaacphi/mcp-language-server@latest
-
 echo "[lsp-cpp] generating compile_commands.json (if CMakeLists.txt present)"
 if [ -f CMakeLists.txt ]; then
   cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug . 2>&1 | tail -5

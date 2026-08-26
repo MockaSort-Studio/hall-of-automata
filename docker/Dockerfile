@@ -2,7 +2,7 @@
 #
 # Provides the infrastructure layer common to all agent environments:
 # Node.js 20 (for MCP server tooling), gh CLI, git, jq, yq, unzip,
-# and runner user at UID 1001.
+# mcp-language-server, and runner user at UID 1001.
 #
 # Target repos extend FROM this image and add repo-specific runtimes
 # (Elixir, PostgreSQL, etc.) in their own docker/Dockerfile.
@@ -11,6 +11,13 @@
 # --user 1001 in the container options so GHA does not override the
 # effective user to root. CC 2.1+ refuses --dangerously-skip-permissions
 # as root; running as non-root is the fix.
+
+# ── Build stage: compile mcp-language-server ───────────────────────────────────
+# No pre-built binaries exist in upstream releases; build from source using the
+# Go version required by go.mod (1.24). The binary is copied to the final image,
+# keeping the runtime lean — same principle as yq's curl pattern.
+FROM golang:1.24 AS build-mcp-lsp
+RUN go install github.com/isaacphi/mcp-language-server@latest
 
 FROM ubuntu:24.04
 
@@ -40,6 +47,9 @@ RUN apt-get update \
 RUN curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
        -o /usr/local/bin/yq \
     && chmod +x /usr/local/bin/yq
+
+# mcp-language-server compiled in the build stage above; copy the static binary
+COPY --from=build-mcp-lsp /go/bin/mcp-language-server /usr/local/bin/mcp-language-server
 
 # ── Runner user ────────────────────────────────────────────────────────────────
 # UID 1001 matches the github-hosted runner's UID so workspace bind-mounts
