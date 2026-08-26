@@ -50,9 +50,12 @@ RUN useradd -m -u 1001 -s /bin/bash runner
 # apt-installed Node.js owns /usr/lib/node_modules as root; runner (UID 1001)
 # cannot install there. Point NPM_CONFIG_PREFIX at a world-writable location
 # so npm install -g works without sudo — same pattern as MIX_HOME for Elixir.
+# Do not pre-create bin/ here: mkdir as root would leave it at 755, blocking
+# runner from writing symlinks into it. Let npm create bin/ on first install
+# (runs as runner) so it inherits the world-writable parent correctly.
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH="/usr/local/share/npm-global/bin:${PATH}"
-RUN mkdir -p /usr/local/share/npm-global/bin \
+RUN mkdir -p /usr/local/share/npm-global \
     && chmod 777 /usr/local/share/npm-global
 
 # GHA sets HOME=/github/home; use --system so safe.directory is honoured
