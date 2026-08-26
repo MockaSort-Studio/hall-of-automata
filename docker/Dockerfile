@@ -46,6 +46,15 @@ RUN curl -fsSL https://github.com/mikefarah/yq/releases/latest/download/yq_linux
 # are accessible and CC (which refuses to run as root since 2.1.186) works.
 RUN useradd -m -u 1001 -s /bin/bash runner
 
+# ── npm global prefix ──────────────────────────────────────────────────────────
+# apt-installed Node.js owns /usr/lib/node_modules as root; runner (UID 1001)
+# cannot install there. Point NPM_CONFIG_PREFIX at a world-writable location
+# so npm install -g works without sudo — same pattern as MIX_HOME for Elixir.
+ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH="/usr/local/share/npm-global/bin:${PATH}"
+RUN mkdir -p /usr/local/share/npm-global/bin \
+    && chmod 777 /usr/local/share/npm-global
+
 # GHA sets HOME=/github/home; use --system so safe.directory is honoured
 # regardless of what HOME the runner injects at container start.
 RUN git config --system --add safe.directory '*'
