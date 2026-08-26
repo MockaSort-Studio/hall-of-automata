@@ -52,8 +52,11 @@ elif [ "${MODE:-doing}" = "advising" ] || [ "${MODE:-doing}" = "researching" ]; 
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 else
-  # No PR, no declared outcome — agent posted a clarifying question.
-  echo "stage=awaiting-input"    >> "$GITHUB_OUTPUT"
+  # No PR, no declared outcome — dispatch-result.json was never written.
+  # Automata are required to write it on every exit path; absence means
+  # a pre-agent step (e.g. LSP setup) crashed before the agent ran, or
+  # the agent crashed without writing it. Either way: failed, not a question.
+  echo "stage=failed"            >> "$GITHUB_OUTPUT"
   echo "pr-number="              >> "$GITHUB_OUTPUT"
   echo "branch="                 >> "$GITHUB_OUTPUT"
 fi
