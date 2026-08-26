@@ -6,7 +6,4 @@ set -euo pipefail
 echo "[lsp-python] installing pyright"
 npm install -g pyright > /dev/null
 
-echo "[lsp-python] installing mcp-language-server"
-go install github.com/isaacphi/mcp-language-server@latest
-
 echo "[lsp-python] LSP setup complete"
