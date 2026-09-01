@@ -39,11 +39,13 @@ jobs:
 
       - name: Fetch operator repo
         run: |
+          set -euo pipefail
           git remote add upstream https://github.com/MockaSort-Studio/hall-of-automata.git
           git fetch upstream main --no-tags --depth=1
 
       - name: Apply operator-managed paths
         run: |
+          set -euo pipefail
           # Wipe operator-managed directories so deletions propagate, then re-apply from upstream.
           # Never touches org-specific files:
           #   agents.json, routing.yml, roster/<custom>.md, CLAUDE.md
@@ -62,13 +64,47 @@ jobs:
             .gitignore \
             main.py
           # Sync roster files present in upstream without wiping org-custom roster entries.
-          git ls-tree --name-only upstream/main roster/ | xargs git checkout upstream/main --
+          git ls-tree --name-only upstream/main roster/ | xargs -r git checkout upstream/main --
 
-      - name: Merge agents.json
+          # Strip anything upstream marks as operator-only (e.g. the image-push workflow,
+          # which is hardcoded to the operator's own GHCR namespace and secrets). The
+          # exclude list lives only at the operator repo root — never propagated itself.
+          git show upstream/main:.hall-sync-exclude 2>/dev/null > /tmp/hall-sync-exclude.txt || : > /tmp/hall-sync-exclude.txt
+          while IFS= read -r path; do
+            path="${path%%#*}"
+            path="$(echo -n "$path" | xargs || true)"
+            [ -z "$path" ] && continue
+            git rm -rf --ignore-unmatch -- "$path"
+          done < /tmp/hall-sync-exclude.txt
+
+      - name: Merge agent registry
         run: |
-          git show upstream/main:agents.json > /tmp/upstream-agents.json
+          set -euo pipefail
+
+          # Discover upstream's current registry filename rather than hardcoding it.
+          # A hardcoded name is exactly what broke federated sync silently when
+          # agents.yml -> agents.json happened — existence-checking survives the next rename.
+          UPSTREAM_FILE=""
+          for candidate in agents.json agents.yml; do
+            if git cat-file -e "upstream/main:$candidate" 2>/dev/null; then
+              UPSTREAM_FILE="$candidate"
+              break
+            fi
+          done
+          if [ -z "$UPSTREAM_FILE" ]; then
+            echo "::error::No agents.json or agents.yml found in upstream/main — registry file may have been renamed again. Add the new candidate name to this step." >&2
+            exit 1
+          fi
+
+          git show "upstream/main:$UPSTREAM_FILE" > "/tmp/upstream-registry.raw"
+          if [ "$UPSTREAM_FILE" = "agents.yml" ]; then
+            yq -o=json /tmp/upstream-registry.raw > /tmp/upstream-agents.json
+          else
+            cp /tmp/upstream-registry.raw /tmp/upstream-agents.json
+          fi
 
           # Determine local org agents. Migrate from agents.yml on first sync if agents.json absent.
+          LOCAL_JSON=""
           if [ -f agents.json ]; then
             LOCAL_JSON=agents.json
           elif [ -f agents.yml ]; then
@@ -76,7 +112,7 @@ jobs:
             LOCAL_JSON=/tmp/migrated-agents.json
           fi
 
-          if [ -n "${LOCAL_JSON:-}" ]; then
+          if [ -n "$LOCAL_JSON" ]; then
             # Merge: upstream is authoritative for all existing agent entries.
             # Org-specific agents (keys absent from upstream) are preserved.
             jq -s '
@@ -93,6 +129,7 @@ jobs:
 
       - name: Push if changed
         run: |
+          set -euo pipefail
           if git diff --cached --quiet; then
             echo "Already up to date with ${{ github.event.client_payload.version || inputs.version }}"
             exit 0
