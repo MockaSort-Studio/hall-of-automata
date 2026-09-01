@@ -1,0 +1,8 @@
+# Paths excluded from federation sync — never pushed to federated org repos,
+# even though they live under an otherwise-synced operator-managed directory.
+# One path per line, relative to repo root. Comments start with #.
+
+# Builds and pushes the Hall dispatch base image to ghcr.io/mockasort-studio/* —
+# hardcoded to the operator's own GHCR namespace and GITHUB_TOKEN. Every federated
+# org is meant to consume that same published image, not build/push its own.
+.github/workflows/base-image.yml
