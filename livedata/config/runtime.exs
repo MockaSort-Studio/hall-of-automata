@@ -29,63 +29,72 @@ if config_env() != :test do
 end
 
 if config_env() == :prod do
-  # Which database this instance talks to, in precedence order:
-  #
-  #   DATABASE_URL_PR   — a Neon branch, written by .github/workflows/preview.yml
-  #                       while a pull request owns the shared Render service.
-  #   DATABASE_URL_MAIN — production. Never written by CI; entered by hand.
-  #   DATABASE_URL      — honoured last so a deployment predating the preview
-  #                       workflow keeps running unchanged.
-  #
-  # Render has no indirection like Koyeb's `DATABASE_URL=@SECRET`, so the choice
-  # has to happen here. The point is that CI only ever writes the PR variable:
-  # production's connection string cannot be clobbered by a preview.
-  #
-  # Blank counts as unset. Deleting a Render env var removes it, but a var left
-  # as "" would otherwise win here — `System.get_env/1` returns "", which is
-  # truthy in Elixir — and silently point production at nothing.
-  database_url =
-    Enum.find_value(~w(DATABASE_URL_PR DATABASE_URL_MAIN DATABASE_URL), fn var ->
-      case System.get_env(var) do
-        nil -> nil
-        "" -> nil
-        value -> value
-      end
-    end) ||
-      raise """
-      no database connection string is set.
-      Set DATABASE_URL_MAIN (or DATABASE_URL), for example:
-      ecto://USER:PASS@HOST/DATABASE
-      """
-
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  # DATABASE_SSL controls Postgrex TLS. Default "true" (verify-peer against OS
-  # trust store) is correct for Neon and other managed providers. Set to "false"
-  # for a self-hosted Postgres container without TLS configured (e.g. the Docker
-  # Compose deployment in deploy/compose.yml). Never set to "false" in production
-  # against a remote database — see docs/contributing/deployment.md.
-  database_ssl = System.get_env("DATABASE_SSL", "true") != "false"
+  db_repo_config =
+    case System.get_env("DB_SECRET_ARN") do
+      arn when is_binary(arn) and arn != "" ->
+        # RDS deployment: credentials live in Secrets Manager, never in env files.
+        # DB_SECRET_ARN holds only the ARN (a resource identifier, not a credential).
+        # The EC2 instance profile grants secretsmanager:GetSecretValue on this ARN.
+        Application.ensure_all_started(:hackney)
 
-  config :livedata, Livedata.Repo,
-    ssl: database_ssl,
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    # For machines with several cores, consider starting multiple pools of `pool_size`
-    # pool_count: 4,
-    socket_options: maybe_ipv6
+        db_config = Livedata.SecretsManager.fetch_db_config!(arn)
 
-  # The secret key base is used to sign/encrypt cookies and other secrets.
-  # A default value is used in config/dev.exs and config/test.exs but you
-  # want to use a different value for prod and you most likely don't want
-  # to check this value into version control, so we use an environment
-  # variable instead.
+        Keyword.merge(db_config,
+          ssl: true,
+          pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+          socket_options: maybe_ipv6
+        )
+
+      _ ->
+        # Fallback: DATABASE_URL_* for non-RDS deployments (Neon / local Docker).
+        # Blank counts as unset — `System.get_env/1` returns "" for empty vars.
+        database_url =
+          Enum.find_value(~w(DATABASE_URL_PR DATABASE_URL_MAIN DATABASE_URL), fn var ->
+            case System.get_env(var) do
+              nil -> nil
+              "" -> nil
+              value -> value
+            end
+          end) ||
+            raise """
+            Neither DB_SECRET_ARN nor a DATABASE_URL_* variable is set.
+            For RDS: set DB_SECRET_ARN to the Secrets Manager ARN from `terraform output db_secret_arn`.
+            For Neon/local: set DATABASE_URL_MAIN to the connection string.
+            """
+
+        # DATABASE_SSL: default "true" (verify-peer). Set to "false" only for a
+        # self-hosted Postgres without TLS (e.g. deploy/compose.yml). Never
+        # "false" in production against a remote database.
+        database_ssl = System.get_env("DATABASE_SSL", "true") != "false"
+
+        [
+          ssl: database_ssl,
+          url: database_url,
+          pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+          socket_options: maybe_ipv6
+        ]
+    end
+
+  config :livedata, Livedata.Repo, db_repo_config
+
+  # SECRET_KEY_BASE: fetched from Secrets Manager on RDS deployments.
+  # SECRET_KEY_BASE_SECRET_ARN holds the ARN (not the key itself).
   secret_key_base =
-    System.get_env("SECRET_KEY_BASE") ||
-      raise """
-      environment variable SECRET_KEY_BASE is missing.
-      You can generate one by calling: mix phx.gen.secret
-      """
+    case System.get_env("SECRET_KEY_BASE_SECRET_ARN") do
+      arn when is_binary(arn) and arn != "" ->
+        Application.ensure_all_started(:hackney)
+        Livedata.SecretsManager.fetch_string!(arn)
+
+      _ ->
+        System.get_env("SECRET_KEY_BASE") ||
+          raise """
+          Neither SECRET_KEY_BASE_SECRET_ARN nor SECRET_KEY_BASE is set.
+          For RDS: set SECRET_KEY_BASE_SECRET_ARN to the ARN from `terraform output secret_key_base_secret_arn`.
+          For Neon/local: set SECRET_KEY_BASE (generate with: mix phx.gen.secret).
+          """
+    end
 
   host = System.get_env("PHX_HOST") || "example.com"
 
