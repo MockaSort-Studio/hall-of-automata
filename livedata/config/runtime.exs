@@ -37,8 +37,6 @@ if config_env() == :prod do
         # RDS deployment: credentials live in Secrets Manager, never in env files.
         # DB_SECRET_ARN holds only the ARN (a resource identifier, not a credential).
         # The EC2 instance profile grants secretsmanager:GetSecretValue on this ARN.
-        Application.ensure_all_started(:hackney)
-
         db_config = Livedata.SecretsManager.fetch_db_config!(arn)
 
         Keyword.merge(db_config,
@@ -84,7 +82,6 @@ if config_env() == :prod do
   secret_key_base =
     case System.get_env("SECRET_KEY_BASE_SECRET_ARN") do
       arn when is_binary(arn) and arn != "" ->
-        Application.ensure_all_started(:hackney)
         Livedata.SecretsManager.fetch_string!(arn)
 
       _ ->

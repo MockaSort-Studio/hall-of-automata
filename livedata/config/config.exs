@@ -59,6 +59,10 @@ config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
   metadata: [:request_id]
 
+# Use Req as the HTTP client for ex_aws (req is already a project dep; no manual
+# ensure_all_started needed — Phoenix starts it as part of the normal boot).
+config :ex_aws, :http_client, ExAws.Request.ReqHttpClient
+
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
