@@ -2,8 +2,6 @@ defmodule Livedata.Auth do
   @moduledoc """
   Session-level auth API: store, retrieve, and validate a Cognito-issued
   user identity in the Plug cookie session.
-
-  @req: KR 8.3
   """
 
   import Plug.Conn

@@ -1,8 +1,6 @@
 defmodule LivedataWeb.AuthController do
   @moduledoc """
   Handles the Cognito OIDC authorization_code flow.
-
-  @req: KR 8.3
   """
 
   use LivedataWeb, :controller

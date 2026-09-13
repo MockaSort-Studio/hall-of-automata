@@ -9,8 +9,6 @@ defmodule LivedataWeb.UserAuth do
   The `auth_return_to` session key is written by the `store_return_to` plug
   in the `:browser` pipeline (router.ex) on every GET request, so that after
   a successful login the user is returned to the page they requested.
-
-  @req: KR 8.3
   """
 
   import Phoenix.Component, only: [assign: 3]

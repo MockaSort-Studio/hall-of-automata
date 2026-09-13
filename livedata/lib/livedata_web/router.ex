@@ -13,7 +13,6 @@ defmodule LivedataWeb.Router do
     plug :store_return_to
   end
 
-  # @req: KR 8.3 — stores the requested path so the callback can redirect there after login
   defp store_return_to(%{method: "GET", request_path: path} = conn, _opts) do
     if String.starts_with?(path, "/auth/") do
       conn

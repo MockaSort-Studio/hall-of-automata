@@ -6,8 +6,6 @@ defmodule Livedata.Auth.Secrets do
   In dev and test the config key `:cognito_credentials` may be set directly,
   bypassing the remote call entirely — set `COGNITO_CLIENT_ID` env var in dev,
   or set `cognito_credentials` in `config/test.exs`.
-
-  @req: KR 8.3
   """
 
   @cache_key :cognito_credentials

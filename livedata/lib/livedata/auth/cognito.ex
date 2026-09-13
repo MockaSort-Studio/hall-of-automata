@@ -5,8 +5,6 @@ defmodule Livedata.Auth.Cognito do
   Wraps `Assent.Strategy.OIDC` with the runtime config (issuer URL, redirect
   URI, client credentials) assembled at call time from Application env and
   the Secrets module.
-
-  @req: KR 8.3
   """
 
   @behaviour Livedata.Auth.CognitoBehaviour
