@@ -1,90 +1,43 @@
 defmodule LivedataWeb.AuthController do
   @moduledoc """
-  Handles the Cognito OIDC authorization_code flow.
+  Session bridge and logout for the LiveView login flow.
+
+  GET /auth/session/:token — reads a one-time bridge token written by LoginLive
+  after successful Cognito auth, writes the Plug session cookie, then redirects
+  to the app. Replacing the OIDC callback flow.
+
+  DELETE /auth — clears the session and redirects to /login.
+
+  @req: KR 8.3
   """
 
   use LivedataWeb, :controller
 
   alias Livedata.Auth
-  alias Livedata.Auth.Secrets
+  alias Livedata.Auth.SessionBridge
 
-  @doc "Initiates the Cognito OIDC authorization_code flow."
-  def new(conn, _params) do
-    cognito = cognito_module()
+  @doc "Reads the bridge token, writes the Plug session, and redirects."
+  def session(conn, %{"token" => token} = params) do
+    return_to = Map.get(params, "return_to", "/")
 
-    case cognito.authorize_url() do
-      {:ok, url, session_params} ->
+    case SessionBridge.fetch(token) do
+      {:ok, user} ->
         conn
-        |> put_session("cognito_session_params", session_params)
-        |> redirect(external: url)
+        |> Auth.put_session_user(user)
+        |> delete_session("auth_return_to")
+        |> redirect(to: return_to)
 
-      {:error, _reason} ->
+      {:error, :not_found} ->
         conn
-        |> put_flash(:error, "Authentication service unavailable. Please try again later.")
-        |> redirect(to: ~p"/")
+        |> put_flash(:error, "Session token expired or invalid. Please sign in again.")
+        |> redirect(to: "/login")
     end
   end
 
-  @doc "Handles the Cognito callback: exchanges the code, stores the session."
-  def callback(conn, params) do
-    case get_session(conn, "cognito_session_params") do
-      nil ->
-        conn
-        |> put_flash(:error, "Your session expired, please try again.")
-        |> redirect(to: ~p"/auth/cognito")
-
-      session_params ->
-        cognito = cognito_module()
-
-        case cognito.exchange_code(params, session_params) do
-          {:ok, user, _token} ->
-            return_to = get_session(conn, "auth_return_to") || ~p"/"
-
-            conn
-            |> delete_session("cognito_session_params")
-            |> delete_session("auth_return_to")
-            |> Auth.put_session_user(user)
-            |> redirect(to: return_to)
-
-          {:error, _reason} ->
-            conn
-            |> delete_session("cognito_session_params")
-            |> put_flash(:error, "Authentication failed. Please try signing in again.")
-            |> redirect(to: ~p"/auth/cognito")
-        end
-    end
-  end
-
-  @doc "Signs the user out, clears the session, and redirects to Cognito to end the SSO session."
+  @doc "Signs the user out, clears the Plug session, and redirects to /login."
   def delete(conn, _params) do
-    conn = Auth.delete_session(conn)
-
-    case build_cognito_logout_url() do
-      {:ok, url} -> redirect(conn, external: url)
-      {:error, _} -> redirect(conn, to: ~p"/")
-    end
-  end
-
-  defp cognito_module do
-    Application.get_env(:livedata, :cognito_module, Livedata.Auth.Cognito)
-  end
-
-  defp build_cognito_logout_url do
-    with hosted_ui_base when is_binary(hosted_ui_base) <-
-           Application.get_env(:livedata, :cognito_hosted_ui_base),
-         redirect_uri when is_binary(redirect_uri) <-
-           Application.get_env(:livedata, :cognito_redirect_uri),
-         {:ok, creds} <- Secrets.client_credentials() do
-      logout_base =
-        URI.parse(redirect_uri) |> Map.merge(%{path: "/", query: nil}) |> URI.to_string()
-
-      url =
-        "#{hosted_ui_base}/logout?client_id=#{creds.client_id}&logout_uri=#{URI.encode_www_form(logout_base)}"
-
-      {:ok, url}
-    else
-      nil -> {:error, :not_configured}
-      {:error, reason} -> {:error, reason}
-    end
+    conn
+    |> Auth.delete_session()
+    |> redirect(to: "/login")
   end
 end

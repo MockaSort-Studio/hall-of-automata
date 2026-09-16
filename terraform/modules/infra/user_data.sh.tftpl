@@ -1,0 +1,29 @@
+#!/bin/bash
+# Install the CodeDeploy agent on Amazon Linux 2023.
+# Runs once at first boot via cloud-init. All output is captured in
+# /var/log/user-data.log and forwarded to syslog for CloudWatch pickup.
+set -euo pipefail
+exec > >(tee /var/log/user-data.log | logger -t user-data -s) 2>&1
+
+echo "[$(date -Iseconds)] Starting user-data: installing CodeDeploy agent"
+
+# All values injected by Terraform at plan time — no IMDS dependency at boot.
+# /etc/livedata/region   — used by every deploy script to set --region
+# /etc/livedata/secrets.conf — Secrets Manager names sourced by after_install.sh
+REGION="${region}"
+mkdir -p /etc/livedata
+echo "$REGION" > /etc/livedata/region
+cat > /etc/livedata/secrets.conf << 'EOF'
+DB_CREDENTIALS_SECRET=${db_credentials_secret_name}
+SECRET_KEY_BASE_SECRET=${secret_key_base_secret_name}
+EOF
+chmod 600 /etc/livedata/secrets.conf
+
+dnf install -y ruby wget
+cd /tmp
+wget -q "https://aws-codedeploy-$REGION.s3.$REGION.amazonaws.com/latest/install"
+chmod +x ./install
+./install auto
+systemctl enable codedeploy-agent
+
+echo "[$(date -Iseconds)] CodeDeploy agent installed and enabled (region: $REGION)"

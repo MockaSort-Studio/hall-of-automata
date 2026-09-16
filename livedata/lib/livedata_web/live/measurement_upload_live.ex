@@ -139,7 +139,7 @@ defmodule LivedataWeb.MeasurementUploadLive do
       |> assign(:hidden_error_count, max(length(assigns.errors) - @max_shown_errors, 0))
 
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current_user={@current_user}>
       <:breadcrumbs>
         <Layouts.crumb navigate={~p"/"}>Dashboard</Layouts.crumb>
         <Layouts.crumb :if={@activity} navigate={~p"/projects/#{@activity.project_id}"}>

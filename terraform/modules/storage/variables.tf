@@ -4,9 +4,15 @@ variable "bucket_name" {
 }
 
 variable "ec2_instance_role_arn" {
-  description = "ARN of the EC2 instance IAM role granted read/write access. Empty string skips bucket policy creation — wire from infra module output after issue-153."
+  description = "ARN of the EC2 instance IAM role granted read/write access. Used in the bucket policy body when create_bucket_policy is true."
   type        = string
   default     = ""
+}
+
+variable "create_bucket_policy" {
+  description = "If true, creates an S3 bucket policy granting the EC2 role read/write access. Must be a known-at-plan-time value; use a literal bool, not a computed attribute."
+  type        = bool
+  default     = false
 }
 
 variable "days_to_warm" {

@@ -23,6 +23,12 @@ variable "db_username" {
   type        = string
 }
 
+variable "db_password" {
+  description = "Master password for the RDS instance. Must not contain URL-reserved characters (: @ / ? #)."
+  type        = string
+  sensitive   = true
+}
+
 variable "backup_retention_days" {
   description = "Number of days to retain automated RDS backups (1–35)."
   type        = number

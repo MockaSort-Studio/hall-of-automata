@@ -8,12 +8,22 @@ output "db_port" {
   value       = aws_db_instance.main.port
 }
 
-output "db_secret_arn" {
-  description = "Secrets Manager ARN of the RDS master user credentials (managed by RDS rotation)."
-  value       = aws_db_instance.main.master_user_secret[0].secret_arn
+output "db_credentials_secret_arn" {
+  description = "Secrets Manager ARN for the DB credentials secret (username, password, host, port, dbname)."
+  value       = aws_secretsmanager_secret.db_credentials.arn
+}
+
+output "db_credentials_secret_name" {
+  description = "Secrets Manager name for the DB credentials secret."
+  value       = aws_secretsmanager_secret.db_credentials.name
 }
 
 output "secret_key_base_secret_arn" {
   description = "Secrets Manager ARN of the Phoenix SECRET_KEY_BASE."
   value       = aws_secretsmanager_secret.secret_key_base.arn
+}
+
+output "secret_key_base_secret_name" {
+  description = "Secrets Manager name of the Phoenix SECRET_KEY_BASE."
+  value       = aws_secretsmanager_secret.secret_key_base.name
 }

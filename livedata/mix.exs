@@ -42,7 +42,8 @@ defmodule Livedata.MixProject do
     [
       livedata: [
         include_executables_for: [:unix],
-        steps: [:assemble]
+        steps: [:assemble],
+        config_providers: [{Livedata.SecretsProvider, []}]
       ]
     ]
   end
@@ -76,10 +77,9 @@ defmodule Livedata.MixProject do
        app: false,
        compile: false,
        depth: 1},
-      {:assent, "~> 0.2"},
+      {:joken, "~> 2.6"},
       {:ex_aws, "~> 2.5"},
-      {:hackney, "~> 1.9"},
-      {:mox, "~> 1.0", only: :test},
+      {:ex_aws_secretsmanager, "~> 2.0"},
       {:swoosh, "~> 1.16"},
       {:req, "~> 0.5"},
       {:telemetry_metrics, "~> 1.0"},

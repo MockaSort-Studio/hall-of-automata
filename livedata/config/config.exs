@@ -62,6 +62,10 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Use Req (already started by Phoenix) as the HTTP client for ex_aws.
+# This satisfies the project HTTP-client policy and avoids a hackney dep.
+config :ex_aws, :http_client, ExAws.Request.Req
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

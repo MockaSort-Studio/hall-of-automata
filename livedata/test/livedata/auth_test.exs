@@ -20,6 +20,19 @@ defmodule Livedata.AuthTest do
       assert user["email"] == "test@example.com"
     end
 
+    test "persists cognito_username to session", %{conn: conn} do
+      full_user =
+        @user
+        |> Map.put("exp", future_exp())
+        |> Map.put("cognito_username", "testuser")
+        |> Map.put("refresh_token", "rt_abc")
+
+      conn = Auth.put_session_user(conn, full_user)
+      user = Auth.get_session_user(conn)
+      assert user["cognito_username"] == "testuser"
+      assert user["refresh_token"] == "rt_abc"
+    end
+
     test "returns nil when no user in session", %{conn: conn} do
       assert Auth.get_session_user(conn) == nil
     end

@@ -49,7 +49,7 @@ defmodule LivedataWeb.ActivityNewLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current_user={@current_user}>
       <:breadcrumbs>
         <Layouts.crumb navigate={~p"/"}>Dashboard</Layouts.crumb>
         <Layouts.crumb navigate={~p"/projects/#{@project.id}"}>{@project.name}</Layouts.crumb>

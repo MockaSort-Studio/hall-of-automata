@@ -26,6 +26,7 @@ defmodule LivedataWeb.Layouts do
 
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr :current_user, :map, default: nil, doc: "authenticated user map or nil"
 
   attr :current_scope, :map,
     default: nil,
@@ -45,11 +46,25 @@ defmodule LivedataWeb.Layouts do
         Air2Tree
       </.link>
 
-      <nav id="app-nav" class="flex flex-1 items-center gap-1 text-sm">
+      <nav :if={@current_user} id="app-nav" class="flex flex-1 items-center gap-1 text-sm">
         <.nav_link id="nav-dashboard" navigate={~p"/"}>Dashboard</.nav_link>
         <.nav_link id="nav-record" navigate={~p"/measurements/new"}>Record measurement</.nav_link>
         <.nav_link id="nav-register" navigate={~p"/projects/new"}>Register project</.nav_link>
       </nav>
+
+      <div :if={!@current_user} class="flex-1" />
+
+      <div :if={@current_user} id="app-user-menu" class="flex items-center gap-3 text-sm">
+        <span class="hidden text-base-content/50 sm:block">{@current_user["email"]}</span>
+        <.link
+          id="nav-signout"
+          href={~p"/auth"}
+          method="delete"
+          class="rounded-md px-3 py-1.5 text-base-content/70 transition-colors hover:bg-base-200 hover:text-base-content"
+        >
+          Sign out
+        </.link>
+      </div>
 
       <.theme_toggle />
     </header>

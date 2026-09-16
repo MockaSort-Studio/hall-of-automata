@@ -4,16 +4,19 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# ── AMI ─────────────────────────────────────────────────────────────────────
-# Owner 427812963091 is the official NixOS AMI account. NixOS is chosen for
-# declarative host package management (Docker via virtualisation.docker.enable).
-data "aws_ami" "nixos" {
+data "aws_region" "current" {}
+
+# ── AMI ──────────────────────────────────────────────────────────────────────
+# Amazon Linux 2023: first-class CodeDeploy, SSM, and CloudWatch support with
+# zero custom configuration. The Mix release bundles the BEAM runtime so no
+# Elixir/Erlang packages are needed on the host.
+data "aws_ami" "al2023" {
   most_recent = true
-  owners      = ["427812963091"]
+  owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["nixos/*-x86_64-linux"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 
   filter {
@@ -122,20 +125,95 @@ resource "aws_security_group" "main" {
 
 # ── EC2 Instance ─────────────────────────────────────────────────────────────
 resource "aws_instance" "main" {
-  ami                    = data.aws_ami.nixos.id
+  ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
   key_name               = var.key_name
   subnet_id              = aws_subnet.main.id
   vpc_security_group_ids = [aws_security_group.main.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
-  # Root volume — OS only; data lives on the separate EBS volume.
+  # user_data installs the CodeDeploy agent at first boot.
+  # Replace-on-change enabled: the instance is stateless (all state in RDS/S3);
+  # a user_data change means the host config changed, so replace is correct.
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    region                      = data.aws_region.current.name
+    db_credentials_secret_name  = var.db_credentials_secret_name
+    secret_key_base_secret_name = var.secret_key_base_secret_name
+  })
+  user_data_replace_on_change = true
+
+  # Enforce IMDSv2 (token-required). Deploy scripts read region from
+  # /etc/livedata/region (written by user_data) instead of querying IMDS.
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
+  # Root volume — OS only; app is deployed to /opt/livedata by CodeDeploy.
   root_block_device {
     volume_type           = "gp3"
     volume_size           = 20
     delete_on_termination = true
   }
 
-  tags = merge(var.tags, { Name = "a2t-mrv-vm" })
+  # CodeDeployApp tag is the selector used by the CodeDeploy deployment group (#148).
+  tags = merge(var.tags, { Name = "a2t-mrv-vm", CodeDeployApp = "livedata" })
+}
+
+# ── Post-provision verification ───────────────────────────────────────────────
+# Waits for SSM to register the instance and then verifies the CodeDeploy agent
+# is active. If user_data fails silently, this makes terraform apply fail loudly.
+resource "null_resource" "verify_codedeploy_agent" {
+  depends_on = [aws_instance.main, aws_eip.main, aws_iam_role_policy_attachment.ec2_ssm]
+
+  triggers = {
+    instance_id = aws_instance.main.id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["bash", "-c"]
+    command     = <<-EOT
+      set -euo pipefail
+      INSTANCE_ID="${aws_instance.main.id}"
+      REGION="${data.aws_region.current.name}"
+
+      echo "Waiting for SSM registration of $INSTANCE_ID (up to 5 min)..."
+      for i in $(seq 1 30); do
+        STATUS=$(aws ssm describe-instance-information \
+          --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
+          --region "$REGION" \
+          --query 'InstanceInformationList[0].PingStatus' \
+          --output text 2>/dev/null || echo "NotReady")
+        [ "$STATUS" = "Online" ] && break
+        echo "  attempt $i/30 — $STATUS"
+        sleep 10
+      done
+      [ "$STATUS" = "Online" ] || { echo "ERROR: instance never joined SSM — check /var/log/user-data.log"; exit 1; }
+
+      # Poll until codedeploy-agent is active (user_data installs ruby + agent, ~90s).
+      echo "Waiting for CodeDeploy agent to start (up to 6 min)..."
+      AGENT_OK=false
+      for j in $(seq 1 24); do
+        CMD_ID=$(aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --region "$REGION" \
+          --document-name AWS-RunShellScript \
+          --parameters 'commands=["systemctl is-active codedeploy-agent"]' \
+          --output text --query 'Command.CommandId' 2>/dev/null || echo "SEND_FAILED")
+        [ "$CMD_ID" = "SEND_FAILED" ] && { echo "  check $j/24 — SSM send failed, retrying"; sleep 15; continue; }
+        sleep 15
+        RESULT=$(aws ssm get-command-invocation \
+          --command-id "$CMD_ID" \
+          --instance-id "$INSTANCE_ID" \
+          --region "$REGION" \
+          --query 'Status' --output text 2>/dev/null || echo "ERROR")
+        [ "$RESULT" = "Success" ] && { AGENT_OK=true; break; }
+        echo "  check $j/24 — $RESULT"
+      done
+      $AGENT_OK || { echo "ERROR: CodeDeploy agent not active on $INSTANCE_ID after 6 min"; exit 1; }
+      echo "OK — CodeDeploy agent verified running on $INSTANCE_ID."
+    EOT
+  }
 }
 
 # ── Elastic IP ───────────────────────────────────────────────────────────────
@@ -145,23 +223,4 @@ resource "aws_eip" "main" {
   tags     = merge(var.tags, { Name = "a2t-mrv-eip" })
 
   depends_on = [aws_internet_gateway.main]
-}
-
-# ── EBS Data Volume (Postgres data directory) ────────────────────────────────
-resource "aws_ebs_volume" "data" {
-  availability_zone = aws_instance.main.availability_zone
-  size              = var.data_volume_size_gb
-  type              = "gp3"
-  tags              = merge(var.tags, { Name = "a2t-mrv-data" })
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_volume_attachment" "data" {
-  device_name  = "/dev/sdf"
-  volume_id    = aws_ebs_volume.data.id
-  instance_id  = aws_instance.main.id
-  force_detach = false
 }

@@ -2,14 +2,12 @@ defmodule Livedata.Repo.Migrations.CreateRawMeasurements do
   use Ecto.Migration
 
   def up do
-    execute "CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE"
-
     # @req: CRCF-04
     execute "CREATE TYPE source_type AS ENUM ('MANUAL_ENTRY', 'REMOTE_SENSING', 'MODEL_OUTPUT')"
 
     create table(:raw_measurements, primary_key: false) do
       # @req: CRCF-19
-      add :id, :uuid, null: false, default: fragment("gen_random_uuid()")
+      add :id, :uuid, null: false, primary_key: true, default: fragment("gen_random_uuid()")
       # @req: CRCF-21
       add :activity_id, references(:activities, type: :uuid, on_delete: :restrict), null: false
       # @req: CRCF-20
@@ -25,22 +23,23 @@ defmodule Livedata.Repo.Migrations.CreateRawMeasurements do
       # @req: CRCF-26
       add :is_superseded, :boolean, null: false, default: false
       # @req: CRCF-26
-      # No references(:raw_measurements) here: TimescaleDB hypertables do not support
-      # self-referential FKs on partitioned tables. Application layer enforces referential
-      # integrity; the no_self_supersession CHECK constraint covers what the DB can enforce.
       add :superseded_by, :uuid, null: true
       # @req: CRCF-20
       timestamps(updated_at: false, type: :utc_datetime_usec)
     end
 
-    # TimescaleDB: convert to hypertable partitioned on measured_at before adding unique constraints
-    execute "SELECT create_hypertable('raw_measurements', 'measured_at')"
+    # @req: CRCF-28
+    create unique_index(:raw_measurements, [:content_hash])
 
-    # TimescaleDB requires the partition key in any unique constraint
-    execute "ALTER TABLE raw_measurements ADD PRIMARY KEY (id, measured_at)"
+    # BRIN index on measured_at — cheaper than B-tree for this append-only,
+    # naturally time-ordered table. Covers staleness-monitoring range scans and
+    # ORDER BY measured_at DESC queries at the cost of less precise block pruning.
+    execute "CREATE INDEX raw_measurements_measured_at_idx ON raw_measurements USING BRIN (measured_at)"
 
-    # @req: CRCF-28 — unique content_hash; partition key required in unique index for TimescaleDB
-    create unique_index(:raw_measurements, [:content_hash, :measured_at])
+    # @req: CRCF-26 — self-referential FK
+    execute "ALTER TABLE raw_measurements
+               ADD CONSTRAINT raw_measurements_superseded_by_fkey
+               FOREIGN KEY (superseded_by) REFERENCES raw_measurements(id)"
 
     # @req: CRCF-26
     create constraint(:raw_measurements, :superseded_must_have_superseded_by,

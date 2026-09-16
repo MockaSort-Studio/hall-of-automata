@@ -9,9 +9,8 @@ defmodule Livedata.Repo.Migrations.CreateDerivedMeasurementSources do
           null: false
 
       # @req: CRCF-33
-      # No FK to raw_measurements: raw_measurements is a TimescaleDB hypertable with composite
-      # PK (id, measured_at). PostgreSQL cannot reference a non-unique column subset of a
-      # composite key. Application layer enforces referential integrity.
+      # FK to raw_measurements added in 20260912000001_drop_timescaledb, which is the
+      # first migration where raw_measurements has a plain single-column PK.
       add :source_id, :uuid, null: false
     end
 

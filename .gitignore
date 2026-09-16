@@ -13,3 +13,8 @@ devenv.local.nix
 
 # deploy secrets — copy from deploy/.env.example, never commit
 deploy/.env
+
+# Terraform local state and provider cache (bootstrap uses local state by design)
+terraform/bootstrap/terraform.tfstate
+terraform/bootstrap/terraform.tfstate.backup
+**/.terraform/

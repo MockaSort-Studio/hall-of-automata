@@ -46,11 +46,17 @@ config :phoenix_live_view,
 config :phoenix,
   sort_verified_routes_query_params: true
 
-# Cognito OIDC — test config bypasses Secrets Manager and uses the mock module.
+# Auth — test uses CognitoMock with a fixed bypass password.
 config :livedata,
+  auth_provider: Livedata.Auth.CognitoMock,
+  auth_bypass_password: "test_bypass_password",
   cognito_issuer_url: "https://cognito-idp.eu-west-1.amazonaws.com/test-pool",
-  cognito_redirect_uri: "http://localhost:4002/auth/cognito/callback",
   cognito_secret_name: "a2t-mrv/cognito/client-secret",
   cognito_credentials: %{client_id: "test_client_id", client_secret: "test_secret"},
-  cognito_module: Livedata.Auth.CognitoMock,
-  cognito_hosted_ui_base: "https://a2t-mrv-test.auth.eu-west-1.amazoncognito.com"
+  cognito_req_opts: [plug: {Req.Test, Livedata.Auth.Cognito}]
+
+# Fake AWS credentials so ExAws.Auth.headers/6 can sign requests in tests.
+config :ex_aws,
+  access_key_id: "test_access_key",
+  secret_access_key: "test_secret_key",
+  region: "eu-north-1"

@@ -8,7 +8,8 @@ defmodule LivedataWeb.Endpoint do
     store: :cookie,
     key: "_livedata_key",
     signing_salt: "pfSa8sAM",
-    same_site: "Lax"
+    same_site: "Lax",
+    max_age: 86_400
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

@@ -168,9 +168,7 @@ defmodule Livedata.Measurements.BulkImport do
   end
 
   defp broadcast_all(rows) do
-    Enum.each(rows, fn rm ->
-      Phoenix.PubSub.broadcast(Livedata.PubSub, "measurements:new", {:measurement_created, rm})
-    end)
+    Enum.each(rows, &Measurements.broadcast_measurement/1)
   end
 
   defp changeset_to_error(%Ecto.Changeset{errors: [{field, {msg, opts}} | _]}),

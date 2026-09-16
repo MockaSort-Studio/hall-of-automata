@@ -2,6 +2,8 @@ defmodule Livedata.Auth do
   @moduledoc """
   Session-level auth API: store, retrieve, and validate a Cognito-issued
   user identity in the Plug cookie session.
+
+  @req: KR 8.3
   """
 
   import Plug.Conn
@@ -18,7 +20,9 @@ defmodule Livedata.Auth do
       "sub" => user["sub"],
       "email" => user["email"],
       "name" => user["name"],
-      "exp" => user["exp"]
+      "exp" => user["exp"],
+      "refresh_token" => user["refresh_token"],
+      "cognito_username" => user["cognito_username"]
     }
 
     put_session(conn, @user_key, session_user)
@@ -26,6 +30,10 @@ defmodule Livedata.Auth do
 
   @spec get_session_user(Plug.Conn.t()) :: map() | nil
   def get_session_user(conn), do: get_session(conn, @user_key)
+
+  @doc "Reads the session user from a raw session map — for use in LiveView on_mount callbacks."
+  @spec get_session_user_from_session(map()) :: map() | nil
+  def get_session_user_from_session(session), do: Map.get(session, @user_key)
 
   @spec delete_session(Plug.Conn.t()) :: Plug.Conn.t()
   def delete_session(conn) do

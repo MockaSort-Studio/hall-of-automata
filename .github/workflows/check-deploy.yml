@@ -1,0 +1,142 @@
+name: check-deploy
+
+# Pre-merge checks that catch deployment failures before they reach main.
+# Runs on PRs that touch the deploy pipeline: livedata source, deploy scripts,
+# appspec, or this workflow.
+#
+# Three checks, no AWS credentials required:
+#   1. shellcheck — lint all scripts/deploy/*.sh for bash errors
+#   2. prod-release — build the Mix release in prod mode (same steps as deploy)
+#   3. appspec-lint — validate appspec.yml YAML structure and script paths
+
+on:
+  pull_request:
+    paths:
+      - livedata/**
+      - appspec.yml
+      - scripts/deploy/**
+      - .github/workflows/check-deploy.yml
+      - .github/workflows/deploy-livedata.yml
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: Lint deploy scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: shellcheck scripts/deploy/*.sh
+        run: shellcheck --severity=warning scripts/deploy/*.sh
+
+  prod-release:
+    name: Build prod Mix release
+    # Must match deploy-livedata.yml: ubuntu-22.04 (glibc 2.35) so the release
+    # binary is compatible with AL2023 (glibc 2.34). ubuntu-latest is 24.04.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Elixir/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.18.5"
+          otp-version: "27.3"
+
+      - name: Cache Mix dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            livedata/deps
+            livedata/_build/prod/lib
+          key: mix-${{ runner.os }}-${{ hashFiles('livedata/mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get --only prod
+
+      - name: Compile dependencies
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix deps.compile
+
+      - name: Install asset build tools
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix assets.setup
+
+      - name: Compile application
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix compile --warnings-as-errors
+
+      - name: Build and digest assets
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix assets.deploy
+
+      - name: Build Mix release
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix release livedata
+
+      - name: Verify release tarball is producible
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/livedata.tar.gz -C livedata/_build/prod/rel/livedata .
+          echo "Release size: $(du -sh /tmp/livedata.tar.gz | cut -f1)"
+          # Verify the release binary exists and is executable
+          test -x livedata/_build/prod/rel/livedata/bin/livedata
+          echo "Release binary OK."
+
+  appspec-lint:
+    name: Validate appspec.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse appspec.yml
+        run: |
+          python3 << 'PYEOF'
+          import yaml, sys, os
+
+          with open('appspec.yml') as f:
+              spec = yaml.safe_load(f)
+
+          errors = []
+
+          for event, entries in spec.get('hooks', {}).items():
+              for entry in (entries or []):
+                  loc = entry.get('location', '')
+                  if not os.path.exists(loc):
+                      errors.append(f'Hook {event}: {loc!r} not found')
+
+          for mapping in spec.get('files', []):
+              src = mapping.get('source', '').rstrip('/')
+              if src != 'release' and not os.path.exists(src):
+                  errors.append(f'files source {src!r} not found')
+
+          if errors:
+              for e in errors:
+                  print(f'ERROR: {e}', file=sys.stderr)
+              sys.exit(1)
+
+          print('appspec.yml OK')
+          PYEOF

@@ -1,40 +1,39 @@
 name: deploy-livedata
 
-# Triggered on every push to main that touches livedata, the devenv build config,
-# or the deploy stack. Builds the OCI image from devenv.nix, pushes to GHCR,
-# SSH-deploys to the production VM, and fails loudly if the health check does
-# not return a successful response.
+# Deploy pattern:
+#   livedata/appspec/script change  → terraform runs (no-op apply), then
+#                                     workflow_run fires here; check job sees
+#                                     deploy files changed → deploys
+#   terraform-only change           → terraform runs (apply), then workflow_run
+#                                     fires here; check job sees no deploy files
+#                                     → skipped
+#   both change in same commit      → terraform runs (apply), then workflow_run
+#                                     fires here; check job sees deploy files
+#                                     → deploys AFTER infra is settled
 #
-# Required secrets (Settings → Secrets and variables → Actions):
-#   DEPLOY_SSH_KEY   — private key for SSH to the production VM
-#   DEPLOY_HOST      — hostname or IP of the production VM
+# Terraform is the sequencer: deploy never starts until terraform has finished,
+# for every possible commit combination. No push trigger here.
 #
-# Required variables (Settings → Secrets and variables → Actions → Variables):
-#   PHX_HOST         — bare hostname served by the app (for health check and deployment URL)
-#                      Must be a variable, not a secret: secrets context is not allowed in
-#                      environment.url (only github/vars/inputs/needs/strategy/matrix are).
+# Builds a Mix release via erlef/setup-beam on Ubuntu 22.04 (Jammy, glibc 2.35)
+# — compatible with AL2023 (glibc 2.34) without a Docker container. Bundles into
+# a CodeDeploy revision zip, uploads to S3, and triggers a CodeDeploy deployment.
+# ValidateService in appspec.yml performs the health check; a failed validate
+# triggers automatic rollback.
 #
-# Optional repository variables (default shown):
-#   DEPLOY_USER      — SSH user on the VM (default: root)
-#   DEPLOY_PATH      — path to the deploy/ directory on the VM (default: ~/a2t-mrv/deploy)
+# Authentication: OIDC role assumption — no static AWS keys needed.
 #
-# Note: the GITHUB_TOKEN used for GHCR login on the VM is valid for the
-# duration of the workflow run (~6 hours). No separate GHCR_PULL_TOKEN is needed.
-#
-# Note: devenv.nix has `hash = lib.fakeHash` for mixFodDeps. The first run of
-# this workflow will fail with a hash mismatch in the build step. Copy the
-# "got:" value from the error and replace lib.fakeHash in devenv.nix, then
-# the workflow will succeed on the next push.
+# Optional repository variables (defaults match Terraform-provisioned names):
+#   AWS_REGION             — AWS region (default: eu-north-1)
+#   CODEDEPLOY_APP_NAME    — CodeDeploy application name (default: a2t-mrv-livedata)
+#   CODEDEPLOY_DG_NAME     — CodeDeploy deployment group name (default: a2t-mrv-livedata-dg)
 
 on:
-  push:
+  # Terraform is the sequencer for all pushes to main. When terraform's apply
+  # job completes, the check job below gates on changed deploy-relevant files.
+  workflow_run:
+    workflows: [terraform]
+    types: [completed]
     branches: [main]
-    paths:
-      - livedata/**
-      - devenv.nix
-      - devenv.lock
-      - deploy/**
-      - .github/workflows/deploy-livedata.yml
   workflow_dispatch:
 
 # One deploy at a time; never cancel in progress — a partial deploy is worse
@@ -44,155 +43,218 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
   contents: read
-  packages: write
+  deployments: write
+  id-token: write
 
 jobs:
-  build-push:
-    name: Build and push livedata image
+  check:
+    name: Check if deploy is needed
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.image.outputs.ref }}
+      needed: ${{ steps.gate.outputs.needed }}
+    steps:
+      - name: Gate on changed files (workflow_run only)
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "workflow_run" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "Terraform did not succeed — skipping deploy." >&2
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          COUNT=$(gh api "repos/${{ github.repository }}/commits/$SHA" \
+            --jq '[.files[].filename] | map(select(
+              startswith("livedata/") or
+              . == "appspec.yml" or
+              startswith("scripts/deploy/") or
+              . == ".github/workflows/deploy-livedata.yml"
+            )) | length')
+          if [ "${COUNT:-0}" -gt 0 ]; then
+            echo "Deploy-relevant files changed ($COUNT) — deploying." >&2
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No deploy-relevant files in this terraform commit — skipping." >&2
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-deploy:
+    name: Build Mix release and deploy via CodeDeploy
+    needs: check
+    if: needs.check.outputs.needed == 'true'
+    environment:
+      name: dev
+      url: https://dev.mrv.airtotree.com
+    # Ubuntu 22.04 (Jammy, glibc 2.35): erlef/setup-beam installs OTP/Elixir
+    # linked against the system glibc, so the release runs on AL2023 (glibc 2.34).
+    # ubuntu-latest is 24.04 (glibc 2.39) which would require GLIBC_2.38 symbols.
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v27
+      - name: Set up Elixir/OTP
+        uses: erlef/setup-beam@v1
         with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-          extra_nix_config: |
-            trusted-users = root runner
+          elixir-version: "1.18.5"
+          otp-version: "27.3"
 
-      # devenv and its dependencies are cached via the public Cachix binary cache,
-      # avoiding a full rebuild of the Nix toolchain on every run.
-      - name: Configure Cachix (devenv binary cache)
-        uses: cachix/cachix-action@v15
+      - name: Cache Mix dependencies
+        uses: actions/cache@v4
         with:
-          name: devenv
+          path: |
+            livedata/deps
+            livedata/_build/prod/lib
+          key: mix-ubuntu-22.04-${{ hashFiles('livedata/mix.lock') }}
+          restore-keys: mix-ubuntu-22.04-
 
-      - name: Install devenv
-        run: nix profile install github:cachix/devenv/v2.2.2
-
-      - name: Cache Nix store
-        uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('devenv.lock', 'devenv.nix', 'livedata/mix.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 7G
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-last-accessed: P1DT12H
-          purge-primary-key: never
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build livedata OCI image
-        # devenv reads containers.livedata from devenv.nix and compiles the Mix
-        # release in a Nix sandbox (no network access at build time). `build`
-        # only prints the resulting Nix store path — it does not produce a
-        # docker-loadable tarball, since nix2container images aren't a `docker
-        # save` tar. `container copy --registry docker-daemon:` builds and
-        # runs skopeo to load the image directly into the local Docker daemon,
-        # tagged livedata:latest (devenv's own `container run` does the same
-        # internally to launch a container locally).
-        run: |
-          devenv container copy livedata --registry docker-daemon:
-
-      - name: Tag and push to GHCR
-        id: image
-        run: |
-          set -euo pipefail
-          SHA_TAG="ghcr.io/mockasort-studio/a2t-mrv-livedata:${{ github.sha }}"
-          LATEST_TAG="ghcr.io/mockasort-studio/a2t-mrv-livedata:latest"
-          docker tag livedata:latest "$SHA_TAG"
-          docker tag livedata:latest "$LATEST_TAG"
-          docker push "$SHA_TAG"
-          docker push "$LATEST_TAG"
-          echo "ref=$SHA_TAG" >> "$GITHUB_OUTPUT"
-
-  deploy:
-    name: Deploy to production VM
-    runs-on: ubuntu-latest
-    needs: build-push
-    environment:
-      name: dev
-      url: https://${{ vars.PHX_HOST }}
-
-    steps:
-      - name: Install SSH key
+      - name: Install dependencies
+        working-directory: livedata
         env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          MIX_ENV: prod
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get --only prod
 
-      - name: Pull and restart livedata
-        # Passes the GITHUB_TOKEN (valid for this run's duration) to the remote
-        # for a one-shot GHCR login. The token never touches the VM's Docker
-        # credential store — docker logout runs at the end of the SSH session.
-        # Tilde in DEPLOY_PATH is expanded on the remote via ${DEPLOY_PATH/#\~/$HOME}.
+      - name: Compile dependencies
+        working-directory: livedata
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '~/a2t-mrv/deploy' }}
-          IMAGE_REF: ${{ needs.build-push.outputs.image }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_ACTOR: ${{ github.actor }}
-        run: |
-          set -euo pipefail
+          MIX_ENV: prod
+        run: mix deps.compile
 
-          ssh -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=30 \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            env \
-              GH_TOKEN="$GH_TOKEN" \
-              GH_ACTOR="$GH_ACTOR" \
-              IMAGE_REF="$IMAGE_REF" \
-              DEPLOY_PATH="$DEPLOY_PATH" \
-            bash << 'REMOTE'
-          set -euo pipefail
-          echo "$GH_TOKEN" | docker login ghcr.io --username "$GH_ACTOR" --password-stdin
-          TARGET="${DEPLOY_PATH/#\~/$HOME}"
-          cd "$TARGET"
-          LIVEDATA_IMAGE="$IMAGE_REF" docker compose pull livedata
-          LIVEDATA_IMAGE="$IMAGE_REF" docker compose up -d --no-deps livedata
-          docker logout ghcr.io
-          REMOTE
-
-      - name: Post-deploy health check
-        # Retries for up to 2 minutes (12 × 10 s) to allow for migration and
-        # app startup time. Fails loudly with a non-zero exit if the app does
-        # not serve a successful HTTP response — satisfying the acceptance
-        # criterion "workflow fails loudly if the post-deploy health check fails".
+      - name: Install asset build tools (tailwind + esbuild binaries)
+        working-directory: livedata
         env:
-          PHX_HOST: ${{ vars.PHX_HOST }}
+          MIX_ENV: prod
+        run: mix assets.setup
+
+      - name: Compile application
+        # Must run before assets.deploy: assets/js/app.js imports
+        # "phoenix-colocated/livedata" written by the compiler into
+        # _build/prod/phoenix-colocated/, which esbuild resolves via NODE_PATH.
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix compile
+
+      - name: Build and digest assets
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix assets.deploy
+
+      - name: Build Mix release
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+        run: mix release livedata
+
+      - name: Smoke-test release boot
+        # Run the release eval command in CI with no database credentials.
+        # Config.Provider should complete with no patches (no-op path) and the
+        # process should exit cleanly. This gate catches module-name errors,
+        # config syntax problems, and provider crashes before the release ships.
+        working-directory: livedata
+        env:
+          MIX_ENV: prod
+          PHX_HOST: localhost
+          SECRET_KEY_BASE: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          COGNITO_USER_POOL_ID: smoke-test-pool
+          COGNITO_DOMAIN_PREFIX: smoke-test
+          COGNITO_REGION: eu-north-1
         run: |
           set -euo pipefail
-          URL="https://${PHX_HOST}/"
+          _build/prod/rel/livedata/bin/livedata eval "IO.inspect(:boot_ok)"
 
-          for i in $(seq 1 12); do
-            STATUS="$(curl -sSo /dev/null -w '%{http_code}' --max-time 10 "$URL" || true)"
-            case "$STATUS" in
-              2[0-9][0-9]|301|302)
-                echo "Health check passed — $URL returned $STATUS."
-                exit 0
-                ;;
-              *)
-                echo "Attempt $i/12 — got $STATUS, waiting 10 s..."
-                sleep 10
-                ;;
-            esac
-          done
+      - name: Bundle OpenSSL libs for AL2023 compatibility
+        # AL2023 ships OpenSSL 3.5 compiled without SM4 (EVP_sm4_cbc), which the OTP
+        # crypto NIF requires. Bundle the Jammy libcrypto/libssl (OpenSSL 3.0, has SM4)
+        # with the release; after_install.sh sets LD_LIBRARY_PATH so crypto.so loads
+        # the bundled lib instead of the system one.
+        run: |
+          set -euo pipefail
+          OPENSSL_DEST=livedata/_build/prod/rel/livedata/lib/openssl
+          mkdir -p "$OPENSSL_DEST"
+          cp /usr/lib/x86_64-linux-gnu/libcrypto.so.3 "$OPENSSL_DEST/"
+          cp /usr/lib/x86_64-linux-gnu/libssl.so.3 "$OPENSSL_DEST/"
+          echo "Bundled: $(ls -sh $OPENSSL_DEST)"
 
-          echo "::error::Post-deploy health check failed — $URL did not respond successfully within 2 minutes."
-          exit 1
+      - name: Package release tarball
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          tar -czf release/livedata.tar.gz -C livedata/_build/prod/rel/livedata .
+          echo "Release size: $(du -sh release/livedata.tar.gz | cut -f1)"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::559744161469:role/a2t-mrv-github-deploy
+          aws-region: ${{ vars.AWS_REGION || 'eu-north-1' }}
+
+      - name: Resolve revisions bucket
+        run: |
+          set -euo pipefail
+          BUCKET=$(aws resourcegroupstaggingapi get-resources \
+            --tag-filters Key=Role,Values=codedeploy-revisions Key=Project,Values=a2t-mrv \
+            --resource-type-filters s3 \
+            --query 'ResourceTagMappingList[0].ResourceARN' \
+            --output text | sed 's|arn:aws:s3:::||')
+          [ -n "$BUCKET" ] && [ "$BUCKET" != "None" ] || \
+            { echo "ERROR: no S3 bucket tagged Role=codedeploy-revisions,Project=a2t-mrv found"; exit 1; }
+          echo "REVISION_BUCKET=$BUCKET" >> "$GITHUB_ENV"
+
+      - name: Upload release artifact to S3
+        run: |
+          set -euo pipefail
+          aws s3 cp release/livedata.tar.gz \
+            "s3://${REVISION_BUCKET}/releases/livedata.tar.gz"
+
+      - name: Bundle revision zip
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          zip -r "revision-${COMMIT_SHA}.zip" appspec.yml scripts/deploy/
+          echo "Revision zip size: $(du -sh revision-${COMMIT_SHA}.zip | cut -f1)"
+
+      - name: Upload revision to S3
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "revision-${COMMIT_SHA}.zip" \
+            "s3://${REVISION_BUCKET}/codedeploy-revisions/revision-${COMMIT_SHA}.zip"
+
+      - name: Create CodeDeploy deployment
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          APP_NAME: ${{ vars.CODEDEPLOY_APP_NAME || 'a2t-mrv-livedata' }}
+          DG_NAME: ${{ vars.CODEDEPLOY_DG_NAME || 'a2t-mrv-livedata-dg' }}
+        run: |
+          set -euo pipefail
+          DEPLOYMENT_ID=$(aws deploy create-deployment \
+            --application-name "$APP_NAME" \
+            --deployment-group-name "$DG_NAME" \
+            --s3-location "bucket=${REVISION_BUCKET},key=codedeploy-revisions/revision-${COMMIT_SHA}.zip,bundleType=zip" \
+            --description "Workflow run $GITHUB_RUN_ID — $COMMIT_SHA" \
+            --output text --query 'deploymentId')
+          echo "Deployment ID: $DEPLOYMENT_ID"
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> "$GITHUB_ENV"
+
+      - name: Wait for deployment to complete
+        # ValidateService in appspec.yml performs the real health check. A failed
+        # validate exits non-zero, which triggers the deployment group's
+        # AutoRollbackConfiguration and causes this wait to fail the workflow.
+        run: |
+          set -euo pipefail
+          aws deploy wait deployment-successful --deployment-id "$DEPLOYMENT_ID"
+          echo "Deployment $DEPLOYMENT_ID succeeded."

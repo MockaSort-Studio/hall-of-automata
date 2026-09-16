@@ -2,34 +2,27 @@ name: preview
 
 # Render's free tier allows a single instance, so there is no separate preview
 # service: the one service is temporarily repointed at the pull request's git
-# branch and its own Neon branch, then restored to main on close.
+# branch, then restored to main on close.
 #
-# The production *database* is never touched. Only two things move:
+# The database is shared: previews run against DATABASE_URL_MAIN on the Render
+# service (currently Neon; will become the dev RDS when infrastructure splits
+# into dev/prod). No per-PR branches are created.
+#
+# Only one thing moves:
 #   - which git branch the service builds
-#   - whether DATABASE_URL_PR is set (see livedata/config/runtime.exs, which
-#     prefers it over DATABASE_URL_MAIN)
-# and only the PR variable is ever written. Render has no equivalent of Koyeb's
-# `DATABASE_URL=@SECRET` indirection, which is why the choice lives in the app.
 #
 # While a preview is up, the deployed app is PR code, and pushes to main do not
 # auto-deploy because the service is pointed elsewhere. Closing or merging the
 # PR restores main and redeploys it.
 #
-# Required credentials. The two API keys must be repository *secrets*; the two
-# identifiers may be either secrets or variables, and are read from both.
-#   NEON_API_KEY       — secret. Installed for you by Neon's GitHub integration.
+# Required credentials (Settings → Secrets and variables → Actions):
 #   RENDER_API_KEY     — secret. Render account settings. A deploy hook cannot
 #                        substitute: hooks only trigger a build, and this workflow
-#                        also has to write an env var, change the service's
-#                        branch, and read deploy status.
-#   NEON_PROJECT_ID    — secret or variable. Neon's integration makes it a variable.
+#                        also has to change the service's branch and read deploy
+#                        status.
 #   RENDER_SERVICE_ID  — secret or variable. The srv-… id in the dashboard URL.
-# Required Render environment variables (set by hand, in the dashboard):
-#   DATABASE_URL_MAIN (production; never written here)
 #
 # Optional repository variables:
-#   NEON_PARENT_BRANCH (defaults to the project's default branch)
-#   NEON_DATABASE_NAME, NEON_ROLE_NAME (resolved from the branch if unset)
 #   RENDER_MAIN_BRANCH (defaults to main)
 
 on:
@@ -45,23 +38,8 @@ on:
       - .github/scripts/render-api.sh
 
 env:
-  # Either location works. Neon's GitHub integration installs NEON_API_KEY as a
-  # secret but NEON_PROJECT_ID as a *variable*, whereas setting both by hand
-  # tends to make both secrets — reading both places means it does not matter
-  # which route was taken.
-  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID || vars.NEON_PROJECT_ID }}
-  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-  # Same either-location treatment. Not sensitive — it is visible in the
-  # service's dashboard URL — so it lives here rather than being threaded
-  # through each step, unlike the two API keys.
   RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID || vars.RENDER_SERVICE_ID }}
-  # Empty by default: neonctl resolves the project's default branch, and the
-  # branch's database / role, on its own. Set these only to override.
-  NEON_PARENT_BRANCH: ${{ vars.NEON_PARENT_BRANCH }}
-  NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME }}
-  NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME }}
   RENDER_MAIN_BRANCH: ${{ vars.RENDER_MAIN_BRANCH || 'main' }}
-  BRANCH_NAME: pr-${{ github.event.pull_request.number }}
 
 # There is one service. Deploys and restores must not interleave.
 concurrency:
@@ -92,148 +70,29 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           set -euo pipefail
-
-          # Without this, a missing Neon key surfaces as neonctl's opaque
-          # "Cannot run interactive auth in CI" — it falls back to browser
-          # OAuth when it finds no credentials.
           missing=()
-          [ -n "${NEON_API_KEY:-}" ] || missing+=("NEON_API_KEY")
-          [ -n "${NEON_PROJECT_ID:-}" ] || missing+=("NEON_PROJECT_ID")
           [ -n "${RENDER_API_KEY:-}" ] || missing+=("RENDER_API_KEY")
           [ -n "${RENDER_SERVICE_ID:-}" ] || missing+=("RENDER_SERVICE_ID")
-
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing credentials: ${missing[*]}."
             echo "Add them under Settings > Secrets and variables > Actions."
-            echo "The API keys must be secrets; the two IDs may be secrets or variables."
             exit 1
           fi
 
-      # Needed for .github/scripts/render-api.sh, which later steps source.
       - uses: actions/checkout@v4
 
-      - name: Install neonctl
-        run: npm install -g neonctl@2
-
-      # One service means one preview at a time, so every other pr-* branch is
-      # already detached from it — a leftover from a PR whose close event never
-      # ran its restore job (force-closed, workflow cancelled, teardown warned
-      # and kept the branch). Neon caps branch count per project, so left to
-      # accumulate they eventually make `branches create` below fail outright
-      # with "branches limit exceeded". That is why this runs *before* the
-      # create and not after: sweeping afterwards cannot rescue the very
-      # failure it exists to prevent.
-      - name: Sweep superseded preview branches
-        run: |
-          set -euo pipefail
-
-          # Only pr-<number> — the names this workflow creates. Production and
-          # the parent branch never match, so they cannot be swept by accident.
-          # $BRANCH_NAME is excluded so a re-run reuses its branch intact.
-          stale=$(
-            neonctl branches list \
-              --project-id "$NEON_PROJECT_ID" \
-              --api-key "$NEON_API_KEY" \
-              --output json \
-            | jq -r --arg keep "$BRANCH_NAME" \
-                '.[].name | select(test("^pr-[0-9]+$")) | select(. != $keep)'
-          )
-
-          if [ -z "$stale" ]; then
-            echo "No superseded preview branches to sweep."
-            exit 0
-          fi
-
-          # A delete failure is not fatal here: the create below reports the
-          # branch list on failure, which is the better diagnostic anyway.
-          while read -r branch; do
-            [ -n "$branch" ] || continue
-            if neonctl branches delete "$branch" \
-              --project-id "$NEON_PROJECT_ID" \
-              --api-key "$NEON_API_KEY"
-            then
-              echo "Swept superseded preview branch $branch"
-            else
-              echo "::warning::Could not delete Neon branch $branch — delete it by hand."
-            fi
-          done <<< "$stale"
-
-      - name: Create or reuse the Neon branch
-        id: neon
-        run: |
-          set -euo pipefail
-
-          # Reused across pushes to the same PR: recreating on every commit
-          # would throw away anything set up by hand while reviewing.
-          if neonctl branches get "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY" >/dev/null 2>&1; then
-            echo "Reusing existing Neon branch $BRANCH_NAME"
-          else
-            parent_args=()
-            if [ -n "${NEON_PARENT_BRANCH:-}" ]; then
-              parent_args=(--parent "$NEON_PARENT_BRANCH")
-              echo "Branching $BRANCH_NAME off $NEON_PARENT_BRANCH"
-            else
-              echo "Branching $BRANCH_NAME off the project's default branch"
-            fi
-
-            if ! neonctl branches create \
-              --project-id "$NEON_PROJECT_ID" \
-              --api-key "$NEON_API_KEY" \
-              --name "$BRANCH_NAME" \
-              "${parent_args[@]}"
-            then
-              echo "::error::Could not create the Neon branch. Branches in this project:"
-              neonctl branches list --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY" || true
-              exit 1
-            fi
-          fi
-
-          conn_args=()
-          [ -n "${NEON_DATABASE_NAME:-}" ] && conn_args+=(--database-name "$NEON_DATABASE_NAME")
-          [ -n "${NEON_ROLE_NAME:-}" ] && conn_args+=(--role-name "$NEON_ROLE_NAME")
-
-          # Unpooled: config/runtime.exs does not set `prepare: :unnamed`, and
-          # Neon's pooler is PgBouncer in transaction mode, which breaks
-          # Postgrex's named prepared statements.
-          DB_URL="$(neonctl connection-string "$BRANCH_NAME" \
-            --project-id "$NEON_PROJECT_ID" \
-            --api-key "$NEON_API_KEY" \
-            "${conn_args[@]}" \
-            --pooled false)"
-
-          # Strip the query string. Neon appends ?sslmode=require&channel_binding=require,
-          # which Ecto's URL parser does not interpret; TLS comes from `ssl: true`
-          # in config/runtime.exs. Left on, sslmode lands in the database name.
-          DB_URL="${DB_URL%%\?*}"
-
-          echo "::add-mask::$DB_URL"
-          echo "db_url=$DB_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Point DATABASE_URL_PR at the branch and repoint the service
+      - name: Repoint service to PR branch
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          DB_URL: ${{ steps.neon.outputs.db_url }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
           source .github/scripts/render-api.sh
 
-          # DATABASE_URL_MAIN is never referenced in this workflow. Only the PR
-          # variable moves, so production's connection string cannot be
-          # clobbered — and runtime.exs prefers DATABASE_URL_PR when it is set.
-          #
-          # Single-key upsert, not the bulk endpoint: replacing the whole env-var
-          # list would drop PHX_HOST, SECRET_KEY_BASE and POOL_SIZE.
-          render_api PUT "/services/$RENDER_SERVICE_ID/env-vars/DATABASE_URL_PR" \
-            "$(jq -n --arg v "$DB_URL" '{value: $v}')" > /dev/null
-          echo "DATABASE_URL_PR now points at Neon branch $BRANCH_NAME"
-
           render_api PATCH "/services/$RENDER_SERVICE_ID" \
             "$(jq -n --arg b "$HEAD_REF" '{branch: $b}')" > /dev/null
           echo "Service now builds $HEAD_REF"
 
-          # Explicit deploy last. Render also auto-deploys on the two changes
-          # above; it supersedes queued deploys, so this one wins.
           render_api POST "/services/$RENDER_SERVICE_ID/deploys" \
             '{"clearCache": "do_not_clear"}' | jq -r '"Triggered deploy \(.id)"'
 
@@ -241,9 +100,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Ownership is tracked here rather than in an env var on the Render
-            // service, so the restore job can tell whether a newer PR has
-            // claimed the shared service since this one opened.
             await github.rest.repos.createDeployment({
               ...context.repo,
               ref: context.payload.pull_request.head.sha,
@@ -264,18 +120,14 @@ jobs:
               marker,
               '### Preview deployed',
               '',
-              `The Render service is now building \`${context.payload.pull_request.head.ref}\` against`,
-              `Neon branch \`pr-${context.issue.number}\`, forked from production data.`,
+              `The Render service is now building \`${context.payload.pull_request.head.ref}\``,
+              `against the shared dev database.`,
               '',
-              '- `bin/start` migrates and seeds on boot, so the branch migrates itself.',
+              '- `bin/start` migrates on boot.',
               '- **The single free-tier service is shared, so main is not deployed right now.**',
               '  Merging or closing this PR restores main.',
-              '- The Neon branch is deleted on close; the production database is untouched.',
               '- First request after a quiet period is slow: the service spins down',
-              '  after 15 minutes idle and Neon compute suspends after about 5.',
-              '',
-              '---',
-              '_Generated by [Claude Code](https://claude.ai/code)_',
+              '  after 15 minutes idle.',
             ].join('\n')
 
             const { data: comments } = await github.rest.issues.listComments({
@@ -292,13 +144,11 @@ jobs:
   restore:
     name: Restore main
     runs-on: ubuntu-latest
-    # `closed` covers both a merge and a plain close.
     if: >-
       github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-      # listDeployments, to see whether a newer PR claimed the service.
       deployments: read
 
     steps:
@@ -307,13 +157,9 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
         run: |
           set -euo pipefail
-
           missing=()
-          [ -n "${NEON_API_KEY:-}" ] || missing+=("NEON_API_KEY")
-          [ -n "${NEON_PROJECT_ID:-}" ] || missing+=("NEON_PROJECT_ID")
           [ -n "${RENDER_API_KEY:-}" ] || missing+=("RENDER_API_KEY")
           [ -n "${RENDER_SERVICE_ID:-}" ] || missing+=("RENDER_SERVICE_ID")
-
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing credentials: ${missing[*]}."
             exit 1
@@ -321,44 +167,30 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Install neonctl
-        run: npm install -g neonctl@2
-
       - name: Does this PR still own the service?
         id: owner
         uses: actions/github-script@v7
         with:
           script: |
-            // The most recent render-preview deployment is whichever PR last
-            // claimed the shared service.
             const { data: deployments } = await github.rest.repos.listDeployments({
               ...context.repo,
               environment: 'render-preview',
               per_page: 1,
             })
-
             const owner = deployments[0]?.payload?.pr
-
-            // Nothing recorded: nothing ever claimed the service, so there is
-            // nothing of anyone else's to preserve — restoring main is safe.
             if (owner == null) {
               core.info('No preview deployment on record — restoring main.')
               core.setOutput('restore', 'true')
               return
             }
-
-            // A newer PR may have claimed it since. Restoring main would
-            // silently tear down that PR's preview.
             if (String(owner) !== String(context.issue.number)) {
               core.info(`Service is serving PR #${owner}, not #${context.issue.number} — leaving it alone.`)
               core.setOutput('restore', 'false')
               return
             }
-
             core.setOutput('restore', 'true')
 
-      - name: Restore main and wait for it to go live
-        id: restore
+      - name: Restore main
         if: steps.owner.outputs.restore == 'true'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -366,73 +198,9 @@ jobs:
           set -euo pipefail
           source .github/scripts/render-api.sh
 
-          # Blanked rather than deleted, for two reasons: the variable stays
-          # declared in render.yaml so a blueprint sync cannot decide it is
-          # surplus and remove it mid-preview, and runtime.exs treats "" as
-          # unset, so the effect is the same fallback to DATABASE_URL_MAIN.
-          render_api PUT "/services/$RENDER_SERVICE_ID/env-vars/DATABASE_URL_PR" \
-            '{"value": ""}' > /dev/null
-          echo "DATABASE_URL_PR cleared — runtime.exs falls back to DATABASE_URL_MAIN"
-
           render_api PATCH "/services/$RENDER_SERVICE_ID" \
             "$(jq -n --arg b "$RENDER_MAIN_BRANCH" '{branch: $b}')" > /dev/null
           echo "Service now builds $RENDER_MAIN_BRANCH"
 
-          deploy_id="$(render_api POST "/services/$RENDER_SERVICE_ID/deploys" \
-            '{"clearCache": "do_not_clear"}' | jq -r '.id')"
-          echo "Triggered deploy $deploy_id"
-
-          # Waiting matters: the Neon branch is only safe to delete once the
-          # service is provably off it. Render keeps the previous instance
-          # serving until the new one is live, and that instance is still
-          # pointed at the PR branch.
-          deadline=$(( SECONDS + 1200 ))
-          while [ "$SECONDS" -lt "$deadline" ]; do
-            status="$(render_api GET "/services/$RENDER_SERVICE_ID/deploys/$deploy_id" '' | jq -r '.status')"
-            case "$status" in
-              live)
-                echo "Deploy $deploy_id is live on $RENDER_MAIN_BRANCH."
-                exit 0
-                ;;
-              build_failed|update_failed|canceled|pre_deploy_failed)
-                echo "::error::Deploy $deploy_id ended as $status."
-                exit 1
-                ;;
-              *)
-                echo "Deploy $deploy_id is $status — waiting."
-                sleep 20
-                ;;
-            esac
-          done
-
-          echo "::error::Deploy $deploy_id did not go live within 20 minutes."
-          exit 1
-
-      - name: Delete the Neon branch
-        # Delete only when the branch is provably unused: either a newer PR owns
-        # the service (so this PR's branch is detached already), or main is live
-        # again. If the restore failed or timed out, the service may still be
-        # pointed here — keep the branch rather than crash-loop the service,
-        # which runs Livedata.Release.migrate/0 at boot.
-        if: >-
-          always() &&
-          steps.owner.outcome == 'success' &&
-          (steps.owner.outputs.restore == 'false' || steps.restore.outcome == 'success')
-        run: |
-          set -euo pipefail
-
-          if neonctl branches get "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY" >/dev/null 2>&1; then
-            neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" --api-key "$NEON_API_KEY"
-            echo "Deleted Neon branch $BRANCH_NAME"
-          else
-            echo "No Neon branch $BRANCH_NAME to delete."
-          fi
-
-      - name: Warn that the Neon branch was left behind
-        if: >-
-          always() && steps.owner.outputs.restore == 'true' &&
-          steps.restore.outcome != 'success'
-        run: |
-          echo "::warning::Main was not restored, so Neon branch $BRANCH_NAME was kept."
-          echo "The service may still be pointed at it. Fix the deploy, then delete with:"
-          echo "  neonctl branches delete $BRANCH_NAME --project-id <id>"
+          render_api POST "/services/$RENDER_SERVICE_ID/deploys" \
+            '{"clearCache": "do_not_clear"}' | jq -r '"Triggered deploy \(.id)"'

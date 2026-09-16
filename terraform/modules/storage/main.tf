@@ -68,7 +68,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "main" {
 }
 
 resource "aws_s3_bucket_policy" "main" {
-  count = var.ec2_instance_role_arn != "" ? 1 : 0
+  count = var.create_bucket_policy ? 1 : 0
 
   bucket     = aws_s3_bucket.main.id
   depends_on = [aws_s3_bucket_public_access_block.main]

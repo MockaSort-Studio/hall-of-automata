@@ -21,12 +21,6 @@ variable "ssh_cidr_blocks" {
   default     = ["0.0.0.0/0"]
 }
 
-variable "data_volume_size_gb" {
-  description = "Size in GiB of the gp3 EBS volume for the Postgres data directory."
-  type        = number
-  default     = 20
-}
-
 variable "tags" {
   description = "Tags applied to every resource."
   type        = map(string)
@@ -54,6 +48,12 @@ variable "backup_retention_days" {
   default     = 7
 }
 
+variable "phx_host" {
+  description = "Public hostname for the Phoenix app (bare domain, no scheme). Used by Caddy for TLS and by the app for URL generation."
+  type        = string
+  default     = "dev.mrv.airtotree.com"
+}
+
 variable "cognito_app_name" {
   description = "Application name prefix for Cognito resource names."
   type        = string
@@ -66,27 +66,10 @@ variable "cognito_domain_prefix" {
   default     = "a2t-mrv"
 }
 
-variable "cognito_callback_urls" {
-  description = "OAuth2 redirect URIs for the authorization_code flow."
-  type        = list(string)
-  default     = ["https://a2t-mrv.onrender.com/auth/cognito/callback"]
-}
-
-variable "cognito_logout_urls" {
-  description = "Sign-out redirect URIs."
-  type        = list(string)
-  default     = ["https://a2t-mrv.onrender.com/"]
-}
-
-variable "storage_bucket_name" {
-  description = "Globally unique S3 bucket name for CRCF retention tiering. Example: a2t-mrv-crcf-<account-id>."
+variable "codedeploy_revisions_bucket_name" {
+  description = "Globally unique S3 bucket name for CodeDeploy revision zips."
   type        = string
-}
-
-variable "ec2_instance_role_arn" {
-  description = "ARN of the EC2 instance IAM role granted S3 access. Set after issue-153 provisions the instance profile. Empty string skips bucket policy creation."
-  type        = string
-  default     = ""
+  default     = "a2t-mrv-codedeploy-revisions-559744161469"
 }
 
 variable "storage_days_to_warm" {
@@ -99,4 +82,10 @@ variable "storage_days_to_cold" {
   description = "Days before objects transition from Standard-IA to Glacier (cold tier)."
   type        = number
   default     = 90
+}
+
+variable "admin_test_email" {
+  description = "Email address for the admin test user in the Cognito user pool."
+  type        = string
+  default     = "admin@mock.local"
 }

@@ -28,7 +28,7 @@ defmodule LivedataWeb.ProjectShowLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} max_width="max-w-6xl">
+    <Layouts.app flash={@flash} current_user={@current_user} max_width="max-w-6xl">
       <:breadcrumbs>
         <Layouts.crumb navigate={~p"/"}>Dashboard</Layouts.crumb>
         <Layouts.crumb>{@project.name}</Layouts.crumb>

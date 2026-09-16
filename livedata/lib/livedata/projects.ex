@@ -1,5 +1,24 @@
 defmodule Livedata.Projects do
-  @moduledoc "Context for project queries."
+  @moduledoc """
+  Context for project queries.
+
+  ## PubSub topic convention
+
+  Activity creation broadcasts on `"activities:new"`:
+
+      message: {:activity_created, %Activity{}}
+
+  OKR 3 consumers subscribe once to receive live activity additions:
+
+      def mount(_params, _session, socket) do
+        if connected?(socket), do: Projects.subscribe_activities()
+        {:ok, stream(socket, :activities, Projects.list_activities_with_stats())}
+      end
+
+      def handle_info({:activity_created, activity}, socket) do
+        {:noreply, stream_insert(socket, :activities, activity, at: 0)}
+      end
+  """
   import Ecto.Query
 
   alias Ecto.Multi
@@ -8,6 +27,12 @@ defmodule Livedata.Projects do
   alias Livedata.Repo
   alias Livedata.Projects.Methodology
   alias Livedata.Projects.{Activity, ActivityForm, ActivityMethodology, Project}
+
+  @activities_topic "activities:new"
+
+  @doc "Subscribes the calling process to new-activity broadcasts."
+  @spec subscribe_activities() :: :ok | {:error, term()}
+  def subscribe_activities, do: Phoenix.PubSub.subscribe(Livedata.PubSub, @activities_topic)
 
   @doc """
   Lists projects, newest first. Auth is out of scope, so this returns all
@@ -196,6 +221,13 @@ defmodule Livedata.Projects do
       |> Repo.transaction()
       |> case do
         {:ok, %{activity: activity, methodologies: methodologies}} ->
+          # @req: CRCF-21 — broadcast on success only; never on a rolled-back transaction.
+          Phoenix.PubSub.broadcast(
+            Livedata.PubSub,
+            @activities_topic,
+            {:activity_created, activity}
+          )
+
           {:ok, %{activity: activity, methodologies: methodologies}}
 
         {:error, _step, _db_changeset, _changes} ->

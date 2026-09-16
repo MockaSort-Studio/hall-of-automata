@@ -8,19 +8,14 @@ output "instance_id" {
   value       = module.infra.instance_id
 }
 
-output "data_volume_id" {
-  description = "EBS volume ID mounted for the Postgres data directory."
-  value       = module.infra.data_volume_id
-}
-
 output "rds_endpoint" {
   description = "RDS instance endpoint (host:port)."
   value       = module.rds.db_endpoint
 }
 
-output "db_secret_arn" {
-  description = "Secrets Manager ARN of the RDS master user credentials."
-  value       = module.rds.db_secret_arn
+output "db_credentials_secret_arn" {
+  description = "Secrets Manager ARN of the DB credentials secret (username, password, host, port, dbname)."
+  value       = module.rds.db_credentials_secret_arn
 }
 
 output "secret_key_base_secret_arn" {
@@ -54,6 +49,26 @@ output "storage_bucket_id" {
 }
 
 output "storage_bucket_arn" {
-  description = "ARN of the CRCF retention S3 bucket. Referenced by the EC2 instance profile in issue-153."
+  description = "ARN of the CRCF retention S3 bucket."
   value       = module.storage.bucket_arn
+}
+
+output "instance_role_arn" {
+  description = "ARN of the EC2 IAM role. Used by the S3 bucket policy and CodeDeploy deployment group (#148)."
+  value       = module.infra.instance_role_arn
+}
+
+output "codedeploy_revisions_bucket_name" {
+  description = "S3 bucket name for CodeDeploy revision zips."
+  value       = aws_s3_bucket.codedeploy_revisions.bucket
+}
+
+output "codedeploy_app_name" {
+  description = "CodeDeploy application name."
+  value       = aws_codedeploy_app.livedata.name
+}
+
+output "codedeploy_deployment_group_name" {
+  description = "CodeDeploy deployment group name."
+  value       = aws_codedeploy_deployment_group.livedata.deployment_group_name
 }

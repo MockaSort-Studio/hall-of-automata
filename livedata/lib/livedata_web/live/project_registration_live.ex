@@ -43,7 +43,7 @@ defmodule LivedataWeb.ProjectRegistrationLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash}>
+    <Layouts.app flash={@flash} current_user={@current_user}>
       <h1 id="registration-title" class="text-2xl font-semibold mb-6">Register a project</h1>
 
       <.form

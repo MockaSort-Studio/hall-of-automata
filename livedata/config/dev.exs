@@ -93,21 +93,18 @@ config :phoenix_live_view,
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
-# Cognito OIDC — dev values. Set env vars or override here for a real dev pool.
-# COGNITO_CLIENT_ID / COGNITO_CLIENT_SECRET can be set if you have a dev user pool.
+# Auth — dev uses CognitoMock with a fixed bypass password. No Cognito pool needed.
+# Set COGNITO_* env vars and remove cognito_module to test against a real dev pool.
 config :livedata,
+  auth_provider: Livedata.Auth.CognitoMock,
+  auth_bypass_password: System.get_env("AUTH_BYPASS_PASSWORD", "devpassword"),
   cognito_issuer_url:
     System.get_env("COGNITO_ISSUER_URL", "https://cognito-idp.eu-west-1.amazonaws.com/dev-pool"),
-  cognito_redirect_uri: "http://localhost:4000/auth/cognito/callback",
-  cognito_secret_name: "a2t-mrv/cognito/client-secret",
-  cognito_hosted_ui_base:
-    System.get_env(
-      "COGNITO_HOSTED_UI_BASE",
-      "https://a2t-mrv.auth.eu-west-1.amazoncognito.com"
-    )
+  cognito_secret_name: "a2t-mrv/cognito/client-secret"
 
 if client_id = System.get_env("COGNITO_CLIENT_ID") do
   config :livedata,
+    auth_provider: Livedata.Auth.Cognito,
     cognito_credentials: %{
       client_id: client_id,
       client_secret: System.get_env("COGNITO_CLIENT_SECRET", "")

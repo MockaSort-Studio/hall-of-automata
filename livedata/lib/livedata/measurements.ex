@@ -3,6 +3,11 @@ defmodule Livedata.Measurements do
   Ingestion + querying of raw measurements. `create_raw_measurement/1` validates
   the manual-entry form, computes the dedup content hash, and inserts one
   append-only raw measurement. (@req: KR 2.2)
+
+  ## PubSub — `"measurements:new"`
+  Both write paths broadcast `{:measurement_created, %RawMeasurement{}}` on
+  success. OKR 3 consumers call `subscribe/0` when connected, then
+  `stream_insert` in the matching `handle_info` clause.
   """
   import Ecto.Query
 
@@ -11,6 +16,7 @@ defmodule Livedata.Measurements do
   alias Livedata.Measurements.{Entry, RawMeasurement}
 
   @manual_source "MANUAL_ENTRY"
+  @pubsub_topic "measurements:new"
 
   @doc """
   The most recently measured raw measurements across the whole portfolio, newest
@@ -44,6 +50,14 @@ defmodule Livedata.Measurements do
     |> Repo.all()
   end
 
+  @doc "Subscribes the calling process to `\"measurements:new\"` broadcasts."
+  def subscribe, do: Phoenix.PubSub.subscribe(Livedata.PubSub, @pubsub_topic)
+
+  @doc "Broadcasts `{:measurement_created, rm}` on `\"measurements:new\"`. Single write path for all producers."
+  def broadcast_measurement(%RawMeasurement{} = rm) do
+    Phoenix.PubSub.broadcast(Livedata.PubSub, @pubsub_topic, {:measurement_created, rm})
+  end
+
   @spec create_raw_measurement(map()) ::
           {:ok, %RawMeasurement{}} | {:error, Ecto.Changeset.t()} | {:error, :duplicate}
   def create_raw_measurement(attrs) do
@@ -75,6 +89,8 @@ defmodule Livedata.Measurements do
   defp insert_dedup(changeset) do
     case Repo.insert(changeset) do
       {:ok, rm} ->
+        # @req: CRCF-21 — broadcast on success only; never on validation failure or duplicate.
+        broadcast_measurement(rm)
         {:ok, rm}
 
       {:error, cs} ->

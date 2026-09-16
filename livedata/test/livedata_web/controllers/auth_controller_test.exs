@@ -1,12 +1,8 @@
 defmodule LivedataWeb.AuthControllerTest do
   use LivedataWeb.ConnCase, async: true
 
-  import Mox
-
   alias Livedata.Auth
-  alias Livedata.Auth.CognitoMock
-
-  setup :verify_on_exit!
+  alias Livedata.Auth.SessionBridge
 
   setup %{conn: conn} do
     {:ok, conn: Phoenix.ConnTest.init_test_session(conn, %{})}
@@ -16,101 +12,63 @@ defmodule LivedataWeb.AuthControllerTest do
     "sub" => "user-123",
     "email" => "user@example.com",
     "name" => "Test User",
-    "exp" => DateTime.utc_now() |> DateTime.add(3600) |> DateTime.to_unix()
+    "exp" => DateTime.utc_now() |> DateTime.add(3600) |> DateTime.to_unix(),
+    "refresh_token" => "rt_abc"
   }
 
-  describe "GET /auth/cognito (new/2)" do
-    test "redirects to Cognito authorization URL on success", %{conn: conn} do
-      expect(CognitoMock, :authorize_url, fn ->
-        {:ok, "https://cognito.example.com/oauth2/authorize?client_id=x", %{state: "s"}}
-      end)
+  describe "GET /auth/session/:token" do
+    test "reads bridge token, writes session, and redirects to /", %{conn: conn} do
+      token = SessionBridge.store(@user)
+      conn = get(conn, ~p"/auth/session/#{token}")
 
-      conn = get(conn, ~p"/auth/cognito")
-
-      assert redirected_to(conn) =~ "https://cognito.example.com"
-      assert get_session(conn, "cognito_session_params") == %{state: "s"}
-    end
-
-    test "redirects home with flash error when Cognito unavailable", %{conn: conn} do
-      expect(CognitoMock, :authorize_url, fn ->
-        {:error, :service_unavailable}
-      end)
-
-      conn = get(conn, ~p"/auth/cognito")
-
-      assert redirected_to(conn) == ~p"/"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Authentication service"
-    end
-  end
-
-  describe "GET /auth/cognito/callback (callback/2)" do
-    test "stores user in session and redirects on success", %{conn: conn} do
-      session_params = %{state: "abc", nonce: "xyz"}
-
-      expect(CognitoMock, :exchange_code, fn params, ^session_params ->
-        assert params["code"] == "auth_code_123"
-        {:ok, @user, %{"access_token" => "tok"}}
-      end)
-
-      conn =
-        conn
-        |> put_session("cognito_session_params", session_params)
-        |> get(~p"/auth/cognito/callback", %{code: "auth_code_123", state: "abc"})
-
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == "/"
       assert Auth.get_session_user(conn)["sub"] == "user-123"
+      assert Auth.get_session_user(conn)["email"] == "user@example.com"
     end
 
-    test "honours stored redirect path after login", %{conn: conn} do
-      session_params = %{state: "s"}
-
-      expect(CognitoMock, :exchange_code, fn _params, _session ->
-        {:ok, @user, %{}}
-      end)
-
-      conn =
-        conn
-        |> put_session("cognito_session_params", session_params)
-        |> put_session("auth_return_to", "/projects/new")
-        |> get(~p"/auth/cognito/callback", %{code: "code", state: "s"})
+    test "honours return_to query param", %{conn: conn} do
+      token = SessionBridge.store(@user)
+      conn = get(conn, ~p"/auth/session/#{token}", return_to: "/projects/new")
 
       assert redirected_to(conn) == "/projects/new"
     end
 
-    test "redirects to login with flash on exchange failure", %{conn: conn} do
-      expect(CognitoMock, :exchange_code, fn _params, _session ->
-        {:error, :invalid_grant}
-      end)
+    test "token is single-use — second request redirects to /login", %{conn: conn} do
+      token = SessionBridge.store(@user)
+      _conn1 = get(Phoenix.ConnTest.build_conn(), ~p"/auth/session/#{token}")
+
+      conn2 = get(conn, ~p"/auth/session/#{token}")
+      assert redirected_to(conn2) == "/login"
+    end
+
+    test "unknown token redirects to /login with flash", %{conn: conn} do
+      conn = get(conn, ~p"/auth/session/invalid_token_xyz")
+
+      assert redirected_to(conn) == "/login"
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "expired or invalid"
+    end
+
+    test "clears auth_return_to from session on success", %{conn: conn} do
+      token = SessionBridge.store(@user)
 
       conn =
         conn
-        |> put_session("cognito_session_params", %{state: "s"})
-        |> get(~p"/auth/cognito/callback", %{code: "bad", state: "s"})
+        |> put_session("auth_return_to", "/measurements/new")
+        |> get(~p"/auth/session/#{token}")
 
-      assert redirected_to(conn) == ~p"/auth/cognito"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Authentication failed"
-    end
-
-    test "redirects to login with flash when session_params are missing", %{conn: conn} do
-      conn = get(conn, ~p"/auth/cognito/callback", %{code: "code", state: "s"})
-
-      assert redirected_to(conn) == ~p"/auth/cognito"
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "session expired"
+      assert get_session(conn, "auth_return_to") == nil
     end
   end
 
-  describe "DELETE /auth/cognito (delete/2)" do
-    test "clears session and redirects to Cognito logout URL", %{conn: conn} do
+  describe "DELETE /auth" do
+    test "clears session and redirects to /login", %{conn: conn} do
       conn =
         conn
         |> Auth.put_session_user(@user)
-        |> delete(~p"/auth/cognito")
+        |> delete(~p"/auth")
 
       assert Auth.get_session_user(conn) == nil
-
-      redirect_url = redirected_to(conn)
-      assert redirect_url =~ "amazoncognito.com/logout"
-      assert redirect_url =~ "client_id=test_client_id"
+      assert redirected_to(conn) == "/login"
     end
   end
 end

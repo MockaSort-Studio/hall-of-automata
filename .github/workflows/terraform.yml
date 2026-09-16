@@ -4,23 +4,70 @@ on:
   push:
     branches: [main]
     paths:
+      # Terraform source — apply may change infra that deploy depends on.
       - terraform/**
       - .github/workflows/terraform.yml
+      # Deploy-relevant files — terraform apply runs first as the sequencer,
+      # then workflow_run fires deploy-livedata. This guarantees deploy always
+      # happens after infra is settled, regardless of what changed.
+      - livedata/**
+      - appspec.yml
+      - scripts/deploy/**
+      - .github/workflows/deploy-livedata.yml
   pull_request:
     paths:
       - terraform/**
       - .github/workflows/terraform.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: write
+  id-token: write
 
 env:
   TF_DIR: terraform
 
 jobs:
+  changed:
+    name: Detect changed files
+    runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.check.outputs.terraform }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger: always validate and apply.
+            echo "terraform=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+            COUNT=$(gh api "repos/${{ github.repository }}/compare/$BASE...$HEAD" \
+              --jq '[.files[].filename] | map(select(
+                startswith("terraform/") or
+                . == ".github/workflows/terraform.yml"
+              )) | length')
+          else
+            COUNT=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}" \
+              --jq '[.files[].filename] | map(select(
+                startswith("terraform/") or
+                . == ".github/workflows/terraform.yml"
+              )) | length')
+          fi
+          [ "${COUNT:-0}" -gt 0 ] \
+            && echo "terraform=true" >> "$GITHUB_OUTPUT" \
+            || echo "terraform=false" >> "$GITHUB_OUTPUT"
+
   validate:
     name: fmt + validate
+    needs: changed
+    if: needs.changed.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +104,8 @@ jobs:
         uses: terraform-linters/setup-tflint@v4
 
       - name: tflint init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: tflint --chdir=$TF_DIR --init
 
       - name: tflint
@@ -74,44 +123,65 @@ jobs:
       - name: terraform test storage (mock)
         run: terraform -chdir=$TF_DIR/modules/storage test
 
+      - name: terraform init (cognito module, no backend)
+        run: terraform -chdir=$TF_DIR/modules/cognito init -backend=false
+
+      - name: terraform test cognito (mock)
+        run: terraform -chdir=$TF_DIR/modules/cognito test
+
   plan:
     name: plan
-    needs: validate
+    needs: [changed, validate]
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    if: github.event_name == 'pull_request' && needs.changed.outputs.terraform == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
     steps:
-      - name: Check AWS credentials configured
-        id: creds-check
-        run: |
-          if [ -z "${AWS_ACCESS_KEY_ID:-}" ]; then
-            echo "::notice::AWS credentials not configured yet — skipping. Add AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY repo secrets to enable this job."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.creds-check.outputs.skip == 'false'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::559744161469:role/a2t-mrv-github-terraform
+          aws-region: ${{ vars.TF_AWS_REGION || 'eu-north-1' }}
 
       - uses: hashicorp/setup-terraform@v3
-        if: steps.creds-check.outputs.skip == 'false'
         with:
           terraform_version: "1.15.9"
 
+      - name: bootstrap state bucket
+        env:
+          AWS_DEFAULT_REGION: ${{ vars.TF_AWS_REGION || 'eu-north-1' }}
+        run: |
+          BUCKET="a2t-mrv-tfstate-559744161469"
+          REGION="${AWS_DEFAULT_REGION}"
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "State bucket exists."
+          else
+            aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
+            aws s3api put-bucket-versioning --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption --bucket "$BUCKET" \
+              --server-side-encryption-configuration \
+              '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+            aws s3api put-public-access-block --bucket "$BUCKET" \
+              --public-access-block-configuration \
+              'BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true'
+            echo "State bucket created."
+          fi
+
       - name: terraform init
-        if: steps.creds-check.outputs.skip == 'false'
         run: terraform -chdir=$TF_DIR init
 
       - name: terraform plan
         id: plan
-        if: steps.creds-check.outputs.skip == 'false'
         run: |
           terraform -chdir=$TF_DIR plan \
             -var="key_name=${{ vars.TF_KEY_NAME || 'placeholder' }}" \
             -var="aws_region=${{ vars.TF_AWS_REGION || 'eu-west-1' }}" \
+            -var="phx_host=${{ vars.TF_PHX_HOST || 'dev.mrv.airtotree.com' }}" \
             -no-color \
             -out=tfplan 2>&1 | tee plan.txt
           tf_exit="${PIPESTATUS[0]}"
@@ -120,7 +190,7 @@ jobs:
 
       - name: Post plan to PR
         uses: actions/github-script@v7
-        if: always() && steps.creds-check.outputs.skip == 'false'
+        if: always()
         with:
           script: |
             const fs = require('fs');
@@ -143,3 +213,62 @@ jobs:
               repo: context.repo.repo,
               body
             });
+
+  apply:
+    name: apply
+    needs: [changed, validate]
+    runs-on: ubuntu-latest
+    # always() lets apply run even when validate was skipped (livedata-only push).
+    # Guard: validate must have succeeded or been skipped — not failed.
+    if: |
+      always() &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.changed.result == 'success' &&
+      (needs.validate.result == 'success' || needs.validate.result == 'skipped')
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::559744161469:role/a2t-mrv-github-terraform
+          aws-region: ${{ vars.TF_AWS_REGION || 'eu-north-1' }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.9"
+
+      - name: bootstrap state bucket
+        env:
+          AWS_DEFAULT_REGION: ${{ vars.TF_AWS_REGION || 'eu-north-1' }}
+        run: |
+          BUCKET="a2t-mrv-tfstate-559744161469"
+          REGION="${AWS_DEFAULT_REGION}"
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "State bucket exists."
+          else
+            aws s3api create-bucket --bucket "$BUCKET" --region "$REGION" \
+              --create-bucket-configuration LocationConstraint="$REGION"
+            aws s3api put-bucket-versioning --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption --bucket "$BUCKET" \
+              --server-side-encryption-configuration \
+              '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+            aws s3api put-public-access-block --bucket "$BUCKET" \
+              --public-access-block-configuration \
+              'BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true'
+            echo "State bucket created."
+          fi
+
+      - name: terraform init
+        run: terraform -chdir=$TF_DIR init
+
+      - name: terraform apply
+        run: |
+          terraform -chdir=$TF_DIR apply \
+            -var="key_name=${{ vars.TF_KEY_NAME || 'placeholder' }}" \
+            -var="aws_region=${{ vars.TF_AWS_REGION || 'eu-north-1' }}" \
+            -var="phx_host=${{ vars.TF_PHX_HOST || 'dev.mrv.airtotree.com' }}" \
+            -auto-approve

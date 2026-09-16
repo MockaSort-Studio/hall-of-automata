@@ -12,8 +12,7 @@ defmodule Livedata.Application do
       Livedata.Repo,
       {DNSCluster, query: Application.get_env(:livedata, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Livedata.PubSub},
-      # Start a worker by calling: Livedata.Worker.start_link(arg)
-      # {Livedata.Worker, arg},
+      Livedata.Auth.SessionBridge,
       # Start to serve requests, typically the last entry
       LivedataWeb.Endpoint
     ]

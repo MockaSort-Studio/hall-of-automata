@@ -8,11 +8,6 @@ output "instance_id" {
   value       = aws_instance.main.id
 }
 
-output "data_volume_id" {
-  description = "EBS data volume ID."
-  value       = aws_ebs_volume.data.id
-}
-
 output "vpc_id" {
   description = "VPC ID shared by all a2t-mrv resources."
   value       = aws_vpc.main.id
@@ -26,4 +21,9 @@ output "db_subnet_ids" {
 output "app_security_group_id" {
   description = "Security group ID of the EC2 app instance (used for RDS ingress rule)."
   value       = aws_security_group.main.id
+}
+
+output "instance_role_arn" {
+  description = "ARN of the EC2 IAM role. Pass to the storage module for the S3 bucket policy principal."
+  value       = aws_iam_role.ec2.arn
 }

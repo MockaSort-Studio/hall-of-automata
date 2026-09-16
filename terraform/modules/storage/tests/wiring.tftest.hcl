@@ -93,12 +93,13 @@ run "bucket_policy_created_with_role_arn" {
   command = plan
 
   variables {
+    create_bucket_policy  = true
     ec2_instance_role_arn = "arn:aws:iam::123456789012:role/a2t-mrv-ec2-role"
   }
 
   assert {
     condition     = length(aws_s3_bucket_policy.main) == 1
-    error_message = "Bucket policy must be created when ec2_instance_role_arn is provided"
+    error_message = "Bucket policy must be created when create_bucket_policy is true"
   }
 }
 

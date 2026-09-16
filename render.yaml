@@ -35,25 +35,26 @@ services:
       # `openssl rand -base64 48`. Rotating it logs every session out.
       - key: SECRET_KEY_BASE
         sync: false
-      # Production Neon connection string, entered in the dashboard. Use the
-      # *direct* endpoint (no -pooler) and strip the query string — see
-      # deployment.md. Never written by CI.
+      # Database connection string, entered in the dashboard. Use the direct
+      # endpoint (no -pooler) and strip the query string — see deployment.md.
+      # Previews share this database; DATABASE_URL_PR is no longer used.
       - key: DATABASE_URL_MAIN
-        sync: false
-      # A Neon branch, written by .github/workflows/preview.yml while a pull
-      # request preview owns this service, and blanked again on close.
-      # config/runtime.exs prefers it over DATABASE_URL_MAIN when non-empty.
-      #
-      # Declared here even though CI owns the value: a blueprint sync deletes
-      # env vars that the blueprint does not mention, which mid-preview would
-      # drop the service back onto the production database without saying so.
-      # Set it to an empty value in the dashboard once and leave it alone.
-      - key: DATABASE_URL_PR
         sync: false
       # The <service>.onrender.com hostname Render assigns. Must be set:
       # config/runtime.exs otherwise falls back to "example.com" and generates
       # wrong absolute URLs.
       - key: PHX_HOST
+        sync: false
+      # AWS region for ExAws bootstrap — needed for SSM and Secrets Manager calls
+      # before any per-service region is resolved. Must match the region where the
+      # Cognito pool, SSM parameters, and secrets are provisioned.
+      - key: AWS_DEFAULT_REGION
+        value: eu-north-1
+      # Enables CognitoMock on Render — no Cognito pool needed for the example
+      # instance. Set to any string; users log in with this password.
+      # When unset, real Cognito is used; region and user pool ID are fetched
+      # from SSM (/a2t-mrv/cognito/region, /a2t-mrv/cognito/user-pool-id).
+      - key: AUTH_BYPASS_PASSWORD
         sync: false
       # Below runtime.exs's default of 10 — Neon's free tier caps connections,
       # and one instance does not need more.

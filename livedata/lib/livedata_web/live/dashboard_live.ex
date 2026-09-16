@@ -62,7 +62,7 @@ defmodule LivedataWeb.DashboardLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} max_width="max-w-6xl">
+    <Layouts.app flash={@flash} current_user={@current_user} max_width="max-w-6xl">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-2xl font-semibold">Your portfolio</h1>
         <div class="flex gap-2">
